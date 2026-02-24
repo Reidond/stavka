@@ -17,26 +17,15 @@ class StavkaRestCallback : RestCallback {
   }
 }
 
-modded class SCR_BaseGameMode {
-  protected float m_fRestTimer = 5.0;
-  protected bool m_bRestTestRan = false;
+class StavkaTest_Rest : StavkaTestBase {
   protected ref StavkaRestCallback m_GetCallback;
   protected ref StavkaRestCallback m_PostCallback;
 
-  override void EOnFrame(IEntity owner, float timeSlice) {
-    super.EOnFrame(owner, timeSlice);
-
-    if (m_bRestTestRan)
-      return;
-
-    m_fRestTimer -= timeSlice;
-    if (m_fRestTimer <= 0) {
-      m_bRestTestRan = true;
-      RunRestTest();
-    }
+  override string GetName() {
+    return "rest";
   }
 
-  protected void RunRestTest() {
+  override void Run() {
     Print("========================================", LogLevel.NORMAL);
     Print("  ASYNC CALLBACK TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);

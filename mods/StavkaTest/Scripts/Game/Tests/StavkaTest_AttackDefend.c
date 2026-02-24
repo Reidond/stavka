@@ -1,39 +1,70 @@
-modded class SCR_BaseGameMode {
-  protected float m_fSpawnTimer = 5.0;
-  protected bool m_bTestRan = false;
+class StavkaTest_AttackDefend : StavkaTestBase {
+  protected SCR_AIGroup m_GroupA;
+  protected SCR_AIGroup m_GroupD;
+  protected SCR_AIGroup m_GroupS;
+  protected SCR_AIGroup m_GroupP;
   protected int m_iTrackFrames = 0;
   protected bool m_bTracking = false;
+  protected bool m_bDone = false;
 
-  protected SCR_AIGroup m_GroupA; // Attack test
-  protected SCR_AIGroup m_GroupD; // Defend test
-  protected SCR_AIGroup m_GroupS; // SearchAndDestroy test
-  protected SCR_AIGroup m_GroupP; // Patrol test
+  override string GetName() {
+    return "attack";
+  }
 
-  override void EOnFrame(IEntity owner, float timeSlice) {
-    super.EOnFrame(owner, timeSlice);
+  override bool NeedsUpdate() {
+    return !m_bDone;
+  }
 
-    if (m_bTracking) {
-      m_iTrackFrames++;
-      if (m_iTrackFrames % 180 == 0) {
-        PrintGroupPos("Attack", m_GroupA);
-        PrintGroupPos("Defend", m_GroupD);
-        PrintGroupPos("S&D", m_GroupS);
-        PrintGroupPos("Patrol", m_GroupP);
-        Print("----------------------------------------", LogLevel.NORMAL);
+  override void Run() {
+    m_bDone = false;
+    m_bTracking = false;
+    m_iTrackFrames = 0;
 
-        if (m_iTrackFrames > 1200)
-          m_bTracking = false;
+    Print("========================================", LogLevel.NORMAL);
+    Print("  WAYPOINT TYPE TEST", LogLevel.NORMAL);
+    Print("========================================", LogLevel.NORMAL);
+
+    vector basePos = Vector(2059, 0, 2047);
+    basePos[1] = GetGame().GetWorld().GetSurfaceY(basePos[0], basePos[2]) + 1;
+
+    vector posA = basePos;
+    vector posD = basePos;
+    posD[2] = posD[2] + 100;
+    vector posS = basePos;
+    posS[2] = posS[2] + 200;
+    vector posP = basePos;
+    posP[2] = posP[2] + 300;
+
+    posA[1] = GetGame().GetWorld().GetSurfaceY(posA[0], posA[2]) + 1;
+    posD[1] = GetGame().GetWorld().GetSurfaceY(posD[0], posD[2]) + 1;
+    posS[1] = GetGame().GetWorld().GetSurfaceY(posS[0], posS[2]) + 1;
+    posP[1] = GetGame().GetWorld().GetSurfaceY(posP[0], posP[2]) + 1;
+
+    m_GroupA = SpawnGroup(posA, "Attack");
+    m_GroupD = SpawnGroup(posD, "Defend");
+    m_GroupS = SpawnGroup(posS, "S&D");
+    m_GroupP = SpawnGroup(posP, "Patrol");
+
+    GetGame().GetCallqueue().CallLater(AssignAllWaypoints, 2000, false);
+  }
+
+  override void Update(float timeSlice) {
+    if (!m_bTracking)
+      return;
+
+    m_iTrackFrames++;
+    if (m_iTrackFrames % 180 == 0) {
+      PrintGroupPos("Attack", m_GroupA);
+      PrintGroupPos("Defend", m_GroupD);
+      PrintGroupPos("S&D", m_GroupS);
+      PrintGroupPos("Patrol", m_GroupP);
+      Print("----------------------------------------", LogLevel.NORMAL);
+
+      if (m_iTrackFrames > 1200) {
+        m_bTracking = false;
+        m_bDone = true;
+        Print("[Attack] Test complete.", LogLevel.NORMAL);
       }
-      return;
-    }
-
-    if (m_bTestRan)
-      return;
-
-    m_fSpawnTimer -= timeSlice;
-    if (m_fSpawnTimer <= 0) {
-      m_bTestRan = true;
-      RunTest();
     }
   }
 
@@ -55,37 +86,6 @@ modded class SCR_BaseGameMode {
           LogLevel.NORMAL);
   }
 
-  protected void RunTest() {
-    Print("========================================", LogLevel.NORMAL);
-    Print("  WAYPOINT TYPE TEST", LogLevel.NORMAL);
-    Print("========================================", LogLevel.NORMAL);
-
-    vector basePos = Vector(2059, 0, 2047);
-    basePos[1] = GetGame().GetWorld().GetSurfaceY(basePos[0], basePos[2]) + 1;
-
-    // Spawn 4 groups in a line, 100m apart
-    vector posA = basePos;
-    vector posD = basePos;
-    posD[2] = posD[2] + 100;
-    vector posS = basePos;
-    posS[2] = posS[2] + 200;
-    vector posP = basePos;
-    posP[2] = posP[2] + 300;
-
-    posA[1] = GetGame().GetWorld().GetSurfaceY(posA[0], posA[2]) + 1;
-    posD[1] = GetGame().GetWorld().GetSurfaceY(posD[0], posD[2]) + 1;
-    posS[1] = GetGame().GetWorld().GetSurfaceY(posS[0], posS[2]) + 1;
-    posP[1] = GetGame().GetWorld().GetSurfaceY(posP[0], posP[2]) + 1;
-
-    m_GroupA = SpawnGroup(posA, "Attack");
-    m_GroupD = SpawnGroup(posD, "Defend");
-    m_GroupS = SpawnGroup(posS, "S&D");
-    m_GroupP = SpawnGroup(posP, "Patrol");
-
-    // Wait 2 seconds for all groups to initialize
-    GetGame().GetCallqueue().CallLater(AssignAllWaypoints, 2000, false);
-  }
-
   protected SCR_AIGroup SpawnGroup(vector pos, string label) {
     EntitySpawnParams params = new EntitySpawnParams();
     params.TransformMode = ETransformMode.WORLD;
@@ -105,7 +105,6 @@ modded class SCR_BaseGameMode {
     Print("  ASSIGNING WAYPOINTS", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    // All waypoints 300m east of their group
     if (m_GroupA) {
       vector posA = m_GroupA.GetOrigin();
       AssignWaypoint(
@@ -115,7 +114,6 @@ modded class SCR_BaseGameMode {
     }
 
     if (m_GroupD) {
-      // Defend stays in place — waypoint at own position
       vector posD = m_GroupD.GetOrigin();
       AssignWaypoint(
           m_GroupD, "Defend",
@@ -125,8 +123,7 @@ modded class SCR_BaseGameMode {
     if (m_GroupS) {
       vector posS = m_GroupS.GetOrigin();
       AssignWaypoint(m_GroupS, "S&D",
-                     "{B3E7B8DC2BAB8ACC}Prefabs/AI/Waypoints/"
-                     "AIWaypoint_SearchAndDestroy.et",
+                     "{B3E7B8DC2BAB8ACC}Prefabs/AI/Waypoints/AIWaypoint_SearchAndDestroy.et",
                      Vector(posS[0] + 300, 0, posS[2]));
     }
 

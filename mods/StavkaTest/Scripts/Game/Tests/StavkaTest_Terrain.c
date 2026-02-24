@@ -1,22 +1,9 @@
-modded class SCR_BaseGameMode {
-  protected float m_fTimer = 5.0;
-  protected bool m_bBenchRan = false;
-
-  override void EOnFrame(IEntity owner, float timeSlice) {
-    super.EOnFrame(owner, timeSlice);
-
-    if (m_bBenchRan)
-      return;
-
-    m_fTimer -= timeSlice;
-    if (m_fTimer <= 0) {
-      m_bBenchRan = true;
-      Print("BENCHMARK TRIGGERED BY TIMER", LogLevel.NORMAL);
-      RunTerrainBenchmark();
-    }
+class StavkaTest_Terrain : StavkaTestBase {
+  override string GetName() {
+    return "terrain";
   }
 
-  protected void RunTerrainBenchmark() {
+  override void Run() {
     Print("", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
     Print("  TERRAIN BENCHMARK STARTING", LogLevel.NORMAL);
@@ -43,8 +30,7 @@ modded class SCR_BaseGameMode {
           LogLevel.NORMAL);
     Print("----------------------------------------", LogLevel.NORMAL);
 
-    BenchmarkGrid(world, "100m COARSE", 100, startX, startZ, mapSizeX,
-                  mapSizeZ);
+    BenchmarkGrid(world, "100m COARSE", 100, startX, startZ, mapSizeX, mapSizeZ);
     BenchmarkGrid(world, "50m  MEDIUM", 50, startX, startZ, mapSizeX, mapSizeZ);
     BenchmarkGrid(world, "25m  FINE", 25, startX, startZ, mapSizeX, mapSizeZ);
     BenchmarkGrid(world, "10m  ULTRA", 10, startX, startZ, mapSizeX, mapSizeZ);
