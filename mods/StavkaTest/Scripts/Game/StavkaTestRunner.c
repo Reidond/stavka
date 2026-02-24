@@ -37,6 +37,10 @@ class StavkaTestRunner {
     Register(new StavkaTest_EnumGroups());
     Register(new StavkaTest_Health());
     Register(new StavkaTest_VehicleGetIn());
+    Register(new StavkaTest_VehicleDrive());
+    Register(new StavkaTest_EventHooks());
+    Register(new StavkaTest_Combat());
+    Register(new StavkaTest_RoundTrip());
 
     Print("[StavkaTest] Initialized. Tests available:", LogLevel.NORMAL);
     foreach (StavkaTestBase t : s_aTests)
