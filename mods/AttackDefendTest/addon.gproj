@@ -1,0 +1,8 @@
+GameProject {
+ ID "AttackDefendTest"
+ GUID "68B0195BDCEAF580"
+ TITLE "AttackDefendTest"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}
