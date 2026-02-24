@@ -32,6 +32,7 @@ class StavkaTestRunner {
     Register(new StavkaTest_Rest());
     Register(new StavkaTest_Spawn());
     Register(new StavkaTest_AttackDefend());
+    Register(new StavkaTest_MultiDespawn());
 
     Print("[StavkaTest] Initialized. Tests available:", LogLevel.NORMAL);
     foreach (StavkaTestBase t : s_aTests)
