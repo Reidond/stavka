@@ -76,6 +76,7 @@ class StavkaTestRunner {
       if (test.GetName() == name) {
         Print(string.Format("[StavkaTest] Running: %1", name), LogLevel.NORMAL);
         s_pActive = test;
+        TeleportGMCamera(StavkaTestBase.SPAWN_POS);
         test.Run();
         return;
       }
@@ -83,6 +84,31 @@ class StavkaTestRunner {
 
     Print(string.Format("[StavkaTest] Unknown test: '%1'", name), LogLevel.NORMAL);
     List();
+  }
+
+  // Move GM camera to test area (no-op if not in editor mode).
+  static void TeleportGMCamera(vector pos) {
+    pos[1] = GetGame().GetWorld().GetSurfaceY(pos[0], pos[2]) + 50;
+
+    SCR_ManualCamera camera = SCR_CameraEditorComponent.GetCameraInstance();
+    if (!camera) {
+      Print("[StavkaTest] No GM camera (not in editor mode?)", LogLevel.NORMAL);
+      return;
+    }
+
+    SCR_TeleportToCursorManualCameraComponent teleport =
+      SCR_TeleportToCursorManualCameraComponent.Cast(
+        camera.FindCameraComponent(SCR_TeleportToCursorManualCameraComponent));
+
+    if (teleport) {
+      teleport.TeleportCamera(pos);
+    } else {
+      vector mat[4];
+      camera.GetWorldTransform(mat);
+      mat[3] = pos;
+      camera.SetWorldTransform(mat);
+      camera.SetDirty(true);
+    }
   }
 
   // Print all available test names.

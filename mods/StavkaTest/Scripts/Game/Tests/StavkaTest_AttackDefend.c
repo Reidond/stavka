@@ -24,7 +24,7 @@ class StavkaTest_AttackDefend : StavkaTestBase {
     Print("  WAYPOINT TYPE TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector basePos = Vector(2059, 0, 2047);
+    vector basePos = SPAWN_POS;
     basePos[1] = GetGame().GetWorld().GetSurfaceY(basePos[0], basePos[2]) + 1;
 
     vector posA = basePos;

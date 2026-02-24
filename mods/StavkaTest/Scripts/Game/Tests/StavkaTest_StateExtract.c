@@ -16,9 +16,9 @@ class StavkaTest_StateExtract : StavkaTestBase {
     Print("  STATE EXTRACTION TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector pos1 = Vector(2059, 0, 2047);
-    vector pos2 = Vector(2059, 0, 2197);
-    vector pos3 = Vector(2059, 0, 2347);
+    vector pos1 = SPAWN_POS;
+    vector pos2 = Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 150);
+    vector pos3 = Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 300);
     pos1[1] = GetGame().GetWorld().GetSurfaceY(pos1[0], pos1[2]) + 1;
     pos2[1] = GetGame().GetWorld().GetSurfaceY(pos2[0], pos2[2]) + 1;
     pos3[1] = GetGame().GetWorld().GetSurfaceY(pos3[0], pos3[2]) + 1;
@@ -86,7 +86,7 @@ class StavkaTest_StateExtract : StavkaTestBase {
 
     // Method 1: QueryEntitiesBySphere to discover all AI groups in world
     Print("[Method1] QueryEntitiesBySphere (r=5000) ...", LogLevel.NORMAL);
-    vector center = Vector(2059, 0, 2197);
+    vector center = Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 150);
     GetGame().GetWorld().QueryEntitiesBySphere(center, 5000, QueryGroupCallback);
 
     // Method 2: Extract state from our known spawned groups

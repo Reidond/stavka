@@ -90,14 +90,16 @@ Tell the user:
 - Registered in `StavkaTestRunner.Init()`
 - Trigger with: `!test {shortname}` in game chat
 
-## Enforce Script rules (critical)
+## Spawn position
 
-- Use `arma-reforger` skill.
-- No string concatenation across lines (no `"foo" "bar"` — must be one string)
-- Use `string.Format("%1 %2", a, b)` for formatting (1-indexed tokens)
-- Use `Print("msg", LogLevel.NORMAL)` for output
-- All casts must be null-checked: `MyType obj = MyType.Cast(x); if (!obj) return;`
-- Use `ref` for member variables holding class instances
-- Use `GetGame().GetWorld()` for world access, `GetGame().GetCallqueue().CallLater()` for deferred calls
-- Naming: `m_fFloat`, `m_iInt`, `m_bBool`, `m_sString`, `m_vVector`, `m_aArray`
-- Resource loads: `Resource.Load("{GUID}path/to/prefab.et")`
+- Use `SPAWN_POS` constant (inherited from `StavkaTestBase`) for the base spawn position
+- `static const vector SPAWN_POS = Vector(2059, 0, 2047)` — defined in `StavkaTestBase.c`
+- For multi-group tests, offset from SPAWN_POS: `Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 150)`
+- Always resolve Y from terrain: `pos[1] = GetGame().GetWorld().GetSurfaceY(pos[0], pos[2]) + 1`
+- **Never hardcode `Vector(2059, 0, 2047)`** — always use `SPAWN_POS`
+
+## Enforce Script rules
+
+**IMPORTANT**: Always load the `arma-reforger` skill before writing test code. It contains the full
+Enforce Script language reference, API patterns, naming conventions, and critical compile-time rules
+(no `ref` on entities, `string.Format` max 9 params, non-existent APIs to avoid, etc.).

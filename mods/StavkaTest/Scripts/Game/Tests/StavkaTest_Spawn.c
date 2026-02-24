@@ -23,7 +23,8 @@ class StavkaTest_Spawn : StavkaTestBase {
     Print("  AI SPAWN + WAYPOINT TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector spawnPos = Vector(2059.38, 44.16, 2046.97);
+    vector spawnPos = SPAWN_POS;
+    spawnPos[1] = GetGame().GetWorld().GetSurfaceY(spawnPos[0], spawnPos[2]) + 1;
     Print(string.Format("[Spawn] Position: %1", spawnPos), LogLevel.NORMAL);
 
     EntitySpawnParams params = new EntitySpawnParams();

@@ -446,16 +446,33 @@ Shape.CreateLine(ShapeFlags.VISIBLE, Color.GREEN, startPos, endPos);
 
 ---
 
+## Enforce Script Rules (Critical)
+
+These are verified compile-time and runtime constraints:
+
+1. **Always null-check** casts and component lookups — Enforce Script silently crashes on null dereference
+2. **Always call `super`** in `modded` class overrides
+3. **No multi-line string literal concatenation** — `"foo" "bar"` is invalid; must be one string per line
+4. **`string.Format` max 9 params** (%1-%9) — split into multiple `Format` + concatenation if needed
+5. **No `ref` for entity classes** — `SCR_AIGroup`, `IEntity`, `SCR_ChimeraCharacter` etc. disallow strong refs. Use plain (weak) references for entities
+6. **Use `ref` only for non-entity managed classes** — arrays, custom classes, ScriptInvokers
+7. **`autoptr` trap** — never store autoptr in class members; object dies when scope exits
+8. **RplProp only in original class** — cannot add in `modded` classes
+9. **AI groups need init time** — wait 1-2 seconds after spawn before assigning waypoints
+10. **Server-only state changes** — game logic runs on server, effects run anywhere
+11. **JIP safety** — use RplProp for state, not one-shot RPCs
+12. **Never use `EOnFrame` without need** — prefer `CallLater` or event-driven patterns
+
+### Non-existent APIs (confirmed compile errors)
+
+Do NOT use these — they do not exist in Enforce Script:
+- `AIWorld.GetAIGroupCount()` / `AIWorld.GetAIGroup(int)` — no indexed group access
+- `World.QueryEntitiesByClassName()` — does not exist
+- Use `QueryEntitiesBySphere()` with cast-filtering in callback instead
+
 ## Common Pitfalls
 
-1. **Always null-check** casts and component lookups - Enforce Script silently crashes on null dereference
-2. **Always call `super`** in `modded` class overrides
-3. **Never use `EOnFrame` without need** - prefer `CallLater` or event-driven patterns
-4. **`autoptr` trap** - never store autoptr in class members; object dies when scope exits
-5. **RplProp only in original class** - cannot add in `modded` classes
-6. **AI groups need init time** - wait 1-2 seconds after spawn before assigning waypoints
-7. **Server-only state changes** - game logic runs on server, effects run anywhere
-8. **JIP safety** - use RplProp for state, not one-shot RPCs
+(See Enforce Script Rules above for the full list)
 
 ---
 

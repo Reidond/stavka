@@ -19,9 +19,9 @@ class StavkaTest_EnumGroups : StavkaTestBase {
     Print("========================================", LogLevel.NORMAL);
 
     // Spawn 3 groups: 2 OPFOR, 1 BLUFOR
-    vector pos1 = Vector(2059, 0, 2047);
-    vector pos2 = Vector(2059, 0, 2197);
-    vector pos3 = Vector(2059, 0, 2347);
+    vector pos1 = SPAWN_POS;
+    vector pos2 = Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 150);
+    vector pos3 = Vector(SPAWN_POS[0], 0, SPAWN_POS[2] + 300);
     pos1[1] = GetGame().GetWorld().GetSurfaceY(pos1[0], pos1[2]) + 1;
     pos2[1] = GetGame().GetWorld().GetSurfaceY(pos2[0], pos2[2]) + 1;
     pos3[1] = GetGame().GetWorld().GetSurfaceY(pos3[0], pos3[2]) + 1;
@@ -52,7 +52,7 @@ class StavkaTest_EnumGroups : StavkaTestBase {
     m_iCharCount = 0;
     m_iGroupCount = 0;
     m_aFoundGroups.Clear();
-    GetGame().GetWorld().QueryEntitiesBySphere(Vector(2059, 50, 2197), 500, CharacterToGroupCallback);
+    GetGame().GetWorld().QueryEntitiesBySphere(Vector(SPAWN_POS[0], 50, SPAWN_POS[2] + 150), 500, CharacterToGroupCallback);
     Print(string.Format("[M1] Entities scanned: %1", m_iQueryCount), LogLevel.NORMAL);
     Print(string.Format("[M1] Characters found: %1", m_iCharCount), LogLevel.NORMAL);
     Print(string.Format("[M1] Unique groups discovered: %1", m_aFoundGroups.Count()), LogLevel.NORMAL);
@@ -85,7 +85,7 @@ class StavkaTest_EnumGroups : StavkaTestBase {
     Print("[M2] Scanning entity types in 500m ...", LogLevel.NORMAL);
 
     m_iQueryCount = 0;
-    GetGame().GetWorld().QueryEntitiesBySphere(Vector(2059, 50, 2197), 500, TypeCensusCallback);
+    GetGame().GetWorld().QueryEntitiesBySphere(Vector(SPAWN_POS[0], 50, SPAWN_POS[2] + 150), 500, TypeCensusCallback);
     Print(string.Format("[M2] Total entities: %1", m_iQueryCount), LogLevel.NORMAL);
 
     Print("========================================", LogLevel.NORMAL);

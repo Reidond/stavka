@@ -24,7 +24,7 @@ class StavkaTest_VehicleGetIn : StavkaTestBase {
     Print("  VEHICLE + GETIN TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector basePos = Vector(2059, 0, 2047);
+    vector basePos = SPAWN_POS;
     basePos[1] = GetGame().GetWorld().GetSurfaceY(basePos[0], basePos[2]);
 
     Print("[Vehicle] Attempting vehicle spawns ...", LogLevel.NORMAL);

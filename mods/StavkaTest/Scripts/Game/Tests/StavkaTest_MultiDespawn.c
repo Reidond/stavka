@@ -26,7 +26,7 @@ class StavkaTest_MultiDespawn : StavkaTestBase {
     Print("  MULTI-GROUP + DESPAWN TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector basePos = Vector(2059, 0, 2047);
+    vector basePos = SPAWN_POS;
 
     vector pos1 = basePos;
     vector pos2 = Vector(basePos[0], 0, basePos[2] + 150);

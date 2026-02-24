@@ -12,7 +12,7 @@ class StavkaTest_Health : StavkaTestBase {
     Print("  HEALTH / ALIVE STATUS TEST", LogLevel.NORMAL);
     Print("========================================", LogLevel.NORMAL);
 
-    vector pos = Vector(2059, 0, 2047);
+    vector pos = SPAWN_POS;
     pos[1] = GetGame().GetWorld().GetSurfaceY(pos[0], pos[2]) + 1;
 
     EntitySpawnParams params = new EntitySpawnParams();
