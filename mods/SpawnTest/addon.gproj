@@ -1,0 +1,8 @@
+GameProject {
+ ID "SpawnTest"
+ GUID "68B009E4C130DE86"
+ TITLE "SpawnTest"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}
