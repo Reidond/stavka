@@ -1,0 +1,8 @@
+GameProject {
+ ID "TerrainBenchmark"
+ GUID "68AF727BD546598A"
+ TITLE "TerrainBenchmark"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}
