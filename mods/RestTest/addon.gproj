@@ -1,0 +1,8 @@
+GameProject {
+ ID "RestTest"
+ GUID "68B00130C37E29BE"
+ TITLE "RestTest"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}
