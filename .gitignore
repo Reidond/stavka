@@ -1,2 +1,7 @@
 *.rdb
 .omc/
+node_modules/
+test-server/settings.json
+test-server/profile/
+test-server/arma-server/
+test-server/steamcmd/

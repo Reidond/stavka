@@ -1,0 +1,5 @@
+{
+  "serverBin": "/path/to/ArmaReforgerServer",
+  "profileDir": "./profile",
+  "addonsDir": "../mods"
+}

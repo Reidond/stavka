@@ -1,0 +1,17 @@
+MetaFileClass {
+ Name "{68B1A0F0C0DE0002}Missions/StavkaTest_Conflict.conf"
+ Configurations {
+  MissionHeaderResourceClass PC {
+  }
+  MissionHeaderResourceClass XBOX_ONE : PC {
+  }
+  MissionHeaderResourceClass XBOX_SERIES : PC {
+  }
+  MissionHeaderResourceClass PS4 : PC {
+  }
+  MissionHeaderResourceClass PS5 : PC {
+  }
+  MissionHeaderResourceClass HEADLESS : PC {
+  }
+ }
+}

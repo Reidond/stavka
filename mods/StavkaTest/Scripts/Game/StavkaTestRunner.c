@@ -41,6 +41,7 @@ class StavkaTestRunner {
     Register(new StavkaTest_EventHooks());
     Register(new StavkaTest_Combat());
     Register(new StavkaTest_RoundTrip());
+    Register(new StavkaTest_Conflict());
 
     Print("[StavkaTest] Initialized. Tests available:", LogLevel.NORMAL);
     foreach (StavkaTestBase t : s_aTests)
