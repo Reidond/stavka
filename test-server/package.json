@@ -1,6 +1,11 @@
 {
   "name": "@stavka/test-server",
   "type": "module",
+  "scripts": {
+    "setup": "node --experimental-strip-types setup.ts",
+    "start": "node --experimental-strip-types start.ts",
+    "saves": "node --experimental-strip-types saves.ts"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   }

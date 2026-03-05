@@ -8,18 +8,19 @@ import {
   copyFileSync,
   chmodSync,
 } from "node:fs";
-import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve, join } from "node:path";
 import { createInterface } from "node:readline";
 import { pipeline } from "node:stream/promises";
+import { __dirname } from "./settings.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const isWindows = process.platform === "win32";
 
 const SERVER_APP_ID = "1874900";
-const STEAMCMD_URL =
-  "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz";
+const STEAMCMD_URL = isWindows
+  ? "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
+  : "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz";
 const STEAMCMD_DIR = resolve(__dirname, "steamcmd");
-const STEAMCMD_BIN = join(STEAMCMD_DIR, "steamcmd.sh");
+const STEAMCMD_BIN = join(STEAMCMD_DIR, isWindows ? "steamcmd.exe" : "steamcmd.sh");
 const INSTALL_DIR = resolve(__dirname, "arma-server");
 const SETTINGS_PATH = resolve(__dirname, "settings.json");
 const SETTINGS_EXAMPLE = resolve(__dirname, "settings.example.json");
@@ -39,10 +40,14 @@ function findSteamCmd(): string | null {
   if (existsSync(STEAMCMD_BIN)) return STEAMCMD_BIN;
 
   // Check system PATH
-  const candidates = ["steamcmd", "/usr/bin/steamcmd", "/usr/games/steamcmd"];
+  const whichCmd = isWindows ? "where" : "which";
+  const candidates = isWindows
+    ? ["steamcmd", "C:\\steamcmd\\steamcmd.exe"]
+    : ["steamcmd", "/usr/bin/steamcmd", "/usr/games/steamcmd"];
+
   for (const cmd of candidates) {
     try {
-      execSync(`which ${cmd}`, { stdio: "ignore" });
+      execSync(`${whichCmd} ${cmd}`, { stdio: "ignore" });
       return cmd;
     } catch {}
   }
@@ -53,20 +58,25 @@ async function downloadSteamCmd(): Promise<string> {
   console.log("Downloading SteamCMD...");
   mkdirSync(STEAMCMD_DIR, { recursive: true });
 
-  const tarPath = join(STEAMCMD_DIR, "steamcmd_linux.tar.gz");
+  const archiveName = isWindows ? "steamcmd.zip" : "steamcmd_linux.tar.gz";
+  const archivePath = join(STEAMCMD_DIR, archiveName);
 
   const response = await fetch(STEAMCMD_URL);
   if (!response.ok || !response.body) {
     throw new Error(`Failed to download SteamCMD: ${response.statusText}`);
   }
 
-  const fileStream = createWriteStream(tarPath);
+  const fileStream = createWriteStream(archivePath);
   // @ts-ignore - ReadableStream to NodeJS.ReadableStream
   await pipeline(response.body, fileStream);
 
   console.log("Extracting SteamCMD...");
-  execSync(`tar -xzf steamcmd_linux.tar.gz`, { cwd: STEAMCMD_DIR });
-  chmodSync(STEAMCMD_BIN, 0o755);
+  if (isWindows) {
+    execSync(`tar -xf ${archiveName}`, { cwd: STEAMCMD_DIR });
+  } else {
+    execSync(`tar -xzf ${archiveName}`, { cwd: STEAMCMD_DIR });
+    chmodSync(STEAMCMD_BIN, 0o755);
+  }
 
   console.log(`SteamCMD installed: ${STEAMCMD_DIR}`);
   return STEAMCMD_BIN;
@@ -153,7 +163,7 @@ async function main() {
 
   const settings = JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
   settings.serverBin = serverBin;
-  if (!settings.profileDir) settings.profileDir = "./profile";
+  if (!settings.profileDir) settings.profileDir = "./arma-server/profile";
   if (!settings.addonsDir) settings.addonsDir = "../mods";
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
 

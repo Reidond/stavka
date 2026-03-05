@@ -1,28 +1,8 @@
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, readdirSync, symlinkSync, lstatSync } from "node:fs";
-import { resolve, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { parseArgs } from "node:util";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-interface Settings {
-  serverBin: string;
-  profileDir: string;
-  addonsDir: string;
-}
-
-function loadSettings(): Settings {
-  const path = resolve(__dirname, "settings.json");
-  if (!existsSync(path)) {
-    console.error(
-      "Missing server/settings.json\n" +
-        "Copy settings.example.json and fill in your local paths."
-    );
-    process.exit(1);
-  }
-  return JSON.parse(readFileSync(path, "utf-8"));
-}
+import { loadSettings, __dirname } from "./settings.ts";
 
 const { values } = parseArgs({
   options: {
@@ -38,16 +18,31 @@ const configPath = resolve(__dirname, values.config!);
 const profileDir = resolve(__dirname, settings.profileDir);
 const addonsDir = resolve(__dirname, settings.addonsDir);
 
-const args: string[] = [
-  "-config",
-  configPath,
-  "-profile",
-  profileDir,
-  "-addonsDir",
-  addonsDir,
-  "-maxFPS",
-  values.fps!,
-];
+// Collect local mod names from addonsDir
+const modNames: string[] = [];
+for (const entry of readdirSync(addonsDir, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  modNames.push(entry.name);
+}
+
+const config = JSON.parse(readFileSync(configPath, "utf-8"));
+const args: string[] = [];
+
+if (modNames.length > 0) {
+  // Local mods require -server mode (-config validates mods against Workshop)
+  args.push(
+    "-server", config.game.scenarioId,
+    "-addonsDir", addonsDir,
+    "-addons", modNames.join(","),
+  );
+} else {
+  args.push("-config", configPath);
+}
+
+args.push(
+  "-profile", profileDir,
+  "-maxFPS", values.fps!,
+);
 
 if (values.save) {
   args.push("-loadSessionSave", values.save);
@@ -61,23 +56,9 @@ if (values.fresh) {
   console.log("Save: none (fresh start)");
 }
 
-// Symlink local mods into server's addons dir so they auto-load
-const serverAddonsDir = resolve(dirname(settings.serverBin), "addons");
-for (const entry of readdirSync(addonsDir, { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue;
-  const target = resolve(addonsDir, entry.name);
-  const link = resolve(serverAddonsDir, entry.name);
-  try {
-    lstatSync(link);
-  } catch {
-    symlinkSync(target, link);
-    console.log(`Linked: ${entry.name} -> ${link}`);
-  }
-}
-
 console.log(`Server:  ${settings.serverBin}`);
 console.log(`Profile: ${profileDir}`);
-console.log(`Addons:  ${addonsDir}`);
+console.log(`Addons:  ${addonsDir} (${modNames.join(", ") || "none"})`);
 console.log(`Config:  ${configPath}`);
 console.log("---");
 
@@ -95,6 +76,3 @@ child.on("exit", (code) => {
   console.log(`Server exited with code ${code}`);
   process.exit(code ?? 0);
 });
-
-process.on("SIGINT", () => child.kill("SIGINT"));
-process.on("SIGTERM", () => child.kill("SIGTERM"));

@@ -6,23 +6,8 @@ import {
   mkdirSync,
   statSync,
 } from "node:fs";
-import { resolve, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function loadProfileDir(): string {
-  const path = resolve(__dirname, "settings.json");
-  if (!existsSync(path)) {
-    console.error(
-      "Missing server/settings.json\n" +
-        "Copy settings.example.json and fill in your local paths."
-    );
-    process.exit(1);
-  }
-  const settings = JSON.parse(readFileSync(path, "utf-8"));
-  return resolve(__dirname, settings.profileDir);
-}
+import { resolve, basename } from "node:path";
+import { loadProfileDir } from "./settings.ts";
 
 function getSavesDir(): string {
   return resolve(loadProfileDir(), ".save", "sessions");
