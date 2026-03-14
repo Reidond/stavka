@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/arma-test-server"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Andrii Shafar <andriishafar69@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/Reidond/stavka"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
