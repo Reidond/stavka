@@ -1,0 +1,23 @@
+---
+description: Enforce plan-critic self-review before every CreatePlan tool call and before presenting any spec document to the user.
+alwaysApply: true
+---
+
+# Plan Self-Review Gate
+
+**Before calling `CreatePlan` or presenting any spec document (`spec.md`, `design.md`, `tasks.md`) to the user, you MUST:**
+
+1. Read `.claude/skills/plan-critic/SKILL.md`
+2. Run the **DoR pre-flight** (Step 1 — Orient): answer each verification question in the Requirements DoR or Design/Plan DoR table; any "No" or "Unknown" becomes a finding
+3. Run all five review dimensions plus the three universal challenge questions against the plan you just wrote
+4. For Blocker findings, apply the **Self-Refine loop**: propose fix → apply → re-evaluate (max 2 iterations before marking `[UNRESOLVED]`)
+5. Resolve every Blocker and Major finding by revising the document — silently, before presentation
+6. If a Blocker or Question cannot be resolved without user input, mark it `[UNRESOLVED]` and prepend a `## Plan Review — Action Required` block to the document
+
+**This gate is mandatory — skipping it is not permitted regardless of task size, urgency, or apparent simplicity.**
+
+## Output protocol
+
+- **APPROVED** (no unresolved Blockers or Questions): call `CreatePlan` / present the document normally. Add a one-line note if significant changes were made during review.
+- **NOT APPROVED** (unresolved Blockers or Questions): prepend the `## Plan Review — Action Required` block listing all unresolved findings before presenting. Do not suppress them.
+- **Minor findings**: fix silently in the document; never surface to the user.
