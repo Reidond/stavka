@@ -5,3 +5,6 @@ test-server/settings.json
 test-server/profile/
 test-server/arma-server/
 test-server/steamcmd/
+target/
+.env
+.DS_Store
