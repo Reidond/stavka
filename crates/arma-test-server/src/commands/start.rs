@@ -3,7 +3,7 @@ use crate::settings::{
 };
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::fs;
@@ -11,6 +11,9 @@ use tokio::process::Command;
 use tokio::signal;
 use tokio::time::timeout;
 use walkdir::WalkDir;
+
+/// Mod name used for the Stavka test scenario; must match addon folder name.
+const STAVKA_TEST_MOD: &str = "StavkaTest";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
@@ -140,6 +143,64 @@ async fn get_mod_names(addons_dir: &PathBuf) -> Result<Vec<String>> {
     Ok(mod_names)
 }
 
+/// Find workspace root: directory that contains mods/StavkaTest (with addon.gproj).
+fn find_workspace_root() -> Option<PathBuf> {
+    let mut current = std::env::current_dir().ok()?;
+    loop {
+        let mod_path = current.join("mods").join(STAVKA_TEST_MOD);
+        if mod_path.join("addon.gproj").exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    None
+}
+
+/// Ensure StavkaTest mod is linked into addons dir (junction on Windows, symlink on Unix).
+/// No-op if workspace not found or link already correct.
+fn ensure_stavka_test_addon_link(addons_dir: &Path, workspace_root: &Path) -> Result<()> {
+    let source = workspace_root.join("mods").join(STAVKA_TEST_MOD);
+    let target = addons_dir.join(STAVKA_TEST_MOD);
+
+    if !source.exists() {
+        anyhow::bail!("StavkaTest mod not found at {}", source.display());
+    }
+
+    if target.exists() {
+        // Already linked (or real dir); avoid overwriting
+        return Ok(());
+    }
+
+    // Ensure addons dir exists
+    std::fs::create_dir_all(addons_dir)
+        .with_context(|| format!("Failed to create addons dir {}", addons_dir.display()))?;
+
+    #[cfg(windows)]
+    {
+        // Directory junction (works without admin)
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&target)
+            .arg(&source)
+            .status()
+            .context("Failed to run mklink")?;
+        if !status.success() {
+            anyhow::bail!("mklink /J failed (exit code {:?})", status.code());
+        }
+        println!("Linked addon: {} -> {}", target.display(), source.display());
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&source, &target)
+            .with_context(|| format!("Failed to symlink {} -> {}", target.display(), source.display()))?;
+        println!("Linked addon: {} -> {}", target.display(), source.display());
+    }
+
+    Ok(())
+}
+
 async fn load_or_create_config(config_path: &PathBuf) -> Result<Config> {
     if config_path.exists() {
         let content = fs::read_to_string(config_path).await
@@ -187,6 +248,13 @@ pub async fn run(opts: StartOptions) -> Result<()> {
     let profile_dir = get_profile_dir(&settings)?;
     let addons_dir = get_addons_dir(&settings)?;
     let server_binary = get_server_binary(&settings)?;
+    
+    // Ensure StavkaTest mod is linked into addons (so server can load StavkaTest_Conflict scenario)
+    if let Some(workspace_root) = find_workspace_root() {
+        if let Err(e) = ensure_stavka_test_addon_link(addons_dir.as_path(), &workspace_root) {
+            eprintln!("Warning: could not link StavkaTest addon: {}", e);
+        }
+    }
     
     // Collect mod names
     let mod_names = get_mod_names(&addons_dir).await?;

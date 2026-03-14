@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "AppData\\Local\\stavka",
+			"path": "../../AppData/Local/stavka"
+		}
+	],
+	"settings": {}
+}
