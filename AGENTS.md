@@ -25,13 +25,13 @@ stavka/
 │       ├── Scripts/Game/  # StavkaTestRunner, StavkaTestBase, Tests/*.c
 │       ├── Missions/      # StavkaTest_Conflict.conf
 │       └── Worlds/        # TestGM_Arland.ent
-└── .claude/skills/        # add-test, arma-reforger
+└── .agents/skills/        # add-test, arma-reforger
 ```
 
 ## Skills to use
 
-- **Enforce Script / Arma Reforger**: `.claude/skills/arma-reforger/` — use when editing `.c` files, game modes, replication, UI, or mod structure. Contains API and compile-time rules (e.g. no `ref` on entities, `string.Format` limits).
-- **Add test**: `.claude/skills/add-test/SKILL.md` — use when adding a new test: create `StavkaTest_{Name}.c` in `mods/StavkaTest/Scripts/Game/Tests/`, register in `StavkaTestRunner.c`, use `SPAWN_POS` from `StavkaTestBase` (never hardcode `Vector(2059, 0, 2047)`).
+- **Enforce Script / Arma Reforger**: `.agents/skills/arma-reforger/` — use when editing `.c` files, game modes, replication, UI, or mod structure. Contains API and compile-time rules (e.g. no `ref` on entities, `string.Format` limits).
+- **Add test**: `.agents/skills/add-test/SKILL.md` — use when adding a new test: create `StavkaTest_{Name}.c` in `mods/StavkaTest/Scripts/Game/Tests/`, register in `StavkaTestRunner.c`, use `SPAWN_POS` from `StavkaTestBase` (never hardcode `Vector(2059, 0, 2047)`).
 
 ## Conventions
 
@@ -61,9 +61,9 @@ stavka/
 
 When a task is complete, ALWAYS perform these steps before considering it done:
 
-1. **Post-task review** (major tasks: 3+ files, new feature, spec completion) — Run the full 8-step review: code review (1–6), documentation impact (7), learnings extraction (8). See `.claude/skills/post-task-review/SKILL.md`.
-2. **Learnings extraction** (all tasks) — Extract project-level findings and append to `.ai/learnings.md`. See `.claude/skills/task-learnings/SKILL.md`.
-3. **Documentation updates** — If any modified files affect docs (per `.claude/skills/post-task-review/references/doc-impact-matrix.md`), update the affected documentation.
+1. **Post-task review** (major tasks: 3+ files, new feature, spec completion) — Run the full 8-step review: code review (1–6), documentation impact (7), learnings extraction (8). See `.agents/skills/post-task-review/SKILL.md`.
+2. **Learnings extraction** (all tasks) — Extract project-level findings and append to `.ai/learnings.md`. See `.agents/skills/task-learnings/SKILL.md`.
+3. **Documentation updates** — If any modified files affect docs (per `.agents/skills/post-task-review/references/doc-impact-matrix.md`), update the affected documentation.
 4. **Restart backend** — If any backend files were modified, restart the backend container:
    `docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d backend`
 5. **Rebuild and restart frontend** — If any frontend files were modified, rebuild with clean cache and restart:
@@ -75,7 +75,7 @@ When a task is complete, ALWAYS perform these steps before considering it done:
 - Consult `.ai/learnings.md` before starting any task — it contains accumulated project knowledge.
 - After completing a task, extract and record new learnings using the `task-learnings` skill.
 - If a finding reveals a convention gap, update the relevant rule file (AGENTS.md, .cursor/rules/).
-- See `.claude/skills/task-learnings/SKILL.md` for the full extraction process.
+- See `.agents/skills/task-learnings/SKILL.md` for the full extraction process.
 
 ### Spec-driven development
 
@@ -87,7 +87,7 @@ When a task is complete, ALWAYS perform these steps before considering it done:
 - At each spec gate, iterate if the user requests changes. Challenge changes that are technically unsound or contradict prior approvals — once, with reasoning — then defer to the user.
 - All spec documents must be written to `.specs/{task-name}/` as actual files. The Cursor CreatePlan tool does not replace file creation.
 - Large tasks with natural phase boundaries: use phased execution with intermediate quality gates to reduce context load and catch drift early.
-- Templates live in `.ai/templates/`. See `.claude/skills/spec-driven-dev/SKILL.md` for the full pipeline.
+- Templates live in `.ai/templates/`. See `.agents/skills/spec-driven-dev/SKILL.md` for the full pipeline.
 
 ### Post-task review
 
@@ -95,12 +95,12 @@ When a task is complete, ALWAYS perform these steps before considering it done:
 - Steps 1–6: code review and convention compliance.
 - Step 7: documentation impact analysis — check and update affected docs.
 - Step 8: learnings extraction — capture and record project knowledge.
-- See `.claude/skills/post-task-review/SKILL.md` for the full process.
+- See `.agents/skills/post-task-review/SKILL.md` for the full process.
 
 ### Plan self-review (plan-critic)
 
 - **Before presenting any spec document or Cursor plan to the user**, run the plan-critic self-review.
-- Invoke `.claude/skills/plan-critic/SKILL.md` after writing: `spec.md` (medium tasks), `design.md` (large tasks), `tasks.md` (large tasks, completeness-only), or any `CreatePlan` output.
+- Invoke `.agents/skills/plan-critic/SKILL.md` after writing: `spec.md` (medium tasks), `design.md` (large tasks), `tasks.md` (large tasks, completeness-only), or any `CreatePlan` output.
 - Resolve all Blocker and Major findings silently before presenting. Minor findings are fixed without mention.
 - If any Blockers or Questions cannot be resolved without user input, surface them prominently at the top of the presented document — do not suppress them.
-- See `.claude/skills/plan-critic/SKILL.md` for the full review protocol.
+- See `.agents/skills/plan-critic/SKILL.md` for the full review protocol.
