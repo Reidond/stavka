@@ -86,7 +86,7 @@ impl Default for Config {
         Self {
             bind_address: "0.0.0.0".to_string(),
             bind_port: 2001,
-            public_address: "127.0.0.1".to_string(),
+            public_address: "".to_string(),
             public_port: 2001,
             rcon: RconConfig {
                 address: "127.0.0.1".to_string(),
@@ -202,6 +202,61 @@ fn ensure_stavka_test_addon_link(addons_dir: &Path, workspace_root: &Path) -> Re
     Ok(())
 }
 
+/// Ensure a local addon is linked into the server's native ./addons directory.
+/// This allows using -config (dedicated mode) without -addons/-server flags.
+fn ensure_server_addon_link(server_addons_dir: &Path, source_addon_dir: &Path) -> Result<()> {
+    if !source_addon_dir.exists() {
+        anyhow::bail!("Addon source not found at {}", source_addon_dir.display());
+    }
+
+    let addon_name = source_addon_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .context("Failed to determine addon folder name")?;
+    let target = server_addons_dir.join(addon_name);
+
+    if target.exists() {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(server_addons_dir).with_context(|| {
+        format!(
+            "Failed to create server addons dir {}",
+            server_addons_dir.display()
+        )
+    })?;
+
+    #[cfg(windows)]
+    {
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&target)
+            .arg(source_addon_dir)
+            .status()
+            .context("Failed to run mklink for server addon link")?;
+        if !status.success() {
+            anyhow::bail!("mklink /J failed (exit code {:?})", status.code());
+        }
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(source_addon_dir, &target).with_context(|| {
+            format!(
+                "Failed to symlink server addon {} -> {}",
+                target.display(),
+                source_addon_dir.display()
+            )
+        })?;
+    }
+
+    println!(
+        "Linked server addon: {} -> {}",
+        target.display(),
+        source_addon_dir.display()
+    );
+    Ok(())
+}
+
 async fn load_or_create_config(config_path: &PathBuf) -> Result<Config> {
     if config_path.exists() {
         let content = fs::read_to_string(config_path).await
@@ -259,7 +314,7 @@ pub async fn run(opts: StartOptions) -> Result<()> {
         None
     };
     
-    let config = load_or_create_config(&config_path).await?;
+    let _config = load_or_create_config(&config_path).await?;
     let profile_dir = get_profile_dir(&settings)?;
     let addons_dir = get_addons_dir(&settings)?;
     let server_binary = get_server_binary(&settings)?;
@@ -271,24 +326,28 @@ pub async fn run(opts: StartOptions) -> Result<()> {
         }
     }
     
-    // Collect mod names
+    // Collect mod names from local cache addons.
     let mod_names = get_mod_names(&addons_dir).await?;
-    
+
+    // Mirror local addons into server native ./addons so dedicated mode can load them via -config.
+    let server_dir = server_binary
+        .parent()
+        .context("Failed to get server directory")?;
+    let server_addons_dir = server_dir.join("addons");
+    for mod_name in &mod_names {
+        let source = addons_dir.join(mod_name);
+        if let Err(e) = ensure_server_addon_link(server_addons_dir.as_path(), source.as_path()) {
+            eprintln!("Warning: could not link addon '{}' into server addons: {}", mod_name, e);
+        }
+    }
+
     // Build arguments
     let mut args: Vec<String> = Vec::new();
     
-    if !mod_names.is_empty() {
-        // Local mods require -server mode
-        args.push("-server".to_string());
-        args.push(config.game.scenario_id.clone());
-        args.push("-addonsDir".to_string());
-        args.push(addons_dir.to_string_lossy().to_string());
-        args.push("-addons".to_string());
-        args.push(mod_names.join(","));
-    } else {
-        args.push("-config".to_string());
-        args.push(config_path.to_string_lossy().to_string());
-    }
+    // Always launch as dedicated server through config.
+    // Do not use -server mode; it bypasses dedicated discovery behavior.
+    args.push("-config".to_string());
+    args.push(config_path.to_string_lossy().to_string());
     
     args.push("-profile".to_string());
     args.push(profile_dir.to_string_lossy().to_string());
@@ -316,9 +375,6 @@ pub async fn run(opts: StartOptions) -> Result<()> {
     println!("---");
     
     // Start server
-    let server_dir = server_binary.parent()
-        .context("Failed to get server directory")?;
-    
     println!("(Press Ctrl+C to stop the server)\n");
     
     let mut child = Command::new(&server_binary)

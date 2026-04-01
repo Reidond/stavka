@@ -94,6 +94,8 @@ pub async fn ensure_acl_policy(
     player_tag: &str,
     automation_tag: &str,
     server_port: u16,
+    rcon_port: u16,
+    a2s_port: u16,
 ) -> Result<()> {
     let mut policy = match client.get_acl_policy().await {
         Ok(p) => p,
@@ -126,17 +128,28 @@ pub async fn ensure_acl_policy(
         policy.hosts = serde_json::json!({});
     }
 
-    let arma_rule_exists = policy.acls.iter().any(|rule| {
-        rule.src.contains(&player_tag.to_string())
-            && rule.dst.iter().any(|d| d.contains(server_tag))
-    });
+    let required_destinations = vec![
+        format!("{}:{}", server_tag, server_port),
+        format!("{}:{}", server_tag, rcon_port),
+        format!("{}:{}", server_tag, a2s_port),
+    ];
 
-    if !arma_rule_exists {
-        policy.acls.push(AclRule {
-            action: "accept".to_string(),
-            src: vec![player_tag.to_string()],
-            dst: vec![format!("{}:{}", server_tag, server_port)],
+    for destination in required_destinations {
+        let rule_exists = policy.acls.iter().any(|rule| {
+            rule.action == "accept"
+                && rule.src.len() == 1
+                && rule.src[0] == player_tag
+                && rule.dst.len() == 1
+                && rule.dst[0] == destination
         });
+
+        if !rule_exists {
+            policy.acls.push(AclRule {
+                action: "accept".to_string(),
+                src: vec![player_tag.to_string()],
+                dst: vec![destination],
+            });
+        }
     }
 
     let internet_rule_exists = policy.acls.iter().any(|rule| {
@@ -178,15 +191,22 @@ pub async fn cleanup_acl_policy(
     player_tag: &str,
     automation_tag: &str,
     server_port: u16,
+    rcon_port: u16,
+    a2s_port: u16,
 ) -> Result<()> {
     let mut policy = client.get_acl_policy().await?;
 
-    let arma_dst = format!("{}:{}", server_tag, server_port);
+    let managed_destinations = [
+        format!("{}:{}", server_tag, server_port),
+        format!("{}:{}", server_tag, rcon_port),
+        format!("{}:{}", server_tag, a2s_port),
+        "*:*".to_string(),
+    ];
     policy.acls.retain(|rule| {
         let is_exact_player_src = rule.src.len() == 1 && rule.src[0] == player_tag;
         let is_exact_rule_shape = rule.action == "accept" && is_exact_player_src && rule.dst.len() == 1;
-        let is_automation_rule =
-            is_exact_rule_shape && (rule.dst[0] == arma_dst || rule.dst[0] == "*:*");
+        let is_automation_rule = is_exact_rule_shape
+            && managed_destinations.iter().any(|destination| rule.dst[0] == *destination);
         !is_automation_rule
     });
 
