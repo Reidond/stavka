@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/arma-test-server"]
+members = ["crates/arma-test-server", "crates/tailscale-integration"]
 resolver = "2"
 
 [workspace.package]

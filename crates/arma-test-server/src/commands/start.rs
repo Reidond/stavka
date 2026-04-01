@@ -1,6 +1,7 @@
 use crate::settings::{
     get_addons_dir, get_profile_dir, get_server_binary, load_settings, get_cache_dir
 };
+use crate::commands::tailscale_runtime;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -84,9 +85,9 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             bind_address: "0.0.0.0".to_string(),
-            bind_port: 2302,
+            bind_port: 2001,
             public_address: "127.0.0.1".to_string(),
-            public_port: 2302,
+            public_port: 2001,
             rcon: RconConfig {
                 address: "127.0.0.1".to_string(),
                 port: 19999,
@@ -232,6 +233,7 @@ pub struct StartOptions {
     pub fresh: bool,
     pub config: Option<PathBuf>,
     pub fps: u32,
+    pub tailscale: bool,
 }
 
 pub async fn run(opts: StartOptions) -> Result<()> {
@@ -242,6 +244,19 @@ pub async fn run(opts: StartOptions) -> Result<()> {
         path.clone()
     } else {
         get_cache_dir()?.join("config.json")
+    };
+    
+    let tailscale_session = if opts.tailscale {
+        match tailscale_runtime::setup_before_start(&config_path).await {
+            Ok(session) => Some(session),
+            Err(e) => {
+                eprintln!("Warning: Tailscale setup failed: {}", e);
+                eprintln!("Falling back to normal mode...");
+                None
+            }
+        }
+    } else {
+        None
     };
     
     let config = load_or_create_config(&config_path).await?;
@@ -353,6 +368,12 @@ pub async fn run(opts: StartOptions) -> Result<()> {
     };
     
     println!("Server exited with code {}", status.code().unwrap_or(-1));
+
+    if let Some(session) = tailscale_session {
+        if let Err(e) = tailscale_runtime::cleanup_after_stop(&config_path, &session).await {
+            eprintln!("Warning: Tailscale cleanup failed: {}", e);
+        }
+    }
     
     Ok(())
 }

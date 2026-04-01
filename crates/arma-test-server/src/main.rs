@@ -38,12 +38,22 @@ enum Commands {
         /// Maximum FPS
         #[arg(short, long, default_value = "30")]
         fps: u32,
+        
+        /// Enable Tailscale networking (auto-detect IP, update config)
+        #[arg(long)]
+        tailscale: bool,
     },
     
     /// Manage save files
     Saves {
         #[command(subcommand)]
         command: SavesSubcommand,
+    },
+    
+    /// Tailscale networking management
+    Tailscale {
+        #[command(subcommand)]
+        command: TailscaleSubcommand,
     },
 }
 
@@ -68,6 +78,8 @@ enum SavesSubcommand {
     },
 }
 
+type TailscaleSubcommand = commands::tailscale::TailscaleSubcommand;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -77,12 +89,13 @@ async fn main() -> Result<()> {
             commands::setup::run().await?;
         }
         
-        Commands::Start { save, fresh, config, fps } => {
+        Commands::Start { save, fresh, config, fps, tailscale } => {
             let opts = commands::start::StartOptions {
                 save,
                 fresh,
                 config,
                 fps,
+                tailscale,
             };
             commands::start::run(opts).await?;
         }
@@ -98,6 +111,10 @@ async fn main() -> Result<()> {
                 }
             };
             commands::saves::run(cmd).await?;
+        }
+        
+        Commands::Tailscale { command } => {
+            commands::tailscale::run(command).await?;
         }
     }
     

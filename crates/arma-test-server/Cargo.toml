@@ -25,6 +25,7 @@ futures = "0.3"
 tempfile = "3"
 walkdir = "2"
 chrono = "0.4"
+tailscale-integration = { path = "../tailscale-integration" }
 
 [build-dependencies]
 serde_json = "1"

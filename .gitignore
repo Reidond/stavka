@@ -8,3 +8,4 @@ test-server/steamcmd/
 target/
 .env
 .DS_Store
+tmp/*
