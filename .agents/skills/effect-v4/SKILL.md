@@ -30,6 +30,9 @@ installed declarations before using unstable APIs; do not copy v3 tutorials.
 - HTTP is contract-first `HttpApi`/`HttpApiBuilder`, composed with
   `HttpRouter`. Never inspect URL pathnames or add Hono/`effect-http`.
 - Raw SQL and schema migration text live only in `*-repository.ts` modules.
+- Package scripts stay short and declarative. Multi-command repository
+  automation belongs in the Effect-first `@stavka/tasks` package, not shell
+  chains or embedded file/configuration lists.
 - Business logic never invokes SQL, environment variables, filesystem,
   network, or provider SDKs directly; inject an Effect port.
 - `Effect.runPromise` is permitted only at framework/application boundaries.

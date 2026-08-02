@@ -97,8 +97,22 @@ describe("project architecture conventions", () => {
     expect(variants).toMatch(/\btv\s*\(/u);
   });
 
+  it("keeps package scripts as short task aliases", () => {
+    const manifest = JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")) as {
+      readonly scripts: Readonly<Record<string, string>>;
+    };
+    const offenders = Object.entries(manifest.scripts).filter(
+      ([, command]) => command.length > 80 || /(?:&&|\|\||;)/u.test(command),
+    );
+
+    expect(offenders).toEqual([]);
+    expect(manifest.scripts.eval).toBe("pnpm --filter @stavka/tasks eval");
+    expect(manifest.scripts["lint:tailwind"]).toBe("pnpm --filter @stavka/tasks lint:tailwind");
+  });
+
   it("keeps Tailwind diagnostics aligned across scripts, CI, and Cursor", () => {
     const manifest = readFileSync(join(repositoryRoot, "package.json"), "utf8");
+    const taskPlan = readFileSync(join(repositoryRoot, "tools/tasks/src/task-plan.ts"), "utf8");
     const oxlint = readFileSync(join(repositoryRoot, ".oxlintrc.json"), "utf8");
     const frontendOxlintConfigs = [
       ".oxlintrc.poligon.json",
@@ -108,10 +122,7 @@ describe("project architecture conventions", () => {
     const settings = readFileSync(join(repositoryRoot, ".vscode/settings.json"), "utf8");
     const extensions = readFileSync(join(repositoryRoot, ".vscode/extensions.json"), "utf8");
     const ci = readFileSync(join(repositoryRoot, ".github/workflows/ci.yml"), "utf8");
-    const poligonStyles = readFileSync(
-      join(repositoryRoot, "apps/poligon/src/styles.css"),
-      "utf8",
-    );
+    const poligonStyles = readFileSync(join(repositoryRoot, "apps/poligon/src/styles.css"), "utf8");
 
     expect(manifest).toContain('"lint:tailwind"');
     expect(oxlint).toContain('"eslint-plugin-better-tailwindcss"');
@@ -124,9 +135,9 @@ describe("project architecture conventions", () => {
         config.includes('"better-tailwindcss/no-unknown-classes": "error"'),
       ),
     ).toBe(true);
-    expect(manifest).toContain(".oxlintrc.poligon.json");
-    expect(manifest).toContain(".oxlintrc.maskirovka-seat.json");
-    expect(manifest).toContain(".oxlintrc.maskirovka.json");
+    expect(taskPlan).toContain(".oxlintrc.poligon.json");
+    expect(taskPlan).toContain(".oxlintrc.maskirovka-seat.json");
+    expect(taskPlan).toContain(".oxlintrc.maskirovka.json");
     expect(settings).toContain('"tailwindCSS.classFunctions": ["cn", "tv"]');
     expect(settings).toContain(
       '"apps/maskirovka-seat/src/dashboard/styles.css": "apps/maskirovka-seat/src/dashboard/**"',
@@ -139,10 +150,7 @@ describe("project architecture conventions", () => {
   });
 
   it("ships the project-local Effect v4 engineering skill", () => {
-    const skill = readFileSync(
-      join(repositoryRoot, ".agents/skills/effect-v4/SKILL.md"),
-      "utf8",
-    );
+    const skill = readFileSync(join(repositoryRoot, ".agents/skills/effect-v4/SKILL.md"), "utf8");
     const http = readFileSync(
       join(repositoryRoot, ".agents/skills/effect-v4/references/httpapi.md"),
       "utf8",

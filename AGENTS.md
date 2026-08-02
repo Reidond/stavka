@@ -21,6 +21,11 @@
 - Make every web application feel like a desktop shell: use `100vh` as a fallback immediately followed by `100dvh`, keep the document viewport bounded, and put overflow scrolling on explicit content panes with `min-height: 0`.
 - Human surfaces must retain Cloudflare Access verification for HTTP and WebSocket upgrades.
 
+## Tooling architecture
+
+- Keep every root `package.json` script as a short single-command alias. Do not embed file lists, configuration matrices, or shell control operators such as `&&` and `||` in package scripts.
+- Put multi-step repository orchestration in the Effect-first `@stavka/tasks` package. Execute child processes with Effect's scoped process APIs, inherited stdio, and typed nonzero-exit failures.
+
 ## LLM development
 
 - Start the local gateway with `pnpm ai:up`. It binds to `127.0.0.1:4141`, runs the non-billing doctor, and generates the Wrangler `.dev.vars` files. Never add real provider API keys to development files.

@@ -1,0 +1,21 @@
+{
+  "name": "@stavka/tasks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "tsx src/cli.ts eval",
+    "lint:tailwind": "tsx src/cli.ts lint-tailwind",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-beta.102",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

@@ -93,6 +93,7 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 | `packages/sim-core`    | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
 | `packages/sim-link`    | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
 | `packages/ui`          | Shared Tailwind variants, tokens, interaction primitives, tables, forms, and virtual feeds                             |
+| `tools/tasks`          | Effect-first repository task orchestration behind short package-script aliases                                         |
 | `apps/commander`       | Effect HttpApi Worker, durable Commander/Sergeants, seat routing/accounting, logs, inline/R2 replay exports            |
 | `apps/poligon`         | TanStack/THREE proving ground with Agent, offline, versus, replay, and cost views                                      |
 | `tools/maskirovka`     | Local Effect HttpApi mock/subscription/API gateway, replay cache, contributor client, accounting, and operations SPA   |

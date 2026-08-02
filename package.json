@@ -10,7 +10,7 @@
     "test:watch": "vp test",
     "typecheck": "vp run --filter '@stavka/*' typecheck",
     "check": "vp check",
-    "lint:tailwind": "oxlint --config .oxlintrc.json --deny-warnings apps/commander packages tools/architecture && oxlint --config .oxlintrc.poligon.json --deny-warnings apps/poligon && oxlint --config .oxlintrc.maskirovka-seat.json --deny-warnings apps/maskirovka-seat && oxlint --config .oxlintrc.maskirovka.json --deny-warnings tools/maskirovka",
+    "lint:tailwind": "pnpm --filter @stavka/tasks lint:tailwind",
     "verify": "vp run --filter '@stavka/*' --concurrency-limit 2 verify",
     "generate-key": "node scripts/generate-key.mjs",
     "ai:up": "vp run --no-cache --filter @stavka/maskirovka dev",
@@ -19,7 +19,7 @@
     "ai:models": "vp run --no-cache --filter @stavka/maskirovka models",
     "ai:serve": "vp run --no-cache --filter @stavka/maskirovka serve",
     "ai:deploy-seat": "vp run --no-cache --filter @stavka/maskirovka deploy-seat",
-    "eval": "vp test --run packages/sim-link/tests/sim-link.test.ts apps/commander/tests/llm-client.test.ts apps/commander/tests/command-validator.test.ts apps/commander/tests/seat-router.test.ts apps/commander/tests/terrain-prompt.test.ts apps/commander/tests/semantic-replay.test.ts apps/poligon/tests/sim-world.test.ts apps/poligon/tests/sim-world-rpc.test.ts apps/poligon/tests/offline-sim-host.test.ts apps/poligon/tests/replay-dashboard.test.tsx && vp run --filter '@stavka/*' eval"
+    "eval": "pnpm --filter @stavka/tasks eval"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

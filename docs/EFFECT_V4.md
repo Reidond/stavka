@@ -66,6 +66,16 @@ installed API.
 - Make retries finite, failure-specific, observable, interruptible, and bounded
   by integration timeouts.
 
+## Repository tooling
+
+Treat repository automation as application orchestration rather than shell text.
+Root `package.json` scripts are short aliases only; they must not contain long
+file lists, per-application configuration matrices, or `&&`/`||` chains.
+Multi-step tasks live in `@stavka/tasks`, use Effect's scoped child-process API,
+inherit terminal streams, and fail through a typed error when a command exits
+nonzero. This keeps the manifest readable while preserving cancellation and
+resource cleanup.
+
 ## Verification
 
 Before finishing Effect work, run:
