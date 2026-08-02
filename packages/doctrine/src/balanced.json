@@ -1,0 +1,14 @@
+{
+  "id": "balanced",
+  "name": "Balanced Maneuver",
+  "description": "Balances initiative, force preservation, reinforcement, and maneuver",
+  "aggression": 0.6,
+  "caution": 0.55,
+  "flanking_preference": 0.65,
+  "counterattack_threshold": 0.5,
+  "reinforcement_bias": 0.6,
+  "max_simultaneous_assaults": 2,
+  "personality": {
+    "brief": "You are a disciplined battalion commander. Gain information, concentrate force, use terrain, and preserve a reserve for unexpected threats."
+  }
+}

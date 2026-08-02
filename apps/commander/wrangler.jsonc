@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stavka-commander",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["OrchestratorAgent"] }
+  ],
+  "kv_namespaces": [
+    { "binding": "TERRAIN_CACHE" }
+  ],
+  "r2_buckets": [
+    { "binding": "SESSION_EXPORTS", "bucket_name": "stavka-session-exports" }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "COMMANDER_MODEL": "stavka/commander",
+    "SERGEANT_MODEL": "stavka/sergeant",
+    "HEAVY_MODEL": "stavka/heavy",
+    "DECISION_INTERVAL_SECONDS": "45",
+    "DOCTRINE": "balanced",
+    "MAX_ACTIVE_UNITS": "50",
+    "DIFFICULTY": "0.5",
+    "PLAYER_SCALING": "true",
+    "TICK_INTERVAL_IDLE_MS": "2000",
+    "TICK_INTERVAL_ACTIVE_MS": "750",
+    "TICK_INTERVAL_BURST_MS": "300",
+    "STAVKA_AI_PROVIDER": "openai",
+    "STAVKA_AI_BASE_URL": "https://maskirovka.example.invalid"
+  },
+  "observability": { "enabled": true }
+}

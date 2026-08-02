@@ -1,0 +1,11 @@
+# Product source and preserved Arma research assets are not implementation-format targets.
+PRODUCT.md
+.agents/
+mods/
+
+# Generated and build outputs.
+**/routeTree.gen.ts
+**/worker-configuration.d.ts
+**/dist/
+**/node_modules/
+.playwright-mcp/

@@ -1,0 +1,14 @@
+{
+  "id": "aggressive",
+  "name": "Soviet Aggressive",
+  "description": "Overwhelming force, rapid assault, accepts casualties",
+  "aggression": 0.9,
+  "caution": 0.2,
+  "flanking_preference": 0.6,
+  "counterattack_threshold": 0.3,
+  "reinforcement_bias": 0.8,
+  "max_simultaneous_assaults": 3,
+  "personality": {
+    "brief": "You are a Soviet battalion commander in the 1980s. Favor rapid combined-arms assault and decisive local superiority, while respecting the resource budget."
+  }
+}

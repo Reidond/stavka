@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "key": "f06efff16995ecfd82c78a3f825ad3e6880c73dcb3980050add92d35e7195a74",
+  "storedAt": "2026-08-02T00:00:00.000Z",
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "resp_00000000000000000000000000000001",
+      "object": "response",
+      "created_at": 1785628800,
+      "status": "completed",
+      "error": null,
+      "incomplete_details": null,
+      "instructions": null,
+      "model": "gpt-5.6-sol",
+      "output": [
+        {
+          "id": "msg_00000000000000000000000000000001",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "{\"summary\":\"Hold the current objective.\",\"commands\":[]}",
+              "annotations": [],
+              "logprobs": []
+            }
+          ]
+        }
+      ],
+      "output_text": "{\"summary\":\"Hold the current objective.\",\"commands\":[]}",
+      "parallel_tool_calls": true,
+      "tools": [],
+      "tool_choice": "auto",
+      "metadata": {},
+      "temperature": null,
+      "top_p": null,
+      "usage": {
+        "input_tokens": 18,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 12,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 30
+      }
+    },
+    "metadata": {
+      "requestId": "00000000-0000-4000-8000-000000000001",
+      "timestamp": "2026-08-02T00:00:00.000Z",
+      "tier": "stavka/commander",
+      "seat": "mock",
+      "model": "gpt-5.6-sol",
+      "dialect": "openai-responses",
+      "mode": "record",
+      "cacheHit": false,
+      "queueDepth": 0,
+      "latencyMs": 1,
+      "inputTokens": 18,
+      "outputTokens": 12,
+      "estimatedCostUsd": 0,
+      "estimatedSavedUsd": 0.00045
+    }
+  }
+}

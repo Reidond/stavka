@@ -1,0 +1,19 @@
+{
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "tailwindCSS.experimental.configFile": {
+    "packages/ui/src/tokens.css": "packages/ui/src/**",
+    "apps/poligon/src/styles.css": "apps/poligon/src/**",
+    "apps/maskirovka-seat/src/dashboard/styles.css": "apps/maskirovka-seat/src/dashboard/**",
+    "tools/maskirovka/src/dashboard/styles.css": "tools/maskirovka/src/dashboard/**"
+  },
+  "tailwindCSS.classFunctions": ["cn", "tv"],
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "oxc.fmt.configPath": "./vite.config.ts",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  }
+}

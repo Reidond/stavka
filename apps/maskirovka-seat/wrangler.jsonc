@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stavka-maskirovka-seat",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/dashboard",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": true,
+  },
+  "containers": [
+    {
+      "class_name": "MaskirovkaSeat",
+      "image": "./Dockerfile",
+      "image_build_context": ".",
+      "instance_type": "standard-1",
+      "max_instances": 1,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MASKIROVKA_SEAT", "class_name": "MaskirovkaSeat" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MaskirovkaSeat"] }],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "SEAT_ID": "default-codex-seat",
+    "SEAT_PROVIDER": "codex",
+    "MODEL_ALIASES": "{\"stavka/sergeant\":\"gpt-5.6-luna\",\"stavka/heavy\":\"gpt-5.6-terra\"}",
+    "CONTAINER_SLEEP_AFTER": "15m",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+  },
+}

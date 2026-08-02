@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stavka-poligon",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "SIM_WORLD", "class_name": "SimWorld" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SimWorld"] }],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "COMMANDER_URL": "https://stavka-commander.example.workers.dev",
+  },
+  "observability": { "enabled": true },
+}

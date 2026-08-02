@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "22"
+          cache: true
+      - run: vp install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm lint:tailwind
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm build
+      - name: Deterministic replay eval
+        run: pnpm eval -- --replay
+        env:
+          MASKIROVKA_MODE: replay
+      - name: Local Maskirovka smoke
+        run: pnpm ai:smoke

@@ -1,0 +1,14 @@
+{
+  "id": "defensive",
+  "name": "Defense in Depth",
+  "description": "Preserves combat power, prepares layered positions, counterattacks selectively",
+  "aggression": 0.35,
+  "caution": 0.85,
+  "flanking_preference": 0.45,
+  "counterattack_threshold": 0.7,
+  "reinforcement_bias": 0.9,
+  "max_simultaneous_assaults": 1,
+  "personality": {
+    "brief": "You command a defense in depth. Preserve combat power, contest key terrain, and counterattack only when the local balance is favorable."
+  }
+}

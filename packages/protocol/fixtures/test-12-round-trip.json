@@ -1,0 +1,336 @@
+{
+  "provenance": {
+    "source_document": "PRODUCT.md",
+    "source_sections": [
+      "Test 12 — Full Round-Trip (Mod ↔ Commander)",
+      "Appendix C — Node.js Test Commander (round-trip harness)"
+    ],
+    "legacy_wire_status": "PRODUCT preserves the exact canned legacy response commands and one representative state body, but not all three raw request bodies.",
+    "normalization": "Each request and response below is a complete protocol-v1 simulator derivation of the documented move, spawn, and no-op sequence. Values not retained in the legacy capture, including v1 deltas, simulator IDs, strengths, and positions, are deterministic derived fixture values and are not claimed wire captures.",
+    "validated_environment": "The legacy sequence was validated in Arma Reforger Workbench on Windows; this protocol fixture validates normalization and decoding only."
+  },
+  "request": {
+    "protocol_version": 1,
+    "session_id": "workbench-test-12",
+    "faction": "USSR",
+    "tick_id": 1,
+    "timestamp": 1700000000,
+    "type": "full",
+    "full_snapshot_interval": 30,
+    "snapshot": {
+      "mission": {
+        "id": "TestGM_Arland",
+        "epoch": 1,
+        "name": "Game Master Arland",
+        "map": "Arland",
+        "time_elapsed_seconds": 0,
+        "player_count": { "friendly": 0, "enemy": 0 }
+      },
+      "objectives": [],
+      "friendly_groups": [
+        {
+          "id": "0",
+          "faction": "USSR",
+          "template": "USSR Rifle Squad",
+          "position": [2059, 0, 2047],
+          "strength": { "current": 6, "max": 6 },
+          "behavior": "none",
+          "status": "idle"
+        }
+      ],
+      "known_enemies": [],
+      "resources": {
+        "manpower": 150,
+        "vehicle_pool": 0,
+        "reinforcement_cooldown_seconds": 0,
+        "max_active_units": 50
+      }
+    },
+    "sergeant_reports": [],
+    "events": [],
+    "command_results": []
+  },
+  "response": {
+    "protocol_version": 1,
+    "tick_id": 1,
+    "commands": [
+      {
+        "command_id": "test12-t1-move",
+        "type": "move_group",
+        "params": {
+          "group_id": "0",
+          "destination": [2359, 0, 2047]
+        }
+      }
+    ],
+    "tick_rate_hint": 8000,
+    "request_full_snapshot": false,
+    "config_updates": {},
+    "commander_status": {
+      "connected": true,
+      "mode": "rule",
+      "doctrine": "balanced",
+      "decision_pending": false,
+      "active_groups": 1
+    }
+  },
+  "ticks": [
+    {
+      "phase": "move",
+      "documented_state": "1 USSR group (6 agents; 135-byte legacy state)",
+      "legacy_response": {
+        "tick": 1,
+        "commands": [
+          {
+            "type": "move_group",
+            "groupId": 0,
+            "position": [2359, 0, 2047],
+            "waypointType": "ForcedMove"
+          }
+        ]
+      },
+      "request": {
+        "protocol_version": 1,
+        "session_id": "workbench-test-12",
+        "faction": "USSR",
+        "tick_id": 1,
+        "timestamp": 1700000000,
+        "type": "full",
+        "full_snapshot_interval": 30,
+        "snapshot": {
+          "mission": {
+            "id": "TestGM_Arland",
+            "epoch": 1,
+            "name": "Game Master Arland",
+            "map": "Arland",
+            "time_elapsed_seconds": 0,
+            "player_count": { "friendly": 0, "enemy": 0 }
+          },
+          "objectives": [],
+          "friendly_groups": [
+            {
+              "id": "0",
+              "faction": "USSR",
+              "template": "USSR Rifle Squad",
+              "position": [2059, 0, 2047],
+              "strength": { "current": 6, "max": 6 },
+              "behavior": "none",
+              "status": "idle"
+            }
+          ],
+          "known_enemies": [],
+          "resources": {
+            "manpower": 150,
+            "vehicle_pool": 0,
+            "reinforcement_cooldown_seconds": 0,
+            "max_active_units": 50
+          }
+        },
+        "sergeant_reports": [],
+        "events": [],
+        "command_results": []
+      },
+      "response": {
+        "protocol_version": 1,
+        "tick_id": 1,
+        "commands": [
+          {
+            "command_id": "test12-t1-move",
+            "type": "move_group",
+            "params": {
+              "group_id": "0",
+              "destination": [2359, 0, 2047]
+            }
+          }
+        ],
+        "tick_rate_hint": 8000,
+        "request_full_snapshot": false,
+        "config_updates": {},
+        "commander_status": {
+          "connected": true,
+          "mode": "rule",
+          "doctrine": "balanced",
+          "decision_pending": false,
+          "active_groups": 1
+        }
+      }
+    },
+    {
+      "phase": "spawn",
+      "documented_state": "USSR group underway (163-byte legacy state)",
+      "legacy_response": {
+        "tick": 2,
+        "commands": [
+          {
+            "type": "spawn_group",
+            "prefab": "{84E5BBAB25EA23E5}Prefabs/Groups/BLUFOR/Group_US_FireTeam.et",
+            "position": [2059, 0, 2197],
+            "faction": "US"
+          }
+        ]
+      },
+      "request": {
+        "protocol_version": 1,
+        "session_id": "workbench-test-12",
+        "faction": "USSR",
+        "tick_id": 2,
+        "timestamp": 1700000008,
+        "type": "delta",
+        "full_snapshot_interval": 30,
+        "since_tick": 1,
+        "changes": {
+          "mission": {
+            "id": "TestGM_Arland",
+            "epoch": 1,
+            "name": "Game Master Arland",
+            "map": "Arland",
+            "time_elapsed_seconds": 8,
+            "player_count": { "friendly": 0, "enemy": 0 }
+          },
+          "groups_upserted": [
+            {
+              "id": "0",
+              "faction": "USSR",
+              "template": "USSR Rifle Squad",
+              "position": [2074.9999999999854, 0, 2047],
+              "strength": { "current": 6, "max": 6 },
+              "behavior": "forced_move",
+              "status": "moving"
+            }
+          ],
+          "groups_moved": [],
+          "groups_destroyed": [],
+          "objectives_upserted": [],
+          "known_enemies_upserted": [],
+          "known_enemies_expired": []
+        },
+        "sergeant_reports": [],
+        "events": [],
+        "command_results": [{ "command_id": "test12-t1-move", "status": "accepted" }]
+      },
+      "response": {
+        "protocol_version": 1,
+        "tick_id": 2,
+        "commands": [
+          {
+            "command_id": "test12-t2-spawn",
+            "type": "spawn_group",
+            "params": {
+              "template": "{84E5BBAB25EA23E5}Prefabs/Groups/BLUFOR/Group_US_FireTeam.et",
+              "position": [2059, 0, 2197],
+              "faction": "US"
+            }
+          }
+        ],
+        "tick_rate_hint": 8000,
+        "request_full_snapshot": false,
+        "config_updates": {},
+        "commander_status": {
+          "connected": true,
+          "mode": "rule",
+          "doctrine": "balanced",
+          "decision_pending": false,
+          "active_groups": 1
+        }
+      }
+    },
+    {
+      "phase": "noop",
+      "documented_state": "2 groups (274-byte legacy state); USSR group en route and US Fire Team idle",
+      "legacy_state_sample": {
+        "tick": 3,
+        "groups": [
+          {
+            "id": 0,
+            "faction": "USSR",
+            "agentCount": 6,
+            "leaderPos": [2133.77, 47.61, 2055.75],
+            "waypoint": { "type": "SCR_AIWaypoint", "pos": [2359, 78.98, 2047] }
+          }
+        ]
+      },
+      "legacy_response": { "tick": 3, "commands": [] },
+      "request": {
+        "protocol_version": 1,
+        "session_id": "workbench-test-12",
+        "faction": "USSR",
+        "tick_id": 3,
+        "timestamp": 1700000016,
+        "type": "delta",
+        "full_snapshot_interval": 30,
+        "since_tick": 2,
+        "changes": {
+          "mission": {
+            "id": "TestGM_Arland",
+            "epoch": 1,
+            "name": "Game Master Arland",
+            "map": "Arland",
+            "time_elapsed_seconds": 16,
+            "player_count": { "friendly": 0, "enemy": 0 }
+          },
+          "groups_upserted": [],
+          "groups_moved": [],
+          "groups_destroyed": [],
+          "objectives_upserted": [],
+          "known_enemies_upserted": [
+            {
+              "id": "grp_001",
+              "reported_by": "0",
+              "type": "infantry",
+              "estimated_count": 6,
+              "last_known_position": [2059, 0, 2197],
+              "confidence": "confirmed",
+              "age_seconds": 0
+            }
+          ],
+          "known_enemies_expired": []
+        },
+        "sergeant_reports": [
+          {
+            "type": "sergeant_report",
+            "timestamp": 16,
+            "payload": {
+              "group_id": "0",
+              "report_type": "contact",
+              "position": [2090.999999999971, 0, 2047],
+              "strength": { "current": 6, "max": 6 },
+              "status": "moving",
+              "contacts": [
+                {
+                  "type": "infantry",
+                  "estimated_count": 6,
+                  "bearing": 347.95742485712566,
+                  "distance": 153.37535656029664
+                }
+              ],
+              "ammo_status": "adequate",
+              "morale": "confident",
+              "local_decision": "Reporting newly detected contact",
+              "request": "none"
+            }
+          }
+        ],
+        "events": [],
+        "command_results": [
+          { "command_id": "test12-t1-move", "status": "accepted" },
+          { "command_id": "test12-t2-spawn", "status": "accepted" }
+        ]
+      },
+      "response": {
+        "protocol_version": 1,
+        "tick_id": 3,
+        "commands": [],
+        "tick_rate_hint": 8000,
+        "request_full_snapshot": false,
+        "config_updates": {},
+        "commander_status": {
+          "connected": true,
+          "mode": "rule",
+          "doctrine": "balanced",
+          "decision_pending": false,
+          "active_groups": 1
+        }
+      }
+    }
+  ]
+}

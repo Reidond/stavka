@@ -1,0 +1,180 @@
+import type { SessionExport } from "@stavka/protocol";
+
+export const replayFixture: SessionExport = {
+  export_version: 1,
+  session: {
+    protocol_version: 1,
+    session_id: "poligon-engagement-12-opfor-balanced-x10-single",
+    faction: "OPFOR",
+    mission_epoch: 1,
+    doctrine: "balanced",
+    mode: "rule",
+    map_name: "Poligon Procedural",
+    exported_at: "2026-08-02T12:00:00.000Z",
+  },
+  logs: [
+    {
+      id: "dec_000001",
+      timestamp: "2026-08-02T12:00:01.000Z",
+      agent: "commander",
+      trigger: "urgent_contact",
+      input: {
+        stateSnapshot: { tick: 2 },
+        events: [{ type: "contact" }],
+        prompt: "Respond to contact",
+      },
+      output: {
+        rawResponse: "{}",
+        parsedCommands: [
+          {
+            command_id: "cmd_1",
+            type: "move_group",
+            params: { group_id: "red_1", destination: [100, 0, 200] },
+          },
+        ],
+        summary: "Move to the eastern ridge.",
+      },
+      commandsIssued: ["cmd_1"],
+      model: "stavka/commander",
+      latencyMs: 25,
+      tokenUsage: { input: 20, output: 5 },
+      costUsd: 0.001,
+    },
+  ],
+  archive: {
+    ticks: [
+      {
+        tickId: 1,
+        timestamp: 90,
+        kind: "full",
+        request: {
+          protocol_version: 1,
+          session_id: "poligon-engagement-12-opfor-balanced-x10-single",
+          faction: "OPFOR",
+          tick_id: 1,
+          timestamp: 90,
+          full_snapshot_interval: 30,
+          type: "full",
+          snapshot: {
+            mission: {
+              id: "poligon-engagement-12-opfor-balanced-x10-single",
+              epoch: 1,
+              name: "Poligon engagement",
+              map: "Poligon Procedural",
+              time_elapsed_seconds: 9,
+              player_count: { friendly: 0, enemy: 0 },
+            },
+            objectives: [
+              {
+                id: "ridge",
+                name: "Eastern ridge",
+                position: [140, 0, 220],
+                status: "neutral",
+                capture_progress: 0,
+              },
+            ],
+            friendly_groups: [
+              {
+                id: "red_1",
+                faction: "OPFOR",
+                template: "infantry_squad",
+                position: [0, 0, 0],
+                strength: { current: 6, max: 6 },
+                behavior: "defend",
+                status: "idle",
+              },
+            ],
+            known_enemies: [
+              {
+                id: "blue_1",
+                reported_by: "red_1",
+                type: "infantry",
+                estimated_count: 6,
+                last_known_position: [220, 0, 240],
+                confidence: "probable",
+                age_seconds: 12,
+              },
+            ],
+            resources: {
+              manpower: 150,
+              vehicle_pool: 0,
+              reinforcement_cooldown_seconds: 0,
+              max_active_units: 50,
+            },
+          },
+          sergeant_reports: [],
+          events: [],
+          command_results: [],
+        },
+      },
+      {
+        tickId: 2,
+        timestamp: 100,
+        kind: "delta",
+        request: {
+          protocol_version: 1,
+          session_id: "poligon-engagement-12-opfor-balanced-x10-single",
+          faction: "OPFOR",
+          tick_id: 2,
+          timestamp: 100,
+          full_snapshot_interval: 30,
+          type: "delta",
+          since_tick: 1,
+          changes: {
+            groups_upserted: [],
+            groups_moved: [{ id: "red_1", position: [100, 0, 200] }],
+            groups_destroyed: [],
+            objectives_upserted: [],
+            known_enemies_upserted: [],
+            known_enemies_expired: [],
+            resources: {
+              manpower: 140,
+              vehicle_pool: 0,
+              reinforcement_cooldown_seconds: 0,
+              max_active_units: 50,
+            },
+          },
+          sergeant_reports: [],
+          events: [
+            {
+              id: "event_1",
+              type: "contact",
+              timestamp: 99,
+              significance: "urgent",
+              group_id: "red_1",
+            },
+          ],
+          command_results: [{ command_id: "cmd_1", status: "completed" }],
+        },
+      },
+    ],
+    events: [
+      {
+        id: "event_1",
+        type: "contact",
+        timestamp: 99,
+        significance: "urgent",
+        group_id: "red_1",
+      },
+    ],
+    snapshots: [],
+  },
+  cost_aggregates: [
+    {
+      agent_tier: "commander",
+      model: "stavka/commander",
+      calls: 1,
+      input_tokens: 20,
+      output_tokens: 5,
+      cost_usd: 0.001,
+    },
+    {
+      agent_tier: "commander",
+      model: "stavka/commander",
+      calls: 2,
+      input_tokens: 40,
+      output_tokens: 10,
+      cost_usd: 0.002,
+    },
+  ],
+};

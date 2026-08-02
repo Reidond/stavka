@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "key": "54cb225a5700bd5356d6ad768bc0669165d9c5f658339a35b371be7d1633fbf9",
+  "storedAt": "2026-08-02T00:00:00.000Z",
+  "response": {
+    "status": 200,
+    "body": {
+      "id": "msg_00000000000000000000000000000002",
+      "type": "message",
+      "role": "assistant",
+      "model": "gpt-5.6-sol",
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"summary\":\"Hold the current objective.\",\"commands\":[]}"
+        }
+      ],
+      "stop_reason": "end_turn",
+      "stop_sequence": null,
+      "container": null,
+      "usage": {
+        "cache_creation": null,
+        "input_tokens": 16,
+        "output_tokens": 12,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "inference_geo": null,
+        "service_tier": null
+      }
+    },
+    "metadata": {
+      "requestId": "00000000-0000-4000-8000-000000000002",
+      "timestamp": "2026-08-02T00:00:00.000Z",
+      "tier": "stavka/commander",
+      "seat": "mock",
+      "model": "gpt-5.6-sol",
+      "dialect": "anthropic-messages",
+      "mode": "record",
+      "cacheHit": false,
+      "queueDepth": 0,
+      "latencyMs": 1,
+      "inputTokens": 16,
+      "outputTokens": 12,
+      "estimatedCostUsd": 0,
+      "estimatedSavedUsd": 0.00044
+    }
+  }
+}

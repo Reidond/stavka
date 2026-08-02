@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["eslint-plugin-better-tailwindcss"],
+  "settings": {
+    "better-tailwindcss": {
+      "cwd": "packages/ui",
+      "entryPoint": "src/tokens.css",
+      "detectComponentClasses": true
+    }
+  },
+  "rules": {
+    "better-tailwindcss/enforce-consistent-line-wrapping": [
+      "warn",
+      {
+        "group": "never",
+        "preferSingleLine": true,
+        "printWidth": 0
+      }
+    ],
+    "better-tailwindcss/enforce-consistent-class-order": "warn",
+    "better-tailwindcss/enforce-canonical-classes": "warn",
+    "better-tailwindcss/no-duplicate-classes": "warn",
+    "better-tailwindcss/no-deprecated-classes": "warn",
+    "better-tailwindcss/no-unnecessary-whitespace": "warn",
+    "better-tailwindcss/no-concatenated-classes": "error",
+    "better-tailwindcss/no-unknown-classes": [
+      "error",
+      {
+        "ignore": ["^poligon-(?:shell|layout)$", "^maskirovka-(?:shell|grid)$"]
+      }
+    ],
+    "better-tailwindcss/no-conflicting-classes": "error"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/routeTree.gen.ts",
+    "**/worker-configuration.d.ts"
+  ]
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Effect v4"
+  short_description: "Build contract-first Effect v4 applications"
+  default_prompt: "Use $effect-v4 to build this feature with Effect v4 services, layers, schemas, repositories, and HttpApi."

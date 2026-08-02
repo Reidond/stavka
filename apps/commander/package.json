@@ -1,0 +1,26 @@
+{
+  "name": "@stavka/commander",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "tsc -p tsconfig.json --noEmit && wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@effect/ai-anthropic": "4.0.0-beta.102",
+    "@effect/ai-openai": "4.0.0-beta.102",
+    "@stavka/access-auth": "workspace:*",
+    "@stavka/doctrine": "workspace:*",
+    "@stavka/protocol": "workspace:*",
+    "agents": "0.20.1",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260801.1",
+    "wrangler": "4.118.0"
+  }
+}

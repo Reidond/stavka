@@ -1,0 +1,53 @@
+@import "@stavka/ui/tokens.css";
+
+@source ".";
+@source "../../../../packages/ui/src";
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .maskirovka-shell {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0 auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-width: 96rem;
+    overflow: hidden;
+    padding: 1rem;
+    width: 100%;
+  }
+
+  .maskirovka-shell > header {
+    flex: 0 0 auto;
+  }
+
+  .maskirovka-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .maskirovka-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+}

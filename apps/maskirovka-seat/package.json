@@ -1,0 +1,46 @@
+{
+  "name": "@stavka/maskirovka-seat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm build:dashboard && wrangler dev",
+    "build:dashboard": "vp build --config vite.dashboard.config.ts",
+    "build": "pnpm build:dashboard && wrangler deploy --dry-run --outdir dist/worker",
+    "build:container": "docker build -t stavka-maskirovka-seat:local .",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "types": "wrangler types worker-configuration.d.ts",
+    "verify": "tsc -p tsconfig.json --noEmit && vitest run --config vitest.config.ts && pnpm build",
+    "deploy": "pnpm build:dashboard && wrangler deploy"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.220",
+    "@anthropic-ai/sdk": "0.115.0",
+    "@cloudflare/containers": "0.3.7",
+    "@effect/platform-node": "4.0.0-beta.102",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@openai/codex-sdk": "0.146.0",
+    "@stavka/access-auth": "workspace:*",
+    "@stavka/ui": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-router": "1.170.18",
+    "effect": "4.0.0-beta.102",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "^24.3.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.5",
+    "esbuild": "0.28.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.7",
+    "vitest": "4.1.10",
+    "wrangler": "4.118.0"
+  }
+}
