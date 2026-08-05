@@ -17,11 +17,33 @@ describe("terrain-aware commander context", () => {
         classification_version: 7,
         content_hash: "sha256:test-map",
         terrain_grid: [
-          { grid: [0, 0] as const, type: "forest" as const, cover: "heavy" as const, elevation: 12, slope_degrees: 20, traversable: true },
-          { grid: [1, 0] as const, type: "road" as const, cover: "none" as const, elevation: 11, slope_degrees: 4, traversable: false },
-          { grid: [0, 1] as const, type: "road" as const, cover: "none" as const, elevation: 10, traversable: true },
+          {
+            grid: [0, 0] as const,
+            type: "forest" as const,
+            cover: "heavy" as const,
+            elevation: 12,
+            slope_degrees: 20,
+            traversable: true,
+          },
+          {
+            grid: [1, 0] as const,
+            type: "road" as const,
+            cover: "none" as const,
+            elevation: 11,
+            slope_degrees: 4,
+            traversable: false,
+          },
+          {
+            grid: [0, 1] as const,
+            type: "road" as const,
+            cover: "none" as const,
+            elevation: 10,
+            traversable: true,
+          },
         ],
-        key_features: [{ name: "Hill 12", grid: [0, 0] as const, type: "high_ground" as const, elevation: 12 }],
+        key_features: [
+          { name: "Hill 12", grid: [0, 0] as const, type: "high_ground" as const, elevation: 12 },
+        ],
       },
     };
     const prompt = commanderPrompt(state, "scheduled_tick");

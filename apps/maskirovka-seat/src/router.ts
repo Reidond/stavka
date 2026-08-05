@@ -550,10 +550,9 @@ const HumanAccessLive = Layer.succeed(HumanAccess)((httpEffect) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
-      Effect.mapError(() => unavailable(
-        "ACCESS_REQUEST_UNAVAILABLE",
-        "Unable to verify the original Access request",
-      )),
+      Effect.mapError(() =>
+        unavailable("ACCESS_REQUEST_UNAVAILABLE", "Unable to verify the original Access request"),
+      ),
     );
     return yield* Effect.provideService(httpEffect, HostedAccessRequest, {
       request: webRequest,

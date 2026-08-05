@@ -58,9 +58,12 @@ export class WindowTrackerRepository extends Context.Service<
 >()("@stavka/maskirovka/WindowTrackerRepository") {}
 
 const repositoryFailure = (operation: string, cause: unknown): GatewayError =>
-  new GatewayError(500, "WINDOW_TRACKER_REPOSITORY_FAILURE", `Unable to ${operation} usage tracker`, [
-    cause instanceof Error ? cause.message : "Unknown usage tracker repository error",
-  ]);
+  new GatewayError(
+    500,
+    "WINDOW_TRACKER_REPOSITORY_FAILURE",
+    `Unable to ${operation} usage tracker`,
+    [cause instanceof Error ? cause.message : "Unknown usage tracker repository error"],
+  );
 
 export class FileWindowTrackerRepository implements WindowTrackerRepositoryService {
   readonly durable = true;
@@ -79,28 +82,30 @@ export class FileWindowTrackerRepository implements WindowTrackerRepositoryServi
       },
       catch: (cause) => repositoryFailure("read", cause),
     }).pipe(
-      Effect.flatMap((encoded) => encoded === undefined
-        ? Effect.succeed(undefined)
-        : Schema.decodeUnknownEffect(Schema.fromJsonString(PersistedWindowTracker), {
-            onExcessProperty: "error",
-          })(encoded).pipe(
-            Effect.mapError((cause) => repositoryFailure("decode", cause)),
-          )),
+      Effect.flatMap((encoded) =>
+        encoded === undefined
+          ? Effect.succeed(undefined)
+          : Schema.decodeUnknownEffect(Schema.fromJsonString(PersistedWindowTracker), {
+              onExcessProperty: "error",
+            })(encoded).pipe(Effect.mapError((cause) => repositoryFailure("decode", cause))),
+      ),
     );
   }
 
   save(snapshot: PersistedWindowTracker): Effect.Effect<void, GatewayError> {
     return Schema.encodeEffect(Schema.fromJsonString(PersistedWindowTracker))(snapshot).pipe(
       Effect.mapError((cause) => repositoryFailure("encode", cause)),
-      Effect.flatMap((encoded) => Effect.tryPromise({
-        try: async () => {
-          await mkdir(dirname(this.filename), { recursive: true });
-          const temporary = `${this.filename}.${process.pid}.${crypto.randomUUID()}.tmp`;
-          await writeFile(temporary, `${encoded}\n`, { encoding: "utf8", mode: 0o600 });
-          await rename(temporary, this.filename);
-        },
-        catch: (cause) => repositoryFailure("write", cause),
-      })),
+      Effect.flatMap((encoded) =>
+        Effect.tryPromise({
+          try: async () => {
+            await mkdir(dirname(this.filename), { recursive: true });
+            const temporary = `${this.filename}.${process.pid}.${crypto.randomUUID()}.tmp`;
+            await writeFile(temporary, `${encoded}\n`, { encoding: "utf8", mode: 0o600 });
+            await rename(temporary, this.filename);
+          },
+          catch: (cause) => repositoryFailure("write", cause),
+        }),
+      ),
     );
   }
 }

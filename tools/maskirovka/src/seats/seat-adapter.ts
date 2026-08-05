@@ -1,11 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 
-import {
-  GatewayError,
-  type SeatInvocation,
-  type SeatKind,
-  type SeatResult,
-} from "../domain/types";
+import { GatewayError, type SeatInvocation, type SeatKind, type SeatResult } from "../domain/types";
 
 export interface SeatAdapter {
   readonly id: SeatKind;
@@ -21,9 +16,7 @@ export class SeatAdapters extends Context.Service<SeatAdapters, SeatAdaptersServ
   "@stavka/maskirovka/SeatAdapters",
 ) {}
 
-export const SeatAdaptersLive = (
-  adapters: readonly SeatAdapter[],
-): Layer.Layer<SeatAdapters> => {
+export const SeatAdaptersLive = (adapters: readonly SeatAdapter[]): Layer.Layer<SeatAdapters> => {
   const byId = new Map(adapters.map((adapter) => [adapter.id, adapter]));
   return Layer.succeed(SeatAdapters, {
     get: (seat) => byId.get(seat),

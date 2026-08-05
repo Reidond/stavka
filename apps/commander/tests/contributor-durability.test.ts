@@ -82,26 +82,24 @@ const makeAgent = () => {
 describe("durable contributor jobs", () => {
   it("reissues one deterministic pending job after restart and rejects payload collisions", async () => {
     const first = makeAgent();
-    void first.agent.invokeContributor(
-      "contributor",
-      "stavka/commander",
-      "original prompt",
-      1,
-      "stable-decision",
-    ).catch(() => undefined);
+    void first.agent
+      .invokeContributor("contributor", "stavka/commander", "original prompt", 1, "stable-decision")
+      .catch(() => undefined);
     await vi.waitFor(() => {
       expect(first.sent.some((message) => JSON.parse(message).type === "invoke")).toBe(true);
     });
 
     const replacement = makeAgent();
     replacement.agent.state = structuredClone(first.agent.state);
-    await expect(replacement.agent.invokeContributor(
-      "contributor",
-      "stavka/commander",
-      "changed prompt must not reuse the accepted job",
-      1,
-      "stable-decision",
-    )).rejects.toMatchObject({ code: "CONTRIBUTOR_JOB_MISMATCH" });
+    await expect(
+      replacement.agent.invokeContributor(
+        "contributor",
+        "stavka/commander",
+        "changed prompt must not reuse the accepted job",
+        1,
+        "stable-decision",
+      ),
+    ).rejects.toMatchObject({ code: "CONTRIBUTOR_JOB_MISMATCH" });
     const resumed = replacement.agent.invokeContributor(
       "contributor",
       "stavka/commander",
@@ -120,28 +118,33 @@ describe("durable contributor jobs", () => {
     });
     expect(invoke?.job_id).toMatch(/^job_contributor_stable-decision_/);
 
-    await replacement.agent.onMessage(replacement.connection as never, JSON.stringify({
-      protocol_version: 1,
-      type: "result",
-      job_id: invoke?.job_id,
-      seat_id: "contributor",
-      ok: true,
-      decision: { summary: "Recovered", commands: [] },
-      usage: { input_tokens: 10, output_tokens: 5, estimated_cost_usd: 0.01 },
-    }));
+    await replacement.agent.onMessage(
+      replacement.connection as never,
+      JSON.stringify({
+        protocol_version: 1,
+        type: "result",
+        job_id: invoke?.job_id,
+        seat_id: "contributor",
+        ok: true,
+        decision: { summary: "Recovered", commands: [] },
+        usage: { input_tokens: 10, output_tokens: 5, estimated_cost_usd: 0.01 },
+      }),
+    );
     await expect(resumed).resolves.toMatchObject({
       decision: { summary: "Recovered" },
       costUsd: 0.01,
     });
 
     const sendsBeforeCacheRead = replacement.sent.length;
-    await expect(replacement.agent.invokeContributor(
-      "contributor",
-      "stavka/commander",
-      "original prompt",
-      1,
-      "stable-decision",
-    )).resolves.toMatchObject({ decision: { summary: "Recovered" } });
+    await expect(
+      replacement.agent.invokeContributor(
+        "contributor",
+        "stavka/commander",
+        "original prompt",
+        1,
+        "stable-decision",
+      ),
+    ).resolves.toMatchObject({ decision: { summary: "Recovered" } });
     expect(replacement.sent).toHaveLength(sendsBeforeCacheRead);
   });
 
@@ -177,17 +180,22 @@ describe("durable contributor jobs", () => {
       expect.objectContaining({ id: "lease-bound-job", jobId: job?.id }),
     ]);
 
-    const invoke = sent.map((message) => JSON.parse(message)).find((message) => message.type === "invoke");
-    await agent.onMessage(connection as never, JSON.stringify({
-      protocol_version: 1,
-      type: "result",
-      job_id: invoke?.job_id,
-      seat_id: "contributor",
-      ok: false,
-      code: "TEST_COMPLETE",
-      message: "Test cleanup",
-      retryable: false,
-    }));
+    const invoke = sent
+      .map((message) => JSON.parse(message))
+      .find((message) => message.type === "invoke");
+    await agent.onMessage(
+      connection as never,
+      JSON.stringify({
+        protocol_version: 1,
+        type: "result",
+        job_id: invoke?.job_id,
+        seat_id: "contributor",
+        ok: false,
+        code: "TEST_COMPLETE",
+        message: "Test cleanup",
+        retryable: false,
+      }),
+    );
     await expect(invocation).rejects.toMatchObject({ code: "TEST_COMPLETE" });
   });
 
@@ -196,15 +204,17 @@ describe("durable contributor jobs", () => {
     agent.state = {
       ...agent.state,
       seats: [{ ...contributor, reservedUsd: 0.6 }],
-      seatBudgetReservations: [{
-        id: "abandoned",
-        seatId: "contributor",
-        amountUsd: 0.6,
-        actualCostUsd: 0,
-        period: "2026-08",
-        status: "reserved",
-        updatedAt: Date.now() / 1_000 - 301,
-      }],
+      seatBudgetReservations: [
+        {
+          id: "abandoned",
+          seatId: "contributor",
+          amountUsd: 0.6,
+          actualCostUsd: 0,
+          period: "2026-08",
+          status: "reserved",
+          updatedAt: Date.now() / 1_000 - 301,
+        },
+      ],
     };
 
     const reservation = await agent.reserveSeatBudget("contributor", 0.6, "replacement");
@@ -228,7 +238,9 @@ describe("durable contributor jobs", () => {
     await vi.waitFor(() => {
       expect(sent.some((message) => JSON.parse(message).type === "invoke")).toBe(true);
     });
-    const invoke = sent.map((message) => JSON.parse(message)).find((message) => message.type === "invoke");
+    const invoke = sent
+      .map((message) => JSON.parse(message))
+      .find((message) => message.type === "invoke");
     const jobId = invoke?.job_id as string;
     agent.state = {
       ...agent.state,
@@ -279,20 +291,25 @@ describe("durable contributor jobs", () => {
     await vi.waitFor(() => {
       expect(sent.some((message) => JSON.parse(message).type === "invoke")).toBe(true);
     });
-    const invoke = sent.map((message) => JSON.parse(message)).find((message) => message.type === "invoke");
+    const invoke = sent
+      .map((message) => JSON.parse(message))
+      .find((message) => message.type === "invoke");
 
-    await agent.onMessage(connection as never, JSON.stringify({
-      protocol_version: 1,
-      type: "result",
-      job_id: invoke?.job_id,
-      seat_id: "contributor",
-      ok: false,
-      code: "UPSTREAM_TIMEOUT",
-      message: "provider response timed out after usage",
-      retryable: true,
-      resolved_model: "seat-model",
-      usage: { input_tokens: 11, output_tokens: 7, estimated_cost_usd: 0.03 },
-    }));
+    await agent.onMessage(
+      connection as never,
+      JSON.stringify({
+        protocol_version: 1,
+        type: "result",
+        job_id: invoke?.job_id,
+        seat_id: "contributor",
+        ok: false,
+        code: "UPSTREAM_TIMEOUT",
+        message: "provider response timed out after usage",
+        retryable: true,
+        resolved_model: "seat-model",
+        usage: { input_tokens: 11, output_tokens: 7, estimated_cost_usd: 0.03 },
+      }),
+    );
 
     await expect(invocation).rejects.toMatchObject({
       code: "UPSTREAM_TIMEOUT",
@@ -317,12 +334,15 @@ describe("durable contributor jobs", () => {
       seats: [{ ...contributor, exhausted: true, spentUsd: 0, reservedUsd: 0 }],
     };
 
-    await agent.onMessage(connection as never, JSON.stringify({
-      protocol_version: 1,
-      type: "heartbeat",
-      seat_id: "contributor",
-      status: "healthy",
-    }));
+    await agent.onMessage(
+      connection as never,
+      JSON.stringify({
+        protocol_version: 1,
+        type: "heartbeat",
+        seat_id: "contributor",
+        status: "healthy",
+      }),
+    );
 
     expect(agent.state.seats[0]).toMatchObject({ healthy: true, exhausted: true });
   });

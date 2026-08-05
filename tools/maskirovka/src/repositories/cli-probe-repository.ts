@@ -62,5 +62,7 @@ export class ProcessCliProbeRepository implements CliProbeRepositoryService {
   }
 }
 
-export const CliProbeRepositoryLive: Layer.Layer<CliProbeRepository> =
-  Layer.succeed(CliProbeRepository, new ProcessCliProbeRepository());
+export const CliProbeRepositoryLive: Layer.Layer<CliProbeRepository> = Layer.succeed(
+  CliProbeRepository,
+  new ProcessCliProbeRepository(),
+);

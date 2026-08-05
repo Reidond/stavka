@@ -5,12 +5,13 @@ import { describe, expect, it } from "vitest";
 
 const sourceRoot = fileURLToPath(new URL("../src", import.meta.url));
 
-const sourceFiles = (directory: string): string[] => readdirSync(directory)
-  .flatMap((entry) => {
-    const path = resolve(directory, entry);
-    return statSync(path).isDirectory() ? sourceFiles(path) : [path];
-  })
-  .filter((path) => path.endsWith(".ts") || path.endsWith(".tsx"));
+const sourceFiles = (directory: string): string[] =>
+  readdirSync(directory)
+    .flatMap((entry) => {
+      const path = resolve(directory, entry);
+      return statSync(path).isDirectory() ? sourceFiles(path) : [path];
+    })
+    .filter((path) => path.endsWith(".ts") || path.endsWith(".tsx"));
 
 describe("Commander architecture boundaries", () => {
   it("keeps raw SQL inside repository modules", () => {
@@ -33,7 +34,12 @@ describe("Commander architecture boundaries", () => {
 
   it("keeps Effect execution at application and framework boundaries", () => {
     const violations = sourceFiles(sourceRoot)
-      .filter((path) => !path.endsWith("index.ts") && !path.includes("/durable/") && !path.endsWith("api/router.ts"))
+      .filter(
+        (path) =>
+          !path.endsWith("index.ts") &&
+          !path.includes("/durable/") &&
+          !path.endsWith("api/router.ts"),
+      )
       .filter((path) => readFileSync(path, "utf8").includes("Effect.runPromise"));
     expect(violations).toEqual([]);
   });

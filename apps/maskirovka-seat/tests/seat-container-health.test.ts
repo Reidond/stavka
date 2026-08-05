@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  providerLifecycleIsHealthy,
-  providerLifecycleTransition,
-} from "../src/provider-health";
+import { providerLifecycleIsHealthy, providerLifecycleTransition } from "../src/provider-health";
 
 describe("hosted provider health transitions", () => {
   it.each([

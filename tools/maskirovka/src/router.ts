@@ -1,8 +1,4 @@
-import {
-  authorizeMachine,
-  can,
-  verifyAccessRequest,
-} from "@stavka/access-auth";
+import { authorizeMachine, can, verifyAccessRequest } from "@stavka/access-auth";
 import {
   AnthropicMessagesRequest,
   decodeLlmAliasRemapRequest,
@@ -18,25 +14,11 @@ import {
   HttpServerRequest,
   HttpServerResponse,
 } from "effect/unstable/http";
-import {
-  HttpApi,
-  HttpApiBuilder,
-  HttpApiEndpoint,
-  HttpApiGroup,
-} from "effect/unstable/httpapi";
+import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
 
-import {
-  MaskirovkaConfiguration,
-  type MaskirovkaConfig,
-} from "./config";
+import { MaskirovkaConfiguration, type MaskirovkaConfig } from "./config";
 import { normalizeRequest } from "./domain/protocol";
-import {
-  GatewayError,
-  seatKinds,
-  tierAliases,
-  type Dialect,
-  type TierAlias,
-} from "./domain/types";
+import { GatewayError, seatKinds, tierAliases, type Dialect, type TierAlias } from "./domain/types";
 import {
   StaticAssetRepository,
   type StaticAssetRepositoryService,
@@ -108,13 +90,15 @@ const GatewayHealthResponse = Schema.Struct({
 });
 const ModelsResponse = Schema.Struct({
   object: Schema.Literal("list"),
-  data: Schema.Array(Schema.Struct({
-    id: Tier,
-    object: Schema.Literal("model"),
-    created: Schema.Number,
-    owned_by: Schema.Literal("stavka"),
-    resolution: Schema.Struct({ seat: Seat, model: Schema.String }),
-  })),
+  data: Schema.Array(
+    Schema.Struct({
+      id: Tier,
+      object: Schema.Literal("model"),
+      created: Schema.Number,
+      owned_by: Schema.Literal("stavka"),
+      resolution: Schema.Struct({ seat: Seat, model: Schema.String }),
+    }),
+  ),
 });
 const RequestMetadataResponse = Schema.Struct({
   requestId: Schema.String,
@@ -134,11 +118,9 @@ const RequestMetadataResponse = Schema.Struct({
   apiListCostUsd: Schema.Number,
   estimatedSavedUsd: Schema.Number,
   fallbackFromSeat: Schema.optional(Seat),
-  routingReason: Schema.optional(Schema.Literals([
-    "budget-fallback",
-    "unavailable-fallback",
-    "retry-fallback",
-  ])),
+  routingReason: Schema.optional(
+    Schema.Literals(["budget-fallback", "unavailable-fallback", "retry-fallback"]),
+  ),
 });
 const RequestsResponse = Schema.Struct({ requests: Schema.Array(RequestMetadataResponse) });
 const AliasesResponse = Schema.Struct({ aliases: Schema.Array(AliasResolutionResponse) });
@@ -214,13 +196,11 @@ const errorBody = (error: GatewayError, requestId: string) => ({
               ? {}
               : { cached_input_tokens: error.providerUsage.cachedInputTokens }),
             ...(error.providerUsage.planCreditUsd === undefined &&
-                error.providerUsage.actualCostUsd === undefined
+            error.providerUsage.actualCostUsd === undefined
               ? {}
               : {
                   estimated_cost_usd:
-                    error.providerUsage.planCreditUsd ??
-                    error.providerUsage.actualCostUsd ??
-                    0,
+                    error.providerUsage.planCreditUsd ?? error.providerUsage.actualCostUsd ?? 0,
                 }),
           },
         }
@@ -231,124 +211,137 @@ const errorBody = (error: GatewayError, requestId: string) => ({
 const errorResponse = (
   error: GatewayError,
   requestId: string,
-): HttpServerResponse.HttpServerResponse => HttpServerResponse.jsonUnsafe(
-  errorBody(error, requestId),
-  {
+): HttpServerResponse.HttpServerResponse =>
+  HttpServerResponse.jsonUnsafe(errorBody(error, requestId), {
     status: error.status >= 400 && error.status <= 599 ? error.status : 500,
     headers: { "x-request-id": requestId },
-  },
-);
+  });
 
 const withErrorEnvelope = <R>(
   requestId: string,
   effect: Effect.Effect<HttpServerResponse.HttpServerResponse, GatewayError, R>,
-): Effect.Effect<HttpServerResponse.HttpServerResponse, never, R> => effect.pipe(
-  Effect.catch((error) => Effect.succeed(errorResponse(error, requestId))),
-  Effect.catchCause((cause) => Cause.hasInterruptsOnly(cause)
-    ? Effect.failCause(cause)
-    : Effect.logError(
-        "Maskirovka request failed",
-        Cause.pretty(cause),
-      ).pipe(Effect.as(errorResponse(
-        new GatewayError(500, "INTERNAL_ERROR", "Internal gateway failure"),
-        requestId,
-      )))),
-);
+): Effect.Effect<HttpServerResponse.HttpServerResponse, never, R> =>
+  effect.pipe(
+    Effect.catch((error) => Effect.succeed(errorResponse(error, requestId))),
+    Effect.catchCause((cause) =>
+      Cause.hasInterruptsOnly(cause)
+        ? Effect.failCause(cause)
+        : Effect.logError("Maskirovka request failed", Cause.pretty(cause)).pipe(
+            Effect.as(
+              errorResponse(
+                new GatewayError(500, "INTERNAL_ERROR", "Internal gateway failure"),
+                requestId,
+              ),
+            ),
+          ),
+    ),
+  );
 
 const withTypedErrorEnvelope = <A, R>(
   requestId: string,
   effect: Effect.Effect<A, GatewayError, R>,
-): Effect.Effect<A | HttpServerResponse.HttpServerResponse, never, R> => effect.pipe(
-  Effect.catch((error) => Effect.succeed(errorResponse(error, requestId))),
-  Effect.catchCause((cause) => Cause.hasInterruptsOnly(cause)
-    ? Effect.failCause(cause)
-    : Effect.logError(
-        "Maskirovka request failed",
-        Cause.pretty(cause),
-      ).pipe(Effect.as(errorResponse(
-        new GatewayError(500, "INTERNAL_ERROR", "Internal gateway failure"),
-        requestId,
-      )))),
-);
+): Effect.Effect<A | HttpServerResponse.HttpServerResponse, never, R> =>
+  effect.pipe(
+    Effect.catch((error) => Effect.succeed(errorResponse(error, requestId))),
+    Effect.catchCause((cause) =>
+      Cause.hasInterruptsOnly(cause)
+        ? Effect.failCause(cause)
+        : Effect.logError("Maskirovka request failed", Cause.pretty(cause)).pipe(
+            Effect.as(
+              errorResponse(
+                new GatewayError(500, "INTERNAL_ERROR", "Internal gateway failure"),
+                requestId,
+              ),
+            ),
+          ),
+    ),
+  );
 
 const requireMachine = (
   request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<void, GatewayError, MaskirovkaConfiguration> => Effect.gen(function*() {
-  const config = yield* MaskirovkaConfiguration;
-  if (!config.apiKey) return;
-  const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
-    Effect.mapError(() => new GatewayError(
-      500,
-      "AUTH_REQUEST_FAILURE",
-      "Unable to reconstruct the original authentication request",
-    )),
-  );
-  const authorized = yield* authorizeMachine(webRequest, config.apiKey).pipe(
-    Effect.mapError((error) => new GatewayError(500, "AUTH_FAILURE", error.message)),
-  );
-  if (!authorized) {
-    return yield* Effect.fail(new GatewayError(
-      401,
-      "UNAUTHORIZED",
-      "Invalid seat bearer token",
-    ));
-  }
-});
+): Effect.Effect<void, GatewayError, MaskirovkaConfiguration> =>
+  Effect.gen(function* () {
+    const config = yield* MaskirovkaConfiguration;
+    if (!config.apiKey) return;
+    const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
+      Effect.mapError(
+        () =>
+          new GatewayError(
+            500,
+            "AUTH_REQUEST_FAILURE",
+            "Unable to reconstruct the original authentication request",
+          ),
+      ),
+    );
+    const authorized = yield* authorizeMachine(webRequest, config.apiKey).pipe(
+      Effect.mapError((error) => new GatewayError(500, "AUTH_FAILURE", error.message)),
+    );
+    if (!authorized) {
+      return yield* Effect.fail(new GatewayError(401, "UNAUTHORIZED", "Invalid seat bearer token"));
+    }
+  });
 
 const requireHuman = (
   request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<boolean, GatewayError, MaskirovkaConfiguration> => Effect.gen(function*() {
-  const config = yield* MaskirovkaConfiguration;
-  if (!config.access) {
-    return yield* Effect.fail(new GatewayError(
-      401,
-      "ACCESS_REQUIRED",
-      "Cloudflare Access is required",
-    ));
-  }
-  const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
-    Effect.mapError(() => new GatewayError(
-      500,
-      "ACCESS_REQUEST_FAILURE",
-      "Unable to reconstruct the original Access request",
-    )),
-  );
-  const identity = yield* verifyAccessRequest(webRequest, config.access).pipe(
-    Effect.mapError(() => new GatewayError(
-      401,
-      "ACCESS_REQUIRED",
-      "A valid Cloudflare Access identity is required",
-    )),
-  );
-  if (!can(identity, "read")) {
-    return yield* Effect.fail(new GatewayError(
-      401,
-      "ACCESS_REQUIRED",
-      "A valid Cloudflare Access identity is required",
-    ));
-  }
-  return can(identity, "admin");
-});
+): Effect.Effect<boolean, GatewayError, MaskirovkaConfiguration> =>
+  Effect.gen(function* () {
+    const config = yield* MaskirovkaConfiguration;
+    if (!config.access) {
+      return yield* Effect.fail(
+        new GatewayError(401, "ACCESS_REQUIRED", "Cloudflare Access is required"),
+      );
+    }
+    const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
+      Effect.mapError(
+        () =>
+          new GatewayError(
+            500,
+            "ACCESS_REQUEST_FAILURE",
+            "Unable to reconstruct the original Access request",
+          ),
+      ),
+    );
+    const identity = yield* verifyAccessRequest(webRequest, config.access).pipe(
+      Effect.mapError(
+        () =>
+          new GatewayError(
+            401,
+            "ACCESS_REQUIRED",
+            "A valid Cloudflare Access identity is required",
+          ),
+      ),
+    );
+    if (!can(identity, "read")) {
+      return yield* Effect.fail(
+        new GatewayError(401, "ACCESS_REQUIRED", "A valid Cloudflare Access identity is required"),
+      );
+    }
+    return can(identity, "admin");
+  });
 
 const requireAdminRoute = (
   request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<boolean, GatewayError, MaskirovkaConfiguration> => Effect.gen(function*() {
-  const config = yield* MaskirovkaConfiguration;
-  if (config.apiKey) {
-    const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
-      Effect.mapError(() => new GatewayError(
-        500,
-        "AUTH_REQUEST_FAILURE",
-        "Unable to reconstruct the original authentication request",
-      )),
-    );
-    const machine = yield* authorizeMachine(webRequest, config.apiKey).pipe(
-      Effect.mapError((error) => new GatewayError(500, "AUTH_FAILURE", error.message)),
-    );
-    if (machine) return false;
-  }
-  return yield* requireHuman(request);
-});
+): Effect.Effect<boolean, GatewayError, MaskirovkaConfiguration> =>
+  Effect.gen(function* () {
+    const config = yield* MaskirovkaConfiguration;
+    if (config.apiKey) {
+      const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
+        Effect.mapError(
+          () =>
+            new GatewayError(
+              500,
+              "AUTH_REQUEST_FAILURE",
+              "Unable to reconstruct the original authentication request",
+            ),
+        ),
+      );
+      const machine = yield* authorizeMachine(webRequest, config.apiKey).pipe(
+        Effect.mapError((error) => new GatewayError(500, "AUTH_FAILURE", error.message)),
+      );
+      if (machine) return false;
+    }
+    return yield* requireHuman(request);
+  });
 
 interface BodyAccumulator {
   readonly chunks: readonly Uint8Array[];
@@ -357,67 +350,67 @@ interface BodyAccumulator {
 
 const parseJson = (
   request: HttpServerRequest.HttpServerRequest,
-): Effect.Effect<unknown, GatewayError> => Effect.gen(function*() {
-  const declaredLength = Number(request.headers["content-length"] ?? "0");
-  if (declaredLength > MAX_JSON_BYTES) {
-    return yield* Effect.fail(new GatewayError(
-      413,
-      "PAYLOAD_TOO_LARGE",
-      "Payload exceeds 2MB",
-    ));
-  }
+): Effect.Effect<unknown, GatewayError> =>
+  Effect.gen(function* () {
+    const declaredLength = Number(request.headers["content-length"] ?? "0");
+    if (declaredLength > MAX_JSON_BYTES) {
+      return yield* Effect.fail(new GatewayError(413, "PAYLOAD_TOO_LARGE", "Payload exceeds 2MB"));
+    }
 
-  const accumulated = yield* Stream.runFoldEffect(
-    request.stream,
-    (): BodyAccumulator => ({ chunks: [], length: 0 }),
-    (state, chunk) => {
-      const length = state.length + chunk.byteLength;
-      return length > MAX_JSON_BYTES
-        ? Effect.fail(new GatewayError(
-            413,
-            "PAYLOAD_TOO_LARGE",
-            "Payload exceeds 2MB",
-          ))
-        : Effect.succeed({ chunks: [...state.chunks, chunk], length });
-    },
-  ).pipe(Effect.mapError((error) => error instanceof GatewayError
-    ? error
-    : new GatewayError(400, "INVALID_JSON", "Request body must be valid JSON", [
-        error instanceof Error ? error.message : "Unable to read request body",
-      ])));
+    const accumulated = yield* Stream.runFoldEffect(
+      request.stream,
+      (): BodyAccumulator => ({ chunks: [], length: 0 }),
+      (state, chunk) => {
+        const length = state.length + chunk.byteLength;
+        return length > MAX_JSON_BYTES
+          ? Effect.fail(new GatewayError(413, "PAYLOAD_TOO_LARGE", "Payload exceeds 2MB"))
+          : Effect.succeed({ chunks: [...state.chunks, chunk], length });
+      },
+    ).pipe(
+      Effect.mapError((error) =>
+        error instanceof GatewayError
+          ? error
+          : new GatewayError(400, "INVALID_JSON", "Request body must be valid JSON", [
+              error instanceof Error ? error.message : "Unable to read request body",
+            ]),
+      ),
+    );
 
-  const bytes = new Uint8Array(accumulated.length);
-  let offset = 0;
-  for (const chunk of accumulated.chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return yield* Effect.try({
-    try: () => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown,
-    catch: (error) => new GatewayError(
-      400,
-      "INVALID_JSON",
-      "Request body must be valid JSON",
-      [error instanceof Error ? error.message : "JSON parse error"],
-    ),
+    const bytes = new Uint8Array(accumulated.length);
+    let offset = 0;
+    for (const chunk of accumulated.chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return yield* Effect.try({
+      try: () => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown,
+      catch: (error) =>
+        new GatewayError(400, "INVALID_JSON", "Request body must be valid JSON", [
+          error instanceof Error ? error.message : "JSON parse error",
+        ]),
+    });
   });
-});
 
 const decodeBody = <A>(
   request: HttpServerRequest.HttpServerRequest,
   decode: (value: unknown) => A,
-): Effect.Effect<A, GatewayError> => parseJson(request).pipe(Effect.flatMap((body) =>
-  Effect.try({
-    try: () => decode(body),
-    catch: (error) => error instanceof GatewayError
-      ? error
-      : new GatewayError(
-          400,
-          "INVALID_REQUEST",
-          "Admin request failed Effect Schema validation",
-          [error instanceof Error ? error.message : "Schema validation failed"],
-        ),
-  })));
+): Effect.Effect<A, GatewayError> =>
+  parseJson(request).pipe(
+    Effect.flatMap((body) =>
+      Effect.try({
+        try: () => decode(body),
+        catch: (error) =>
+          error instanceof GatewayError
+            ? error
+            : new GatewayError(
+                400,
+                "INVALID_REQUEST",
+                "Admin request failed Effect Schema validation",
+                [error instanceof Error ? error.message : "Schema validation failed"],
+              ),
+      }),
+    ),
+  );
 
 const json = (body: unknown, status = 200): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.jsonUnsafe(body, { status });
@@ -430,12 +423,13 @@ const attachMetadata = (
     readonly cacheHit: boolean;
     readonly queueDepth: number;
   },
-): HttpServerResponse.HttpServerResponse => HttpServerResponse.setHeaders(response, {
-  "x-request-id": metadata.requestId,
-  "x-maskirovka-seat": metadata.seat,
-  "x-maskirovka-cache": metadata.cacheHit ? "hit" : "miss",
-  "x-maskirovka-queue-depth": String(metadata.queueDepth),
-});
+): HttpServerResponse.HttpServerResponse =>
+  HttpServerResponse.setHeaders(response, {
+    "x-request-id": metadata.requestId,
+    "x-maskirovka-seat": metadata.seat,
+    "x-maskirovka-cache": metadata.cacheHit ? "hit" : "miss",
+    "x-maskirovka-queue-depth": String(metadata.queueDepth),
+  });
 
 const invoke = (
   request: HttpServerRequest.HttpServerRequest,
@@ -444,37 +438,42 @@ const invoke = (
   HttpServerResponse.HttpServerResponse,
   GatewayError,
   Gateway | MaskirovkaConfiguration
-> => Effect.gen(function*() {
-  yield* requireMachine(request);
-  const body = yield* parseJson(request);
-  const normalized = yield* Effect.try({
-    try: () => normalizeRequest(dialect, body),
-    catch: (error) => error instanceof GatewayError
-      ? error
-      : new GatewayError(400, "INVALID_REQUEST", "Unable to normalize request"),
+> =>
+  Effect.gen(function* () {
+    yield* requireMachine(request);
+    const body = yield* parseJson(request);
+    const normalized = yield* Effect.try({
+      try: () => normalizeRequest(dialect, body),
+      catch: (error) =>
+        error instanceof GatewayError
+          ? error
+          : new GatewayError(400, "INVALID_REQUEST", "Unable to normalize request"),
+    });
+    const gateway = yield* Gateway;
+    const response = yield* gateway.run(normalized);
+    yield* Effect.logInfo(
+      [
+        response.metadata.tier,
+        response.metadata.seat,
+        `${response.metadata.inputTokens + response.metadata.outputTokens} tok`,
+        `${response.metadata.latencyMs} ms`,
+        `queue ${response.metadata.queueDepth}`,
+        response.metadata.cacheHit ? "cache hit" : "cache miss",
+      ].join(" · "),
+    );
+    return attachMetadata(json(response.body, response.status), response.metadata);
   });
-  const gateway = yield* Gateway;
-  const response = yield* gateway.run(normalized);
-  yield* Effect.logInfo([
-    response.metadata.tier,
-    response.metadata.seat,
-    `${response.metadata.inputTokens + response.metadata.outputTokens} tok`,
-    `${response.metadata.latencyMs} ms`,
-    `queue ${response.metadata.queueDepth}`,
-    response.metadata.cacheHit ? "cache hit" : "cache miss",
-  ].join(" · "));
-  return attachMetadata(json(response.body, response.status), response.metadata);
-});
 
 const PublicHandlers = HttpApiBuilder.group(MaskirovkaApi, "public", (handlers) =>
   handlers
     .handle("health", () =>
-      Effect.gen(function*() {
+      Effect.gen(function* () {
         const gateway = yield* Gateway;
         return yield* gateway.health();
-      }))
+      }),
+    )
     .handle("models", () =>
-      Effect.gen(function*() {
+      Effect.gen(function* () {
         const gateway = yield* Gateway;
         return {
           object: "list" as const,
@@ -486,7 +485,9 @@ const PublicHandlers = HttpApiBuilder.group(MaskirovkaApi, "public", (handlers) 
             resolution: { seat: alias.seat, model: alias.model },
           })),
         };
-      })));
+      }),
+    ),
+);
 
 const ModelHandlers = HttpApiBuilder.group(MaskirovkaApi, "models", (handlers) =>
   handlers
@@ -497,76 +498,85 @@ const ModelHandlers = HttpApiBuilder.group(MaskirovkaApi, "models", (handlers) =
     .handleRaw("messages", ({ request }) => {
       const requestId = crypto.randomUUID();
       return withErrorEnvelope(requestId, invoke(request, "anthropic-messages"));
-    }));
+    }),
+);
 
 const AdminHandlers = HttpApiBuilder.group(MaskirovkaApi, "admin", (handlers) =>
   handlers
     .handle("status", ({ request }) => {
       const requestId = crypto.randomUUID();
-      return withTypedErrorEnvelope(requestId, Effect.gen(function*() {
-        yield* requireAdminRoute(request);
-        const gateway = yield* Gateway;
-        return yield* gateway.health();
-      }));
+      return withTypedErrorEnvelope(
+        requestId,
+        Effect.gen(function* () {
+          yield* requireAdminRoute(request);
+          const gateway = yield* Gateway;
+          return yield* gateway.health();
+        }),
+      );
     })
     .handle("requests", ({ request, query }) => {
       const requestId = crypto.randomUUID();
-      return withTypedErrorEnvelope(requestId, Effect.gen(function*() {
-        yield* requireAdminRoute(request);
-        const gateway = yield* Gateway;
-        return { requests: yield* gateway.latestRequests(Number(query.limit ?? "100")) };
-      }));
+      return withTypedErrorEnvelope(
+        requestId,
+        Effect.gen(function* () {
+          yield* requireAdminRoute(request);
+          const gateway = yield* Gateway;
+          return { requests: yield* gateway.latestRequests(Number(query.limit ?? "100")) };
+        }),
+      );
     })
     .handle("aliases", ({ request }) => {
       const requestId = crypto.randomUUID();
-      return withTypedErrorEnvelope(requestId, Effect.gen(function*() {
-        yield* requireAdminRoute(request);
-        const gateway = yield* Gateway;
-        return { aliases: gateway.registry.listAliases() };
-      }));
+      return withTypedErrorEnvelope(
+        requestId,
+        Effect.gen(function* () {
+          yield* requireAdminRoute(request);
+          const gateway = yield* Gateway;
+          return { aliases: gateway.registry.listAliases() };
+        }),
+      );
     })
     .handleRaw("remapAlias", ({ request, params }) => {
       const requestId = crypto.randomUUID();
-      return withErrorEnvelope(requestId, Effect.gen(function*() {
-        const admin = yield* requireAdminRoute(request);
-        if (!admin) {
-          return yield* Effect.fail(new GatewayError(
-            403,
-            "FORBIDDEN",
-            "Admin permission required",
-          ));
-        }
-        const tier = decodeURIComponent(params.tier) as TierAlias;
-        if (!tierAliases.includes(tier)) {
-          return yield* Effect.fail(new GatewayError(
-            404,
-            "UNKNOWN_TIER",
-            "Unknown tier alias",
-          ));
-        }
-        const input = yield* decodeBody(request, decodeLlmAliasRemapRequest);
-        const gateway = yield* Gateway;
-        return json({
-          aliases: yield* gateway.registry.remap(tier, input.seat, input.model),
-        });
-      }));
+      return withErrorEnvelope(
+        requestId,
+        Effect.gen(function* () {
+          const admin = yield* requireAdminRoute(request);
+          if (!admin) {
+            return yield* Effect.fail(
+              new GatewayError(403, "FORBIDDEN", "Admin permission required"),
+            );
+          }
+          const tier = decodeURIComponent(params.tier) as TierAlias;
+          if (!tierAliases.includes(tier)) {
+            return yield* Effect.fail(new GatewayError(404, "UNKNOWN_TIER", "Unknown tier alias"));
+          }
+          const input = yield* decodeBody(request, decodeLlmAliasRemapRequest);
+          const gateway = yield* Gateway;
+          return json({
+            aliases: yield* gateway.registry.remap(tier, input.seat, input.model),
+          });
+        }),
+      );
     })
     .handleRaw("killSwitch", ({ request }) => {
       const requestId = crypto.randomUUID();
-      return withErrorEnvelope(requestId, Effect.gen(function*() {
-        const admin = yield* requireAdminRoute(request);
-        if (!admin) {
-          return yield* Effect.fail(new GatewayError(
-            403,
-            "FORBIDDEN",
-            "Admin permission required",
-          ));
-        }
-        const input = yield* decodeBody(request, decodeLlmKillSwitchRequest);
-        const gateway = yield* Gateway;
-        return json({ killed: yield* gateway.registry.setKilled(input.enabled) });
-      }));
-    }));
+      return withErrorEnvelope(
+        requestId,
+        Effect.gen(function* () {
+          const admin = yield* requireAdminRoute(request);
+          if (!admin) {
+            return yield* Effect.fail(
+              new GatewayError(403, "FORBIDDEN", "Admin permission required"),
+            );
+          }
+          const input = yield* decodeBody(request, decodeLlmKillSwitchRequest);
+          const gateway = yield* Gateway;
+          return json({ killed: yield* gateway.registry.setKilled(input.enabled) });
+        }),
+      );
+    }),
+);
 
 const serveDashboard = (
   request: HttpServerRequest.HttpServerRequest,
@@ -575,35 +585,36 @@ const serveDashboard = (
   HttpServerResponse.HttpServerResponse,
   GatewayError,
   StaticAssetRepository | MaskirovkaConfiguration
-> => Effect.gen(function*() {
-  yield* requireHuman(request);
-  const assets = yield* StaticAssetRepository;
-  const requested = yield* assets.read(path);
-  const asset = requested ?? (yield* assets.read("index.html"));
-  if (!asset) {
-    return yield* Effect.fail(new GatewayError(
-      503,
-      "DASHBOARD_NOT_BUILT",
-      "Run the Maskirovka dashboard build first",
-    ));
-  }
-  return HttpServerResponse.uint8Array(asset.content, {
-    contentType: asset.contentType,
-    headers: {
-      "cache-control": requested === undefined || path === "index.html"
-        ? "no-cache"
-        : "public, max-age=31536000, immutable",
-    },
+> =>
+  Effect.gen(function* () {
+    yield* requireHuman(request);
+    const assets = yield* StaticAssetRepository;
+    const requested = yield* assets.read(path);
+    const asset = requested ?? (yield* assets.read("index.html"));
+    if (!asset) {
+      return yield* Effect.fail(
+        new GatewayError(503, "DASHBOARD_NOT_BUILT", "Run the Maskirovka dashboard build first"),
+      );
+    }
+    return HttpServerResponse.uint8Array(asset.content, {
+      contentType: asset.contentType,
+      headers: {
+        "cache-control":
+          requested === undefined || path === "index.html"
+            ? "no-cache"
+            : "public, max-age=31536000, immutable",
+      },
+    });
   });
-});
 
 const DashboardHandlers = HttpApiBuilder.group(MaskirovkaApi, "dashboard", (handlers) =>
   handlers
     .handleRaw("dashboardRedirect", ({ request }) => {
       const requestId = crypto.randomUUID();
-      return withErrorEnvelope(requestId, requireHuman(request).pipe(
-        Effect.as(HttpServerResponse.redirect("/_/", { status: 308 })),
-      ));
+      return withErrorEnvelope(
+        requestId,
+        requireHuman(request).pipe(Effect.as(HttpServerResponse.redirect("/_/", { status: 308 }))),
+      );
     })
     .handleRaw("dashboardIndex", ({ request }) => {
       const requestId = crypto.randomUUID();
@@ -618,21 +629,16 @@ const DashboardHandlers = HttpApiBuilder.group(MaskirovkaApi, "dashboard", (hand
           [params.head, params["*"]].filter(Boolean).join("/") || "index.html",
         ),
       );
-    }));
-
-const ApiHandlers = Layer.mergeAll(
-  PublicHandlers,
-  ModelHandlers,
-  AdminHandlers,
-  DashboardHandlers,
+    }),
 );
+
+const ApiHandlers = Layer.mergeAll(PublicHandlers, ModelHandlers, AdminHandlers, DashboardHandlers);
 
 const NotFoundRoute = HttpRouter.add("*", "*", () => {
   const requestId = crypto.randomUUID();
-  return Effect.succeed(errorResponse(
-    new GatewayError(404, "NOT_FOUND", "Route not found"),
-    requestId,
-  ));
+  return Effect.succeed(
+    errorResponse(new GatewayError(404, "NOT_FOUND", "Route not found"), requestId),
+  );
 });
 
 export interface RouterDependencies {

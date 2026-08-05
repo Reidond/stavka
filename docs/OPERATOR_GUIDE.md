@@ -131,9 +131,17 @@ Poligon validates its search state with Effect Schema:
 | `host`       | `agent`, `offline`                              | Durable Agent/Commander loop or browser-only simulation |
 
 Every simulation-affecting selector is part of the Agent identity. Commander
-session identity also includes faction. In `mode=versus`, confirm both factions
-connect, receive only faction-relative information, and cannot mutate the other
-faction's groups.
+Durable Objects and terrain session indexes key by the tuple
+`(session_id, mission_epoch, faction)` (JSON-serialized). Map upload before
+connect returns `409 MAP_SESSION_NOT_CONNECTED`; mission/map identity mismatch
+against the active connection returns `409 MAP_SESSION_MISMATCH`. In
+`mode=versus`, confirm both factions connect on independent indexes, receive
+only faction-relative information, and cannot mutate the other faction's groups.
+
+Offline `Step` advances one resume quantum (`10 × time_scale` fixed 100 ms
+steps) cooperatively so `×100` stays responsive. Playwright locator clicks can
+still stall under WebGL load; a direct DOM click or the cooperative Step path
+is the stable automation/regression surface.
 
 ### Zero-network browser host
 
@@ -368,6 +376,9 @@ its workspace `deploy` script. Never publish merely because a dry run passed.
 Local rules:
 
 - keep `.dev.vars` and `.maskirovka` state untracked;
+- copy from `.dev.vars.example` only for a local smoke, then delete the ignored
+  files when finished; rebuild Poligon afterward and confirm
+  `apps/poligon/dist/server` has no copied `.dev.vars`;
 - use mock/replay unless the run is explicitly about a live provider;
 - route Commander model traffic through Maskirovka, never directly to a
   provider origin;

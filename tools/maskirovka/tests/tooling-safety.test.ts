@@ -23,10 +23,7 @@ describe("Maskirovka workflow safety", () => {
   });
 
   it.each(["ci.yml", "deploy.yml"])("runs fresh smoke in %s", async (workflow) => {
-    const content = await readFile(
-      resolve(repositoryRoot, ".github/workflows", workflow),
-      "utf8",
-    );
+    const content = await readFile(resolve(repositoryRoot, ".github/workflows", workflow), "utf8");
     expect(content).toContain("run: pnpm ai:smoke");
     if (workflow === "deploy.yml") {
       expect(content).toContain("vp run --no-cache --concurrency-limit 2 deploy");

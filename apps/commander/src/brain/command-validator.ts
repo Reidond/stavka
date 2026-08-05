@@ -22,61 +22,80 @@ export const materializeCommandProposals = (
   proposals: readonly AiCommandProposal[],
   startSequence: number,
   prefix = "cmd_",
-): Command[] => proposals.map((proposal, index): Command => ({
-  ...proposal,
-  command_id: commandId(prefix, startSequence + index),
-}));
+): Command[] =>
+  proposals.map(
+    (proposal, index): Command => ({
+      ...proposal,
+      command_id: commandId(prefix, startSequence + index),
+    }),
+  );
 
 export const reassignCommandIds = (
   commands: readonly Command[],
   startSequence: number,
   prefix = "cmd_",
-): Command[] => commands.map((command, index): Command => ({
-  ...command,
-  command_id: commandId(prefix, startSequence + index),
-}));
+): Command[] =>
+  commands.map(
+    (command, index): Command => ({
+      ...command,
+      command_id: commandId(prefix, startSequence + index),
+    }),
+  );
 
 const positionFor = (command: Command): Vector3 | undefined => {
   switch (command.type) {
-    case "spawn_group": return command.params.position;
+    case "spawn_group":
+      return command.params.position;
     case "move_group":
     case "attack_group":
-    case "sweep_group": return command.params.destination;
+    case "sweep_group":
+      return command.params.destination;
     case "defend_group":
-    case "patrol_group": return command.params.position;
+    case "patrol_group":
+      return command.params.position;
     case "set_objective":
       return command.params.action === "create" || command.params.action === "update"
         ? command.params.position
         : undefined;
-    case "despawn_group": return undefined;
+    case "despawn_group":
+      return undefined;
   }
 };
 
 const withinMap = (position: Vector3, state: CommanderSessionState): boolean => {
   if (!position.every(Number.isFinite)) return false;
   const briefing = state.mapBriefing;
-  const width = briefing === undefined
-    ? 100_000
-    : (briefing.grid_width ?? briefing.grid_size) * briefing.grid_resolution_meters;
-  const height = briefing === undefined
-    ? 100_000
-    : (briefing.grid_height ?? briefing.grid_size) * briefing.grid_resolution_meters;
+  const width =
+    briefing === undefined
+      ? 100_000
+      : (briefing.grid_width ?? briefing.grid_size) * briefing.grid_resolution_meters;
+  const height =
+    briefing === undefined
+      ? 100_000
+      : (briefing.grid_height ?? briefing.grid_size) * briefing.grid_resolution_meters;
   if (
-    position[0] < 0 || position[0] > width ||
-    position[2] < 0 || position[2] > height ||
-    position[1] < -2_000 || position[1] > 20_000
-  ) return false;
+    position[0] < 0 ||
+    position[0] > width ||
+    position[2] < 0 ||
+    position[2] > height ||
+    position[1] < -2_000 ||
+    position[1] > 20_000
+  )
+    return false;
   if (briefing === undefined) return true;
   const gridX = Math.floor(position[0] / briefing.grid_resolution_meters);
   const gridY = Math.floor(position[2] / briefing.grid_resolution_meters);
-  const cell = briefing.terrain_grid.find((candidate) =>
-    candidate.grid[0] === gridX && candidate.grid[1] === gridY);
+  const cell = briefing.terrain_grid.find(
+    (candidate) => candidate.grid[0] === gridX && candidate.grid[1] === gridY,
+  );
   // A populated terrain briefing is an allow-list. Missing cells can be
   // omitted water/sentinel terrain, so accepting them would let an LLM route
   // through unclassified ground. Legacy empty briefings retain map-only
   // validation until terrain data is available.
-  return briefing.terrain_grid.length === 0 ||
-    (cell !== undefined && cell.traversable && cell.type !== "water");
+  return (
+    briefing.terrain_grid.length === 0 ||
+    (cell !== undefined && cell.traversable && cell.type !== "water")
+  );
 };
 
 const vehicleTemplate = (template: string): boolean =>
@@ -159,10 +178,7 @@ export const validateCommands = (
         reject(command, "objective does not exist");
         continue;
       }
-      if (
-        command.params.action === "assign" &&
-        !groups.has(command.params.assignee_group_id)
-      ) {
+      if (command.params.action === "assign" && !groups.has(command.params.assignee_group_id)) {
         reject(command, "objective assignee is not an owned group");
         continue;
       }

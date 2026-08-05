@@ -53,14 +53,16 @@ const envMode = (value: string | undefined): GatewayMode => {
 };
 
 const envSeat = (value: string | undefined, fallback: SeatKind): SeatKind =>
-  seatKinds.includes(value as SeatKind) ? value as SeatKind : fallback;
+  seatKinds.includes(value as SeatKind) ? (value as SeatKind) : fallback;
 
 const aliasModel = (tier: TierAlias, seat: SeatKind, env: NodeJS.ProcessEnv): string => {
   if (tier === "stavka/commander") {
     return env.MASKIROVKA_COMMANDER_MODEL ?? (seat === "claude" ? "claude-fable-5" : "gpt-5.6-sol");
   }
   if (tier === "stavka/sergeant") {
-    return env.MASKIROVKA_SERGEANT_MODEL ?? (seat === "claude" ? "claude-sonnet-5" : "gpt-5.6-luna");
+    return (
+      env.MASKIROVKA_SERGEANT_MODEL ?? (seat === "claude" ? "claude-sonnet-5" : "gpt-5.6-luna")
+    );
   }
   return env.MASKIROVKA_HEAVY_MODEL ?? (seat === "claude" ? "claude-opus-5" : "gpt-5.6-terra");
 };
@@ -70,11 +72,12 @@ const apiFallbackModel = (
   env: NodeJS.ProcessEnv,
   preferAnthropic: boolean,
 ): string => {
-  const configured = tier === "stavka/commander"
-    ? env.MASKIROVKA_API_COMMANDER_MODEL
-    : tier === "stavka/sergeant"
-      ? env.MASKIROVKA_API_SERGEANT_MODEL
-      : env.MASKIROVKA_API_HEAVY_MODEL;
+  const configured =
+    tier === "stavka/commander"
+      ? env.MASKIROVKA_API_COMMANDER_MODEL
+      : tier === "stavka/sergeant"
+        ? env.MASKIROVKA_API_SERGEANT_MODEL
+        : env.MASKIROVKA_API_HEAVY_MODEL;
   return configured ?? aliasModel(tier, preferAnthropic ? "claude" : "api", env);
 };
 
@@ -91,32 +94,36 @@ export const readConfig = (
   const aliases = tierAliases.map((tier) => ({
     tier,
     seat: seatByTier[tier],
-    model: seatByTier[tier] === "api"
-      ? apiFallbackModel(tier, env, preferAnthropicApi)
-      : aliasModel(tier, seatByTier[tier], env),
+    model:
+      seatByTier[tier] === "api"
+        ? apiFallbackModel(tier, env, preferAnthropicApi)
+        : aliasModel(tier, seatByTier[tier], env),
   }));
   const modelsBySeat = (seat: SeatKind): string[] =>
     aliases.filter((alias) => alias.seat === seat).map((alias) => alias.model);
   const apiAvailable = Boolean(env.OPENAI_API_KEY || env.ANTHROPIC_API_KEY);
-  const claudeMonthlyCreditUsd = Math.max(0, envNumber(
-    env.MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD ?? env.MASKIROVKA_CLAUDE_BUDGET_USD,
+  const claudeMonthlyCreditUsd = Math.max(
     0,
-  ));
-  const apiFallbackAliases = tierAliases.map((tier): AliasResolution => ({
-    tier,
-    seat: "api",
-    model: apiFallbackModel(tier, env, preferAnthropicApi),
-  }));
-  const environment = env.ENVIRONMENT === "local" ||
-      env.ENVIRONMENT === "preview" ||
-      env.ENVIRONMENT === "production"
-    ? env.ENVIRONMENT
-    : "production";
+    envNumber(env.MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD ?? env.MASKIROVKA_CLAUDE_BUDGET_USD, 0),
+  );
+  const apiFallbackAliases = tierAliases.map(
+    (tier): AliasResolution => ({
+      tier,
+      seat: "api",
+      model: apiFallbackModel(tier, env, preferAnthropicApi),
+    }),
+  );
+  const environment =
+    env.ENVIRONMENT === "local" || env.ENVIRONMENT === "preview" || env.ENVIRONMENT === "production"
+      ? env.ENVIRONMENT
+      : "production";
   const automationPermissions = (env.MASKIROVKA_ACCESS_AUTOMATION_PERMISSIONS ?? "read")
     .split(",")
     .map((permission) => permission.trim())
-    .filter((permission): permission is AccessPermission =>
-      permission === "read" || permission === "operate" || permission === "admin");
+    .filter(
+      (permission): permission is AccessPermission =>
+        permission === "read" || permission === "operate" || permission === "admin",
+    );
   return {
     host: env.MASKIROVKA_HOST ?? "127.0.0.1",
     port: Math.max(1, Math.min(65_535, Math.floor(envNumber(env.MASKIROVKA_PORT, 4_141)))),
@@ -139,10 +146,46 @@ export const readConfig = (
     aliases,
     apiFallbackAliases,
     seats: [
-      { id: "mock", name: "Deterministic mock", mode: "local", models: modelsBySeat("mock"), monthlyBudgetUsd: 0, priority: 100, status: "healthy", exhausted: false },
-      { id: "claude", name: "Claude Agent SDK", mode: "local", models: modelsBySeat("claude"), monthlyBudgetUsd: claudeMonthlyCreditUsd, priority: 20, status: "unchecked", exhausted: false },
-      { id: "codex", name: "Codex SDK", mode: "local", models: modelsBySeat("codex"), monthlyBudgetUsd: Math.max(0, envNumber(env.MASKIROVKA_CODEX_BUDGET_USD, 0)), priority: 30, status: "unchecked", exhausted: false },
-      { id: "api", name: "Metered API fallback", mode: "api", models: apiFallbackAliases.map((alias) => alias.model), monthlyBudgetUsd: Math.max(0, envNumber(env.MASKIROVKA_API_BUDGET_USD, 0)), priority: 0, status: apiAvailable ? "healthy" : "unavailable", exhausted: false },
+      {
+        id: "mock",
+        name: "Deterministic mock",
+        mode: "local",
+        models: modelsBySeat("mock"),
+        monthlyBudgetUsd: 0,
+        priority: 100,
+        status: "healthy",
+        exhausted: false,
+      },
+      {
+        id: "claude",
+        name: "Claude Agent SDK",
+        mode: "local",
+        models: modelsBySeat("claude"),
+        monthlyBudgetUsd: claudeMonthlyCreditUsd,
+        priority: 20,
+        status: "unchecked",
+        exhausted: false,
+      },
+      {
+        id: "codex",
+        name: "Codex SDK",
+        mode: "local",
+        models: modelsBySeat("codex"),
+        monthlyBudgetUsd: Math.max(0, envNumber(env.MASKIROVKA_CODEX_BUDGET_USD, 0)),
+        priority: 30,
+        status: "unchecked",
+        exhausted: false,
+      },
+      {
+        id: "api",
+        name: "Metered API fallback",
+        mode: "api",
+        models: apiFallbackAliases.map((alias) => alias.model),
+        monthlyBudgetUsd: Math.max(0, envNumber(env.MASKIROVKA_API_BUDGET_USD, 0)),
+        priority: 0,
+        status: apiAvailable ? "healthy" : "unavailable",
+        exhausted: false,
+      },
     ],
     ...(env.OPENAI_API_KEY ? { openAiApiKey: env.OPENAI_API_KEY } : {}),
     ...(env.ANTHROPIC_API_KEY ? { anthropicApiKey: env.ANTHROPIC_API_KEY } : {}),
@@ -191,16 +234,23 @@ const configKeys = [
   "DEV_ACCESS_EMAIL",
 ] as const;
 
-const ConfigEnvironment = Config.all(Object.fromEntries(
-  configKeys.map((key) => [key, Config.string(key).pipe(Config.withDefault(""))]),
-) as Record<(typeof configKeys)[number], Config.Config<string>>);
+const ConfigEnvironment = Config.all(
+  Object.fromEntries(
+    configKeys.map((key) => [key, Config.string(key).pipe(Config.withDefault(""))]),
+  ) as Record<(typeof configKeys)[number], Config.Config<string>>,
+);
 
 export const MaskirovkaConfigDefinition = (
   cwd: string = process.cwd(),
-): Config.Config<MaskirovkaConfig> => ConfigEnvironment.pipe(Config.map((values) =>
-  readConfig(Object.fromEntries(
-    Object.entries(values).filter(([, value]) => value !== ""),
-  ), cwd)));
+): Config.Config<MaskirovkaConfig> =>
+  ConfigEnvironment.pipe(
+    Config.map((values) =>
+      readConfig(
+        Object.fromEntries(Object.entries(values).filter(([, value]) => value !== "")),
+        cwd,
+      ),
+    ),
+  );
 
 export const loadConfig = (
   environment: NodeJS.ProcessEnv = process.env,

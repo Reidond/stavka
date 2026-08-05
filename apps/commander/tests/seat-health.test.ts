@@ -49,14 +49,15 @@ describe("registered HTTP seat health isolation", () => {
   });
 
   it("uses only the seat-specific key when probing", async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
-      headers: { "content-type": "application/json" },
-    }));
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
 
-    expect(await Effect.runPromise(probeHttpSeat(
-      seat,
-      env({ "private-seat": "seat-only-key" }),
-    ))).toBe(true);
+    expect(
+      await Effect.runPromise(probeHttpSeat(seat, env({ "private-seat": "seat-only-key" }))),
+    ).toBe(true);
     const init = fetchMock.mock.calls[0]?.[1];
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer seat-only-key");
   });

@@ -95,13 +95,14 @@ const providerFailure = (
   );
   const body = {
     error: {
-      code: error.reason === "auth"
-        ? "PROVIDER_AUTH_FAILED"
-        : error.reason === "rate_limit"
-          ? "PROVIDER_RATE_LIMITED"
-          : error.reason === "timeout"
-            ? "PROVIDER_TIMEOUT"
-            : "PROVIDER_ERROR",
+      code:
+        error.reason === "auth"
+          ? "PROVIDER_AUTH_FAILED"
+          : error.reason === "rate_limit"
+            ? "PROVIDER_RATE_LIMITED"
+            : error.reason === "timeout"
+              ? "PROVIDER_TIMEOUT"
+              : "PROVIDER_ERROR",
       message: "Subscription provider request failed",
       retryable: error.retryable,
       ...(error.resolvedModel ? { resolved_model: error.resolvedModel } : {}),

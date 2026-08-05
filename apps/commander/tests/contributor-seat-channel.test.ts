@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  resolveLlmRoute,
-  SEAT_REGISTRY_NAME,
-} from "../src/brain/seat-router";
+import { resolveLlmRoute, SEAT_REGISTRY_NAME } from "../src/brain/seat-router";
 import type { CommanderConfig, Env } from "../src/config";
 import type { SeatRegistration } from "../src/state/types";
 
@@ -106,10 +103,7 @@ describe("contributor seat channel", () => {
         upgrade: "websocket",
       },
     });
-    const response = await handleRequest(
-      authorizedRequest,
-      env,
-    );
+    const response = await handleRequest(authorizedRequest, env);
 
     expect(response).toBe(agentResponse);
     expect((response as Response & { readonly webSocket: unknown }).webSocket).toBe(webSocket);
@@ -128,23 +122,15 @@ describe("contributor seat channel", () => {
     const fresh = contributorSeat("fresh", 10, nowSeconds + 1);
     const expired = contributorSeat("expired", 100, nowSeconds);
 
-    expect(resolveLlmRoute(
-      [expired, fresh],
-      config,
-      "stavka/commander",
-      nowSeconds,
-    )).toMatchObject({
-      seatId: "fresh",
-      contributor: true,
-      fallback: false,
-    });
+    expect(resolveLlmRoute([expired, fresh], config, "stavka/commander", nowSeconds)).toMatchObject(
+      {
+        seatId: "fresh",
+        contributor: true,
+        fallback: false,
+      },
+    );
 
-    expect(resolveLlmRoute(
-      [expired],
-      config,
-      "stavka/commander",
-      nowSeconds,
-    )).toMatchObject({
+    expect(resolveLlmRoute([expired], config, "stavka/commander", nowSeconds)).toMatchObject({
       contributor: false,
       fallback: true,
     });

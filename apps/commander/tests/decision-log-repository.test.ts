@@ -32,10 +32,7 @@ interface DecisionRow {
 class DecisionHost implements SqlRepositoryHost {
   #rows: DecisionRow[] = [];
 
-  sql<T>(
-    strings: TemplateStringsArray,
-    ...values: (string | number | boolean | null)[]
-  ): T[] {
+  sql<T>(strings: TemplateStringsArray, ...values: (string | number | boolean | null)[]): T[] {
     const query = strings.join("?");
     if (query.includes("INSERT OR IGNORE INTO decision_logs")) {
       const [id, timestamp, _agent, _trigger, payload] = values as [
@@ -52,22 +49,32 @@ class DecisionHost implements SqlRepositoryHost {
     }
     if (query.includes("WITH watermark(high_water_rowid)")) {
       const highWater = this.#rows.at(-1)?.rowid ?? 0;
-      return [{
-        high_water_rowid: highWater,
-        total: this.#rows.filter((row) => row.rowid <= highWater).length,
-      }] as T[];
+      return [
+        {
+          high_water_rowid: highWater,
+          total: this.#rows.filter((row) => row.rowid <= highWater).length,
+        },
+      ] as T[];
     }
     if (query.includes("SELECT id, timestamp, payload FROM decision_logs")) {
       const highWater = values[0] as number;
       const hasCursor = values.length > 2;
-      const timestamp = hasCursor ? values[1] as string : undefined;
-      const id = hasCursor ? values[3] as string : undefined;
+      const timestamp = hasCursor ? (values[1] as string) : undefined;
+      const id = hasCursor ? (values[3] as string) : undefined;
       const limit = values.at(-1) as number;
       const rows = this.#rows
         .filter((row) => row.rowid <= highWater)
-        .filter((row) => timestamp === undefined || id === undefined ||
-          row.timestamp > timestamp || (row.timestamp === timestamp && row.id > id))
-        .sort((left, right) => left.timestamp.localeCompare(right.timestamp) || left.id.localeCompare(right.id))
+        .filter(
+          (row) =>
+            timestamp === undefined ||
+            id === undefined ||
+            row.timestamp > timestamp ||
+            (row.timestamp === timestamp && row.id > id),
+        )
+        .sort(
+          (left, right) =>
+            left.timestamp.localeCompare(right.timestamp) || left.id.localeCompare(right.id),
+        )
         .slice(0, limit)
         .map((row) => ({ id: row.id, timestamp: row.timestamp, payload: row.payload }));
       return rows as T[];
@@ -85,21 +92,23 @@ describe("decision log export snapshot", () => {
     await Effect.runPromise(repository.save(second));
     const snapshot = await Effect.runPromise(repository.exportSnapshot);
 
-    await Effect.runPromise(repository.save({
-      ...original,
-      timestamp: "2026-08-02T12:59:59.000Z",
-      output: { ...original.output, summary: "should be ignored" },
-    }));
-    await Effect.runPromise(repository.save(
-      entry("decision-late", "2026-08-02T11:59:59.000Z", "must stay outside the snapshot"),
-    ));
+    await Effect.runPromise(
+      repository.save({
+        ...original,
+        timestamp: "2026-08-02T12:59:59.000Z",
+        output: { ...original.output, summary: "should be ignored" },
+      }),
+    );
+    await Effect.runPromise(
+      repository.save(
+        entry("decision-late", "2026-08-02T11:59:59.000Z", "must stay outside the snapshot"),
+      ),
+    );
 
     const first = await Effect.runPromise(
       repository.pageFromSnapshot(snapshot, initialDecisionLogExportCursor(), 1),
     );
-    const final = await Effect.runPromise(
-      repository.pageFromSnapshot(snapshot, first.cursor, 1),
-    );
+    const final = await Effect.runPromise(repository.pageFromSnapshot(snapshot, first.cursor, 1));
 
     expect(snapshot).toEqual({ highWaterRowId: 2, count: 2 });
     expect(first.entries).toEqual([original]);

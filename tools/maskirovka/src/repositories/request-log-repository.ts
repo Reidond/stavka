@@ -22,7 +22,10 @@ const repositoryFailure = (cause: unknown): GatewayError =>
 export class FileRequestLogRepository implements RequestLogRepositoryService {
   private readonly recent: RequestMetadata[] = [];
 
-  constructor(private readonly filename: string, private readonly retain = 500) {}
+  constructor(
+    private readonly filename: string,
+    private readonly retain = 500,
+  ) {}
 
   append(entry: RequestMetadata): Effect.Effect<void, GatewayError> {
     return Effect.tryPromise({
@@ -43,7 +46,8 @@ export class FileRequestLogRepository implements RequestLogRepositoryService {
 
   latest(limit: number): Effect.Effect<readonly RequestMetadata[]> {
     return Effect.sync(() =>
-      this.recent.slice(-Math.max(0, Math.min(limit, this.retain))).reverse());
+      this.recent.slice(-Math.max(0, Math.min(limit, this.retain))).reverse(),
+    );
   }
 }
 

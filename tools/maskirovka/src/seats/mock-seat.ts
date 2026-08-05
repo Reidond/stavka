@@ -10,12 +10,15 @@ const valueForSchema = (schema: Readonly<Record<string, unknown>>, seed: string)
   if (schema.default !== undefined) return schema.default;
   if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
     const first = schema.anyOf[0];
-    return typeof first === "object" && first !== null ? valueForSchema(first as Record<string, unknown>, seed) : null;
+    return typeof first === "object" && first !== null
+      ? valueForSchema(first as Record<string, unknown>, seed)
+      : null;
   }
   if (schema.type === "object" || typeof schema.properties === "object") {
-    const properties = schema.properties && typeof schema.properties === "object"
-      ? schema.properties as Record<string, unknown>
-      : {};
+    const properties =
+      schema.properties && typeof schema.properties === "object"
+        ? (schema.properties as Record<string, unknown>)
+        : {};
     const required = Array.isArray(schema.required)
       ? new Set(schema.required.filter((key): key is string => typeof key === "string"))
       : new Set(Object.keys(properties));
@@ -46,9 +49,10 @@ export class MockSeat implements SeatAdapter {
       const structured = request.outputSchema
         ? valueForSchema(request.outputSchema, hash)
         : undefined;
-      const text = structured === undefined
-        ? `Deterministic mock decision ${hash.slice(0, 12)}: hold position.`
-        : JSON.stringify(structured);
+      const text =
+        structured === undefined
+          ? `Deterministic mock decision ${hash.slice(0, 12)}: hold position.`
+          : JSON.stringify(structured);
       return {
         text,
         ...(structured !== undefined ? { structured } : {}),

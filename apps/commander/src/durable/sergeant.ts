@@ -2,10 +2,7 @@ import { Agent, type FiberRecoveryContext } from "agents";
 import type { Command, GameSnapshot, SergeantReport } from "@stavka/protocol";
 import { Clock, Effect } from "effect";
 
-import {
-  materializeCommandProposals,
-  reassignCommandIds,
-} from "../brain/command-validator";
+import { materializeCommandProposals, reassignCommandIds } from "../brain/command-validator";
 import type { AiCommandProposal } from "../brain/llm-client";
 import { sergeantPrompt } from "../brain/prompts";
 import { planSergeantRules } from "../brain/rule-commander";
@@ -90,7 +87,8 @@ const tacticalCommand = (
     command.type === "spawn_group" ||
     command.type === "despawn_group" ||
     command.type === "set_objective"
-  ) return false;
+  )
+    return false;
   if (command.params.group_id !== groupId) return false;
   return snapshot === undefined || snapshot.friendly_groups.some((group) => group.id === groupId);
 };
@@ -100,13 +98,10 @@ const normalizedCommands = (
   report: SergeantReport,
   snapshot: GameSnapshot | undefined,
   startSequence: number,
-): Command[] => materializeCommandProposals(
-  commands,
-  startSequence,
-  `sgt_${report.payload.group_id}_`,
-)
-  .filter((command) => tacticalCommand(command, report.payload.group_id, snapshot))
-  .slice(0, 3);
+): Command[] =>
+  materializeCommandProposals(commands, startSequence, `sgt_${report.payload.group_id}_`)
+    .filter((command) => tacticalCommand(command, report.payload.group_id, snapshot))
+    .slice(0, 3);
 
 const assessWithModel = (
   report: SergeantReport,
@@ -129,103 +124,96 @@ const assessWithModel = (
   readonly seatId?: string;
   readonly resolvedModel?: string;
   readonly costAttributions?: readonly RoutedAiCostAttribution[];
-}> => Effect.gen(function*() {
-  const rawRules = planSergeantRules(report, snapshot);
-  const rules = reassignCommandIds(
-    rawRules,
-    startSequence,
-    `sgt_${report.payload.group_id}_`,
-  );
-  const route = resolveLlmRoute(seats, config, config.sergeantModel);
-  if (route.stretched) {
+}> =>
+  Effect.gen(function* () {
+    const rawRules = planSergeantRules(report, snapshot);
+    const rules = reassignCommandIds(rawRules, startSequence, `sgt_${report.payload.group_id}_`);
+    const route = resolveLlmRoute(seats, config, config.sergeantModel);
+    if (route.stretched) {
+      return {
+        commands: rules,
+        summary: "Seat budget exhausted; retained tactical rules at stretched cadence.",
+        rawResponse: "",
+        mode: "degraded" as const,
+        latencyMs: 0,
+        tokenUsage: { input: 0, output: 0 },
+        costUsd: 0,
+        commandSequenceAdvance: rules.length,
+        fallback: false,
+        stretched: true,
+      };
+    }
+    if (route.config.aiProvider === "mock") {
+      return {
+        commands: rules,
+        summary: `Rule sergeant assessed ${report.payload.report_type}.`,
+        rawResponse: JSON.stringify({ commands: rules }),
+        mode: "rule" as const,
+        latencyMs: 0,
+        tokenUsage: { input: 0, output: 0 },
+        costUsd: 0,
+        commandSequenceAdvance: rules.length,
+        fallback: route.fallback,
+        stretched: false,
+      };
+    }
+    const prompt = sergeantPrompt(report.payload.group_id, report, snapshot);
+    const started = yield* Clock.currentTimeMillis;
+    const result = yield* Effect.result(
+      runRoutedAiDecision(
+        env,
+        seats,
+        config,
+        config.sergeantModel,
+        prompt,
+        `sergeant:${report.payload.group_id}:${startSequence}:${report.timestamp}`,
+      ),
+    );
+    const finished = yield* Clock.currentTimeMillis;
+    if (result._tag === "Success") {
+      const commands = normalizedCommands(
+        result.success.decision.commands,
+        report,
+        snapshot,
+        startSequence,
+      );
+      return {
+        commands,
+        summary: result.success.decision.summary,
+        rawResponse: result.success.rawResponse || JSON.stringify(result.success.decision),
+        mode: "llm" as const,
+        latencyMs: finished - started,
+        tokenUsage: result.success.tokenUsage,
+        costUsd: result.success.costUsd,
+        commandSequenceAdvance: commands.length,
+        fallback: result.success.fallback,
+        stretched: false,
+        ...(result.success.seatId ? { seatId: result.success.seatId } : {}),
+        ...(result.success.resolvedModel ? { resolvedModel: result.success.resolvedModel } : {}),
+        ...(result.success.costAttributions === undefined
+          ? {}
+          : { costAttributions: result.success.costAttributions }),
+      };
+    }
+    const reported = reportedSeatFailureUsage(result.failure);
+    const failureAttributions = routedFailureCostAttributions(result.failure);
     return {
       commands: rules,
-      summary: "Seat budget exhausted; retained tactical rules at stretched cadence.",
+      summary: `Degraded to tactical rules: ${
+        result.failure instanceof Error ? result.failure.message : "LLM failure"
+      }`,
       rawResponse: "",
       mode: "degraded" as const,
-      latencyMs: 0,
-      tokenUsage: { input: 0, output: 0 },
-      costUsd: 0,
-      commandSequenceAdvance: rules.length,
-      fallback: false,
-      stretched: true,
-    };
-  }
-  if (route.config.aiProvider === "mock") {
-    return {
-      commands: rules,
-      summary: `Rule sergeant assessed ${report.payload.report_type}.`,
-      rawResponse: JSON.stringify({ commands: rules }),
-      mode: "rule" as const,
-      latencyMs: 0,
-      tokenUsage: { input: 0, output: 0 },
-      costUsd: 0,
+      latencyMs: finished - started,
+      tokenUsage: reported.tokenUsage,
+      costUsd: reported.costUsd,
       commandSequenceAdvance: rules.length,
       fallback: route.fallback,
       stretched: false,
+      ...(reported.resolvedModel ? { resolvedModel: reported.resolvedModel } : {}),
+      ...(failureAttributions.length === 0 ? {} : { costAttributions: failureAttributions }),
     };
-  }
-  const prompt = sergeantPrompt(report.payload.group_id, report, snapshot);
-  const started = yield* Clock.currentTimeMillis;
-  const result = yield* Effect.result(
-    runRoutedAiDecision(
-      env,
-      seats,
-      config,
-      config.sergeantModel,
-      prompt,
-      `sergeant:${report.payload.group_id}:${startSequence}:${report.timestamp}`,
-    ),
-  );
-  const finished = yield* Clock.currentTimeMillis;
-  if (result._tag === "Success") {
-    const commands = normalizedCommands(
-      result.success.decision.commands,
-      report,
-      snapshot,
-      startSequence,
-    );
-    return {
-      commands,
-      summary: result.success.decision.summary,
-      rawResponse: result.success.rawResponse || JSON.stringify(result.success.decision),
-      mode: "llm" as const,
-      latencyMs: finished - started,
-      tokenUsage: result.success.tokenUsage,
-      costUsd: result.success.costUsd,
-      commandSequenceAdvance: commands.length,
-      fallback: result.success.fallback,
-      stretched: false,
-      ...(result.success.seatId ? { seatId: result.success.seatId } : {}),
-      ...(result.success.resolvedModel
-        ? { resolvedModel: result.success.resolvedModel }
-        : {}),
-      ...(result.success.costAttributions === undefined
-        ? {}
-        : { costAttributions: result.success.costAttributions }),
-    };
-  }
-  const reported = reportedSeatFailureUsage(result.failure);
-  const failureAttributions = routedFailureCostAttributions(result.failure);
-  return {
-    commands: rules,
-    summary: `Degraded to tactical rules: ${
-      result.failure instanceof Error ? result.failure.message : "LLM failure"
-    }`,
-    rawResponse: "",
-    mode: "degraded" as const,
-    latencyMs: finished - started,
-    tokenUsage: reported.tokenUsage,
-    costUsd: reported.costUsd,
-    commandSequenceAdvance: rules.length,
-    fallback: route.fallback,
-    stretched: false,
-    ...(reported.resolvedModel ? { resolvedModel: reported.resolvedModel } : {}),
-    ...(failureAttributions.length === 0
-      ? {}
-      : { costAttributions: failureAttributions }),
-  };
-});
+  });
 
 export class SergeantAgent extends Agent<Env, SergeantState> {
   override initialState: SergeantState = {
@@ -241,26 +229,32 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
   };
 
   override onStart(): Promise<void> {
-    return Effect.runPromise(this.decisionLogs().initialize.pipe(
-      Effect.andThen(this.recoverPendingWork()),
-    ));
+    return Effect.runPromise(
+      this.decisionLogs().initialize.pipe(Effect.andThen(this.recoverPendingWork())),
+    );
   }
 
   override onFiberRecovered(context: FiberRecoveryContext): Promise<void> {
     if (context.name !== "sergeant-assessment") return Promise.resolve();
     const snapshot = context.snapshot;
-    const version = typeof snapshot === "object" && snapshot !== null &&
+    const version =
+      typeof snapshot === "object" &&
+      snapshot !== null &&
       typeof (snapshot as Record<string, unknown>).version === "number"
-      ? (snapshot as { readonly version: number }).version
-      : undefined;
+        ? (snapshot as { readonly version: number }).version
+        : undefined;
     if (version === undefined) return Promise.resolve();
-    return Effect.runPromise(Effect.gen({ self: this }, function*() {
-      const work = this.state.pendingWorkQueue.find((candidate) =>
-        candidate.version === version && candidate.completedAssessment === undefined);
-      if (work === undefined) return;
-      const retry = yield* Effect.sync(() => this.retryWork(work));
-      if (retry !== undefined) yield* this.launchWork(retry);
-    }));
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const work = this.state.pendingWorkQueue.find(
+          (candidate) =>
+            candidate.version === version && candidate.completedAssessment === undefined,
+        );
+        if (work === undefined) return;
+        const retry = yield* Effect.sync(() => this.retryWork(work));
+        if (retry !== undefined) yield* this.launchWork(retry);
+      }),
+    );
   }
 
   assess(
@@ -276,49 +270,52 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
     snapshot?: GameSnapshot,
     seats: readonly SeatRegistration[] = [],
   ): Promise<void> {
-    return Effect.runPromise(Effect.gen({ self: this }, function*() {
-      const state = this.state;
-      const version = state.nextWorkSequence;
-      const work: SergeantWork = {
-        version,
-        decisionSequence: state.nextDecisionSequence,
-        commandStartSequence: state.nextCommandSequence,
-        attempt: 1,
-        report,
-        snapshot: snapshot ?? null,
-        seats,
-      };
-      yield* Effect.sync(() => this.setState({
-        ...state,
-        nextWorkSequence: version + 1,
-        // Each durable task gets its own id range before it starts. Fibers can
-        // run concurrently, so allocating sequences only after an LLM await
-        // would duplicate decision/command ids.
-        nextDecisionSequence: state.nextDecisionSequence + 1,
-        nextCommandSequence: state.nextCommandSequence + MAX_COMMANDS_PER_ASSESSMENT,
-        pendingWorkQueue: [
-          ...state.pendingWorkQueue,
-          work,
-        ],
-      }));
-      // startFiber returns after durable acceptance, while the actual LLM
-      // work runs independently of the parent alarm. If acceptance itself
-      // fails, the persisted work remains for onStart/fiber recovery.
-      yield* this.launchWork(work);
-    }));
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const state = this.state;
+        const version = state.nextWorkSequence;
+        const work: SergeantWork = {
+          version,
+          decisionSequence: state.nextDecisionSequence,
+          commandStartSequence: state.nextCommandSequence,
+          attempt: 1,
+          report,
+          snapshot: snapshot ?? null,
+          seats,
+        };
+        yield* Effect.sync(() =>
+          this.setState({
+            ...state,
+            nextWorkSequence: version + 1,
+            // Each durable task gets its own id range before it starts. Fibers can
+            // run concurrently, so allocating sequences only after an LLM await
+            // would duplicate decision/command ids.
+            nextDecisionSequence: state.nextDecisionSequence + 1,
+            nextCommandSequence: state.nextCommandSequence + MAX_COMMANDS_PER_ASSESSMENT,
+            pendingWorkQueue: [...state.pendingWorkQueue, work],
+          }),
+        );
+        // startFiber returns after durable acceptance, while the actual LLM
+        // work runs independently of the parent alarm. If acceptance itself
+        // fails, the persisted work remains for onStart/fiber recovery.
+        yield* this.launchWork(work);
+      }),
+    );
   }
 
   runScheduledAssessment(payload: { readonly version: number }): Promise<void> {
     // Compatibility for pre-fiber schedule rows. Do not perform the model
     // work inline behind the parent alarm; hand it to the child fiber instead.
-    return Effect.runPromise(Effect.gen({ self: this }, function*() {
-      const work = this.state.pendingWorkQueue.find(
-        (candidate) => candidate.version === payload.version &&
-          candidate.completedAssessment === undefined,
-      );
-      if (work === undefined) return;
-      yield* this.launchWork(work);
-    }));
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const work = this.state.pendingWorkQueue.find(
+          (candidate) =>
+            candidate.version === payload.version && candidate.completedAssessment === undefined,
+        );
+        if (work === undefined) return;
+        yield* this.launchWork(work);
+      }),
+    );
   }
 
   listCompletedAssessments(): Promise<readonly SergeantAssessment[]> {
@@ -326,28 +323,35 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
   }
 
   acknowledgeAssessments(ids: readonly string[]): Promise<void> {
-    return Effect.runPromise(Effect.sync(() => {
-      const acknowledged = new Set(ids);
-      this.setState({
-        ...this.state,
-        completedAssessments: this.state.completedAssessments.filter(
-          (assessment) => !acknowledged.has(assessment.log.id),
-        ),
-        pendingWorkQueue: this.state.pendingWorkQueue.filter((work) =>
-          work.completedAssessment === undefined ||
-          !acknowledged.has(work.completedAssessment.log.id)),
-      });
-    }));
+    return Effect.runPromise(
+      Effect.sync(() => {
+        const acknowledged = new Set(ids);
+        this.setState({
+          ...this.state,
+          completedAssessments: this.state.completedAssessments.filter(
+            (assessment) => !acknowledged.has(assessment.log.id),
+          ),
+          pendingWorkQueue: this.state.pendingWorkQueue.filter(
+            (work) =>
+              work.completedAssessment === undefined ||
+              !acknowledged.has(work.completedAssessment.log.id),
+          ),
+        });
+      }),
+    );
   }
 
   private recoverPendingWork(): Effect.Effect<void, Error> {
     return Effect.forEach(
       this.state.pendingWorkQueue.filter((work) => work.completedAssessment === undefined),
-      (work) => this.launchWork(work).pipe(
-        Effect.catch((cause) => Effect.logWarning(
-          `Could not resume sergeant assessment ${work.version}: ${cause.message}`,
-        )),
-      ),
+      (work) =>
+        this.launchWork(work).pipe(
+          Effect.catch((cause) =>
+            Effect.logWarning(
+              `Could not resume sergeant assessment ${work.version}: ${cause.message}`,
+            ),
+          ),
+        ),
       { concurrency: 8 },
     ).pipe(Effect.asVoid);
   }
@@ -374,7 +378,8 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
           receipt.status !== "error" &&
           receipt.status !== "aborted" &&
           receipt.status !== "interrupted"
-        ) return;
+        )
+          return;
         const retry = this.retryWork(work);
         if (retry === undefined) return;
         await this.startFiber(
@@ -394,59 +399,68 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
   }
 
   private retryWork(work: SergeantWork): SergeantWork | undefined {
-    const current = this.state.pendingWorkQueue.find((candidate) =>
-      candidate.version === work.version &&
-      candidate.attempt === work.attempt &&
-      candidate.completedAssessment === undefined);
+    const current = this.state.pendingWorkQueue.find(
+      (candidate) =>
+        candidate.version === work.version &&
+        candidate.attempt === work.attempt &&
+        candidate.completedAssessment === undefined,
+    );
     if (current === undefined) return undefined;
     const retry = { ...current, attempt: current.attempt + 1 };
     this.setState({
       ...this.state,
       pendingWorkQueue: this.state.pendingWorkQueue.map((candidate) =>
-        candidate.version === current.version ? retry : candidate),
+        candidate.version === current.version ? retry : candidate,
+      ),
     });
     return retry;
   }
 
   private completeQueuedAssessment(version: number, attempt: number): Promise<void> {
-    return Effect.runPromise(Effect.gen({ self: this }, function*() {
-      const work = this.state.pendingWorkQueue.find((candidate) =>
-        candidate.version === version &&
-        candidate.attempt === attempt &&
-        candidate.completedAssessment === undefined);
-      if (work === undefined) return;
-      const assessment = yield* this.assessmentEffect(
-        work.report,
-        work.snapshot ?? undefined,
-        work.seats,
-        {
-          decisionSequence: work.decisionSequence,
-          commandStartSequence: work.commandStartSequence,
-        },
-      );
-      yield* Effect.sync(() => {
-        const latest = this.state;
-        if (!latest.pendingWorkQueue.some((candidate) =>
-          candidate.version === version &&
-          candidate.attempt === attempt &&
-          candidate.completedAssessment === undefined)) return;
-        this.setState({
-          ...latest,
-          // A completed child is still delivery-pending. Keep its exact work
-          // record until the parent has written its log/archive and sends a
-          // named acknowledgement back to this sergeant.
-          pendingWorkQueue: latest.pendingWorkQueue.map(
-            (candidate) => candidate.version === version && candidate.attempt === attempt
-              ? { ...candidate, completedAssessment: assessment }
-              : candidate,
-          ),
-          completedAssessments: [
-            ...latest.completedAssessments,
-            assessment,
-          ],
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const work = this.state.pendingWorkQueue.find(
+          (candidate) =>
+            candidate.version === version &&
+            candidate.attempt === attempt &&
+            candidate.completedAssessment === undefined,
+        );
+        if (work === undefined) return;
+        const assessment = yield* this.assessmentEffect(
+          work.report,
+          work.snapshot ?? undefined,
+          work.seats,
+          {
+            decisionSequence: work.decisionSequence,
+            commandStartSequence: work.commandStartSequence,
+          },
+        );
+        yield* Effect.sync(() => {
+          const latest = this.state;
+          if (
+            !latest.pendingWorkQueue.some(
+              (candidate) =>
+                candidate.version === version &&
+                candidate.attempt === attempt &&
+                candidate.completedAssessment === undefined,
+            )
+          )
+            return;
+          this.setState({
+            ...latest,
+            // A completed child is still delivery-pending. Keep its exact work
+            // record until the parent has written its log/archive and sends a
+            // named acknowledgement back to this sergeant.
+            pendingWorkQueue: latest.pendingWorkQueue.map((candidate) =>
+              candidate.version === version && candidate.attempt === attempt
+                ? { ...candidate, completedAssessment: assessment }
+                : candidate,
+            ),
+            completedAssessments: [...latest.completedAssessments, assessment],
+          });
         });
-      });
-    }));
+      }),
+    );
   }
 
   private assessmentEffect(
@@ -458,7 +472,7 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
       readonly commandStartSequence: number;
     },
   ): Effect.Effect<SergeantAssessment, unknown> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       const config = yield* readConfigEffect(this.env);
       const decisionSequence = assigned?.decisionSequence ?? this.state.nextDecisionSequence;
       const commandStartSequence = assigned?.commandStartSequence ?? this.state.nextCommandSequence;
@@ -487,31 +501,37 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
           summary: decision.summary,
         },
         commandsIssued: decision.commands.map((command) => command.command_id),
-        model: decision.resolvedModel ?? (decision.seatId
-          ? `${config.sergeantModel}@${decision.seatId}`
-          : decision.fallback
-          ? `${config.sergeantModel}:api-fallback`
-          : decision.stretched
-          ? `${config.sergeantModel}:stretched`
-          : config.sergeantModel),
+        model:
+          decision.resolvedModel ??
+          (decision.seatId
+            ? `${config.sergeantModel}@${decision.seatId}`
+            : decision.fallback
+              ? `${config.sergeantModel}:api-fallback`
+              : decision.stretched
+                ? `${config.sergeantModel}:stretched`
+                : config.sergeantModel),
         latencyMs: decision.latencyMs,
         tokenUsage: decision.tokenUsage,
         costUsd: decision.costUsd,
       };
       yield* this.decisionLogs().save(log);
-      yield* Effect.sync(() => this.setState({
-        ...this.state,
-        groupId: report.payload.group_id,
-        reportsHandled: this.state.reportsHandled + 1,
-        nextDecisionSequence: assigned === undefined
-          ? this.state.nextDecisionSequence + 1
-          : this.state.nextDecisionSequence,
-        nextCommandSequence: assigned === undefined
-          ? this.state.nextCommandSequence + decision.commandSequenceAdvance
-          : this.state.nextCommandSequence,
-        lastReportAt: report.timestamp,
-        lastDecision: decision.commands,
-      }));
+      yield* Effect.sync(() =>
+        this.setState({
+          ...this.state,
+          groupId: report.payload.group_id,
+          reportsHandled: this.state.reportsHandled + 1,
+          nextDecisionSequence:
+            assigned === undefined
+              ? this.state.nextDecisionSequence + 1
+              : this.state.nextDecisionSequence,
+          nextCommandSequence:
+            assigned === undefined
+              ? this.state.nextCommandSequence + decision.commandSequenceAdvance
+              : this.state.nextCommandSequence,
+          lastReportAt: report.timestamp,
+          lastDecision: decision.commands,
+        }),
+      );
       return {
         commands: decision.commands,
         log,

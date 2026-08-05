@@ -19,30 +19,27 @@ export class DoctorService {
     private readonly probes: CliProbeRepositoryService,
     private readonly devVars: DevVarsRepositoryService,
     private readonly repositoryRoot: string,
-    private readonly pingSeat: (
-      seat: SubscriptionSeat,
-    ) => Effect.Effect<void, GatewayError>,
+    private readonly pingSeat: (seat: SubscriptionSeat) => Effect.Effect<void, GatewayError>,
     private readonly environment: NodeJS.ProcessEnv = process.env,
   ) {}
 
   run(options: DoctorOptions): Effect.Effect<DoctorReport, GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       const checks: DoctorCheck[] = [];
 
       const codexInstalled = yield* this.probes.run("codex", ["--version"]);
       const claudeInstalled = yield* this.probes.run("claude", ["--version"]);
-      checks.push(this.toolCheck(
-        "codex-installed",
-        "Codex CLI",
-        codexInstalled.ok,
-        codexInstalled.output,
-      ));
-      checks.push(this.toolCheck(
-        "claude-installed",
-        "Claude CLI",
-        claudeInstalled.ok,
-        claudeInstalled.output,
-      ));
+      checks.push(
+        this.toolCheck("codex-installed", "Codex CLI", codexInstalled.ok, codexInstalled.output),
+      );
+      checks.push(
+        this.toolCheck(
+          "claude-installed",
+          "Claude CLI",
+          claudeInstalled.ok,
+          claudeInstalled.output,
+        ),
+      );
 
       const codexLogin = codexInstalled.ok
         ? yield* this.probes.run("codex", ["login", "status"])
@@ -53,19 +50,22 @@ export class DoctorService {
       checks.push(this.loginCheck("codex-login", "Codex", codexLogin.ok, codexLogin.output));
       checks.push(this.loginCheck("claude-login", "Claude", claudeLogin.ok, claudeLogin.output));
 
-      const overrides = ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY"]
-        .filter((key) => Boolean(this.environment[key]));
-      checks.push(overrides.length === 0
-        ? {
-            id: "api-key-override",
-            status: "pass",
-            message: "No provider API key can silently override subscription OAuth",
-          }
-        : {
-            id: "api-key-override",
-            status: "warn",
-            message: `${overrides.join(" and ")} ${overrides.length === 1 ? "is" : "are"} set; subscription seats strip these variables, while the api seat remains explicitly metered`,
-          });
+      const overrides = ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY"].filter((key) =>
+        Boolean(this.environment[key]),
+      );
+      checks.push(
+        overrides.length === 0
+          ? {
+              id: "api-key-override",
+              status: "pass",
+              message: "No provider API key can silently override subscription OAuth",
+            }
+          : {
+              id: "api-key-override",
+              status: "warn",
+              message: `${overrides.join(" and ")} ${overrides.length === 1 ? "is" : "are"} set; subscription seats strip these variables, while the api seat remains explicitly metered`,
+            },
+      );
 
       for (const [seat, loggedIn] of [
         ["codex", codexLogin.ok],
@@ -84,21 +84,25 @@ export class DoctorService {
             message: `${seat} ping skipped because login is unavailable`,
           });
         } else {
-          const ping = yield* this.pingSeat(seat).pipe(Effect.match({
-            onFailure: (error) => ({ ok: false as const, error }),
-            onSuccess: () => ({ ok: true as const }),
-          }));
-          checks.push(ping.ok
-            ? {
-                id: `${seat}-ping`,
-                status: "pass",
-                message: `${seat} SDK one-turn ping succeeded`,
-              }
-            : {
-                id: `${seat}-ping`,
-                status: "fail",
-                message: `${seat} ping failed: ${ping.error.message}`,
-              });
+          const ping = yield* this.pingSeat(seat).pipe(
+            Effect.match({
+              onFailure: (error) => ({ ok: false as const, error }),
+              onSuccess: () => ({ ok: true as const }),
+            }),
+          );
+          checks.push(
+            ping.ok
+              ? {
+                  id: `${seat}-ping`,
+                  status: "pass",
+                  message: `${seat} SDK one-turn ping succeeded`,
+                }
+              : {
+                  id: `${seat}-ping`,
+                  status: "fail",
+                  message: `${seat} ping failed: ${ping.error.message}`,
+                },
+          );
         }
       }
 
@@ -115,11 +119,13 @@ export class DoctorService {
           value && value !== "sk-stavka-replace-me" ? value : undefined;
         const commanderKey = usableKey(commanderExisting.values.API_KEY);
         const poligonKey = usableKey(poligonExisting.values.COMMANDER_API_KEY);
-        const machineKey = usableKey(this.environment.API_KEY) ??
+        const machineKey =
+          usableKey(this.environment.API_KEY) ??
           commanderKey ??
           poligonKey ??
           `sk-stavka-local-${crypto.randomUUID().replaceAll("-", "")}`;
-        const devEmail = this.environment.DEV_ACCESS_EMAIL ??
+        const devEmail =
+          this.environment.DEV_ACCESS_EMAIL ??
           commanderExisting.values.DEV_ACCESS_EMAIL ??
           poligonExisting.values.DEV_ACCESS_EMAIL ??
           "developer@localhost";
@@ -217,9 +223,7 @@ export class DoctorService {
   }
 }
 
-export class Doctor extends Context.Service<Doctor, DoctorService>()(
-  "@stavka/maskirovka/Doctor",
-) {}
+export class Doctor extends Context.Service<Doctor, DoctorService>()("@stavka/maskirovka/Doctor") {}
 
 export const DoctorLive = (service: DoctorService): Layer.Layer<Doctor> =>
   Layer.succeed(Doctor, service);

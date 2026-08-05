@@ -5,19 +5,11 @@
   "compatibility_date": "2026-08-02",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
-    "bindings": [
-      { "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }
-    ]
+    "bindings": [{ "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }],
   },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["OrchestratorAgent"] }
-  ],
-  "kv_namespaces": [
-    { "binding": "TERRAIN_CACHE" }
-  ],
-  "r2_buckets": [
-    { "binding": "SESSION_EXPORTS", "bucket_name": "stavka-session-exports" }
-  ],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrchestratorAgent"] }],
+  "kv_namespaces": [{ "binding": "TERRAIN_CACHE" }],
+  "r2_buckets": [{ "binding": "SESSION_EXPORTS", "bucket_name": "stavka-session-exports" }],
   "vars": {
     "ENVIRONMENT": "production",
     "COMMANDER_MODEL": "stavka/commander",
@@ -32,7 +24,7 @@
     "TICK_INTERVAL_ACTIVE_MS": "750",
     "TICK_INTERVAL_BURST_MS": "300",
     "STAVKA_AI_PROVIDER": "openai",
-    "STAVKA_AI_BASE_URL": "https://maskirovka.example.invalid"
+    "STAVKA_AI_BASE_URL": "https://maskirovka.example.invalid",
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 }

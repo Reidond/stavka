@@ -22,12 +22,14 @@ const ApiErrorFields = {
     param: Schema.optional(Schema.String),
     retryable: Schema.optional(Schema.Boolean),
     resolved_model: Schema.optional(Schema.String),
-    usage: Schema.optional(Schema.Struct({
-      input_tokens: Schema.Number,
-      output_tokens: Schema.Number,
-      cached_input_tokens: Schema.optional(Schema.Number),
-      estimated_cost_usd: Schema.optional(Schema.Number),
-    })),
+    usage: Schema.optional(
+      Schema.Struct({
+        input_tokens: Schema.Number,
+        output_tokens: Schema.Number,
+        cached_input_tokens: Schema.optional(Schema.Number),
+        estimated_cost_usd: Schema.optional(Schema.Number),
+      }),
+    ),
   }),
 };
 

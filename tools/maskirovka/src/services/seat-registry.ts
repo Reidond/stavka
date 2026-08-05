@@ -27,13 +27,15 @@ export class SeatRegistry {
   }
 
   initialize(): Effect.Effect<void, GatewayError> {
-    return this.repository.load().pipe(Effect.map((persisted) => {
-      if (!persisted) return;
-      this.aliases = persisted.aliases.filter(
-        (alias) => tierAliases.includes(alias.tier) && seatKinds.includes(alias.seat),
-      );
-      this.killed = persisted.killed;
-    }));
+    return this.repository.load().pipe(
+      Effect.map((persisted) => {
+        if (!persisted) return;
+        this.aliases = persisted.aliases.filter(
+          (alias) => tierAliases.includes(alias.tier) && seatKinds.includes(alias.seat),
+        );
+        this.killed = persisted.killed;
+      }),
+    );
   }
 
   isKilled(): boolean {
@@ -68,14 +70,11 @@ export class SeatRegistry {
         .filter((alias) => alias.tier === tier)
         .sort((left, right) => this.priority(right.seat) - this.priority(left.seat));
       if (configured.length === 0) {
-        return Effect.fail(new GatewayError(
-          503,
-          "TIER_UNRESOLVED",
-          `No resolution for ${tier}`,
-        ));
+        return Effect.fail(new GatewayError(503, "TIER_UNRESOLVED", `No resolution for ${tier}`));
       }
-      const selected = configured.find((alias) =>
-        !excludedSeats.has(alias.seat) && this.isRoutable(alias.seat));
+      const selected = configured.find(
+        (alias) => !excludedSeats.has(alias.seat) && this.isRoutable(alias.seat),
+      );
       if (selected) {
         return Effect.succeed(selected);
       }
@@ -83,32 +82,31 @@ export class SeatRegistry {
       const preferred = configured[0]!;
       const exhausted = configured.some((alias) => this.isExhausted(alias.seat));
       if (exhausted && budgetPolicy === "stretch") {
-        return Effect.fail(new GatewayError(
-          429,
-          "SEAT_BUDGET_EXHAUSTED",
-          `Seat budget exhausted for ${tier}; stretch the commander tick interval`,
-          [`seat=${preferred.seat}`, "policy=stretch"],
-        ));
+        return Effect.fail(
+          new GatewayError(
+            429,
+            "SEAT_BUDGET_EXHAUSTED",
+            `Seat budget exhausted for ${tier}; stretch the commander tick interval`,
+            [`seat=${preferred.seat}`, "policy=stretch"],
+          ),
+        );
       }
 
       const api = this.apiFallbackAliases.find((alias) => alias.tier === tier);
-      if (
-        preferred.seat !== "api" &&
-        !excludedSeats.has("api") &&
-        api &&
-        this.isRoutable("api")
-      ) {
+      if (preferred.seat !== "api" && !excludedSeats.has("api") && api && this.isRoutable("api")) {
         return Effect.succeed({
           ...api,
           fallbackFromSeat: preferred.seat,
           routingReason: exhausted ? "budget-fallback" : "unavailable-fallback",
         });
       }
-      return Effect.fail(new GatewayError(
-        503,
-        "SEAT_UNAVAILABLE",
-        `No healthy seat or API fallback can serve ${tier}`,
-      ));
+      return Effect.fail(
+        new GatewayError(
+          503,
+          "SEAT_UNAVAILABLE",
+          `No healthy seat or API fallback can serve ${tier}`,
+        ),
+      );
     });
   }
 
@@ -117,7 +115,7 @@ export class SeatRegistry {
     seat: SeatKind,
     model: string,
   ): Effect.Effect<readonly AliasResolution[], GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       if (!tierAliases.includes(tier)) {
         return yield* Effect.fail(new GatewayError(400, "UNKNOWN_TIER", "Unknown tier alias"));
       }
@@ -137,7 +135,7 @@ export class SeatRegistry {
   }
 
   setKilled(killed: boolean): Effect.Effect<boolean, GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       this.killed = killed;
       yield* this.persist();
       return this.killed;
@@ -149,7 +147,9 @@ export class SeatRegistry {
   }
 
   private priority(seat: SeatKind): number {
-    return this.seats.find((candidate) => candidate.id === seat)?.priority ?? Number.MIN_SAFE_INTEGER;
+    return (
+      this.seats.find((candidate) => candidate.id === seat)?.priority ?? Number.MIN_SAFE_INTEGER
+    );
   }
 
   private isExhausted(seat: SeatKind): boolean {
@@ -159,9 +159,7 @@ export class SeatRegistry {
 
   private isRoutable(seat: SeatKind): boolean {
     const configured = this.seats.find((candidate) => candidate.id === seat);
-    return configured !== undefined &&
-      configured.status === "healthy" &&
-      !this.isExhausted(seat);
+    return configured !== undefined && configured.status === "healthy" && !this.isExhausted(seat);
   }
 }
 
@@ -177,7 +175,7 @@ export const SeatRegistryLive = (
 ): Layer.Layer<SeatRegistryService, GatewayError> =>
   Layer.effect(
     SeatRegistryService,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const registry = new SeatRegistry(aliases, seats, repository, apiFallbackAliases);
       yield* registry.initialize();
       return registry;

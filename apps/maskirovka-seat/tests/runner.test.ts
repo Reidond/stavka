@@ -76,10 +76,14 @@ describe("hosted Claude seat runner", () => {
           resolve();
           return;
         }
-        signal?.addEventListener("abort", () => {
-          aborted = true;
-          resolve();
-        }, { once: true });
+        signal?.addEventListener(
+          "abort",
+          () => {
+            aborted = true;
+            resolve();
+          },
+          { once: true },
+        );
       });
       yield* [];
     };
@@ -92,7 +96,9 @@ describe("hosted Claude seat runner", () => {
       messages: [{ role: "user" as const, content: "Wait forever" }],
     };
 
-    await expect(Effect.runPromise(governor.run(runner.runMessages(request)))).rejects.toMatchObject({
+    await expect(
+      Effect.runPromise(governor.run(runner.runMessages(request))),
+    ).rejects.toMatchObject({
       reason: "timeout",
       status: 504,
       retryable: true,
@@ -113,11 +119,15 @@ describe("hosted Claude seat runner", () => {
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "subscription-token";
     const runner = new LiveSeatRunner("claude", rateLimited);
 
-    await expect(Effect.runPromise(runner.runMessages({
-      model: "claude-fable-5",
-      max_tokens: 64,
-      messages: [{ role: "user", content: "Orders" }],
-    }))).rejects.toMatchObject({
+    await expect(
+      Effect.runPromise(
+        runner.runMessages({
+          model: "claude-fable-5",
+          max_tokens: 64,
+          messages: [{ role: "user", content: "Orders" }],
+        }),
+      ),
+    ).rejects.toMatchObject({
       reason: "rate_limit",
       status: 429,
       retryable: true,
@@ -140,11 +150,15 @@ describe("hosted Claude seat runner", () => {
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "subscription-token";
     const runner = new LiveSeatRunner("claude", failedWithUsage);
 
-    await expect(Effect.runPromise(runner.runMessages({
-      model: "claude-fable-5",
-      max_tokens: 64,
-      messages: [{ role: "user", content: "Orders" }],
-    }))).rejects.toMatchObject({
+    await expect(
+      Effect.runPromise(
+        runner.runMessages({
+          model: "claude-fable-5",
+          max_tokens: 64,
+          messages: [{ role: "user", content: "Orders" }],
+        }),
+      ),
+    ).rejects.toMatchObject({
       resolvedModel: "claude-fable-5",
       usage: {
         inputTokens: 21,

@@ -31,10 +31,12 @@ describe("contributor connection fencing", () => {
   });
 
   it("fails malformed decisions immediately at the channel boundary", async () => {
-    const exit = await Effect.runPromiseExit(decodeContributorDecision({
-      summary: "Malformed",
-      commands: [{ type: "move_group", params: { group_id: "a" } }],
-    }));
+    const exit = await Effect.runPromiseExit(
+      decodeContributorDecision({
+        summary: "Malformed",
+        commands: [{ type: "move_group", params: { group_id: "a" } }],
+      }),
+    );
 
     expect(exit._tag).toBe("Failure");
   });

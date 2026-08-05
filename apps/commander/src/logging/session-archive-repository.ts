@@ -10,10 +10,7 @@ import {
 } from "@stavka/protocol";
 import { Data, Effect, Schema } from "effect";
 
-import {
-  CommanderSessionStateSchema,
-  type CommanderSessionState,
-} from "../state/types";
+import { CommanderSessionStateSchema, type CommanderSessionState } from "../state/types";
 import type { SqlRepositoryHost } from "./decision-log-repository";
 
 export interface ArchivedTick {
@@ -99,10 +96,7 @@ export const SessionArchiveSchema = Schema.Struct({
 export const SessionExportSchema = SharedSessionExportSchema;
 export type SessionExport = SharedSessionExport;
 
-const PersistedSnapshotSchema = Schema.Union([
-  GameSnapshot,
-  CommanderSessionStateSchema,
-]);
+const PersistedSnapshotSchema = Schema.Union([GameSnapshot, CommanderSessionStateSchema]);
 
 const decodeArchivedSnapshot = (row: {
   readonly tick_id: number;
@@ -125,13 +119,7 @@ const decodeArchivedSnapshot = (row: {
 export class SessionArchiveRepositoryError extends Data.TaggedError(
   "SessionArchiveRepositoryError",
 )<{
-  readonly operation:
-    | "initialize"
-    | "saveTick"
-    | "export"
-    | "count"
-    | "snapshot"
-    | "snapshotPage";
+  readonly operation: "initialize" | "saveTick" | "export" | "count" | "snapshot" | "snapshotPage";
   readonly cause: unknown;
 }> {}
 
@@ -176,8 +164,10 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
         timestamp REAL NOT NULL,
         payload TEXT NOT NULL
       )`;
-      void this.host.sql`CREATE INDEX IF NOT EXISTS event_history_timestamp ON event_history(timestamp)`;
-      void this.host.sql`CREATE INDEX IF NOT EXISTS snapshot_history_timestamp ON snapshot_history(timestamp)`;
+      void this.host
+        .sql`CREATE INDEX IF NOT EXISTS event_history_timestamp ON event_history(timestamp)`;
+      void this.host
+        .sql`CREATE INDEX IF NOT EXISTS snapshot_history_timestamp ON snapshot_history(timestamp)`;
     },
     catch: (cause) => new SessionArchiveRepositoryError({ operation: "initialize", cause }),
   });
@@ -202,25 +192,23 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
       catch: (cause) => new SessionArchiveRepositoryError({ operation: "saveTick", cause }),
     });
 
-  readonly export = (
-    limit: number,
-  ): Effect.Effect<SessionArchive, SessionArchiveRepositoryError> =>
+  readonly export = (limit: number): Effect.Effect<SessionArchive, SessionArchiveRepositoryError> =>
     Effect.try({
       try: () => {
         const safeLimit = Math.min(10_000, Math.max(1, Math.floor(limit)));
         return {
           tickRows: this.host.sql<{
-          tick_id: number;
-          timestamp: number;
-          payload: string;
+            tick_id: number;
+            timestamp: number;
+            payload: string;
           }>`SELECT tick_id, timestamp, payload
             FROM tick_history ORDER BY tick_id ASC LIMIT ${safeLimit}`,
           eventRows: this.host.sql<{ payload: string }>`SELECT payload
             FROM event_history ORDER BY timestamp ASC LIMIT ${safeLimit}`,
           snapshotRows: this.host.sql<{
-          tick_id: number;
-          timestamp: number;
-          payload: string;
+            tick_id: number;
+            timestamp: number;
+            payload: string;
           }>`SELECT tick_id, timestamp, payload
             FROM snapshot_history ORDER BY tick_id ASC LIMIT ${safeLimit}`,
         };
@@ -231,15 +219,19 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
         Effect.all({
           ticks: Effect.forEach(tickRows, (row) =>
             Schema.decodeUnknownEffect(Schema.fromJsonString(TickRequest))(row.payload).pipe(
-              Effect.map((request): ArchivedTick => ({
-                tickId: row.tick_id,
-                timestamp: row.timestamp,
-                kind: request.type,
-                request,
-              })),
-            )),
+              Effect.map(
+                (request): ArchivedTick => ({
+                  tickId: row.tick_id,
+                  timestamp: row.timestamp,
+                  kind: request.type,
+                  request,
+                }),
+              ),
+            ),
+          ),
           events: Effect.forEach(eventRows, (row) =>
-            Schema.decodeUnknownEffect(Schema.fromJsonString(GameEvent))(row.payload)),
+            Schema.decodeUnknownEffect(Schema.fromJsonString(GameEvent))(row.payload),
+          ),
           snapshots: Effect.forEach(snapshotRows, decodeArchivedSnapshot),
         }),
       ),
@@ -250,18 +242,19 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
       ),
     );
 
-  readonly count: Effect.Effect<SessionArchiveCounts, SessionArchiveRepositoryError> =
-    Effect.try({
-      try: () => ({
-        ticks: this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM tick_history`[0]
+  readonly count: Effect.Effect<SessionArchiveCounts, SessionArchiveRepositoryError> = Effect.try({
+    try: () => ({
+      ticks:
+        this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM tick_history`[0]?.total ?? 0,
+      events:
+        this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM event_history`[0]?.total ??
+        0,
+      snapshots:
+        this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM snapshot_history`[0]
           ?.total ?? 0,
-        events: this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM event_history`[0]
-          ?.total ?? 0,
-        snapshots: this.host.sql<{ total: number }>`SELECT COUNT(*) AS total FROM snapshot_history`[0]
-          ?.total ?? 0,
-      }),
-      catch: (cause) => new SessionArchiveRepositoryError({ operation: "count", cause }),
-    });
+    }),
+    catch: (cause) => new SessionArchiveRepositoryError({ operation: "count", cause }),
+  });
 
   readonly exportSnapshot: Effect.Effect<
     SessionArchiveExportSnapshot,
@@ -284,7 +277,10 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
           (SELECT COUNT(*) FROM event_history WHERE rowid <= high_water_rowid) AS total
         FROM watermark
       `[0];
-      const snapshots = this.host.sql<{ readonly high_water_rowid: number; readonly total: number }>`
+      const snapshots = this.host.sql<{
+        readonly high_water_rowid: number;
+        readonly total: number;
+      }>`
         WITH watermark(high_water_rowid) AS (
           SELECT COALESCE(MAX(rowid), 0) FROM snapshot_history
         )
@@ -314,57 +310,60 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
     Effect.try({
       try: () => {
         const safeLimit = Math.min(500, Math.max(1, Math.floor(limit)));
-        const tickRows = cursor.ticks.done || snapshot.tickHighWaterRowId === 0
-          ? []
-          : cursor.ticks.after === undefined
-          ? this.host.sql<{
-              readonly tick_id: number;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT tick_id, timestamp, payload FROM tick_history
+        const tickRows =
+          cursor.ticks.done || snapshot.tickHighWaterRowId === 0
+            ? []
+            : cursor.ticks.after === undefined
+              ? this.host.sql<{
+                  readonly tick_id: number;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT tick_id, timestamp, payload FROM tick_history
               WHERE rowid <= ${snapshot.tickHighWaterRowId}
               ORDER BY tick_id ASC LIMIT ${safeLimit + 1}`
-          : this.host.sql<{
-              readonly tick_id: number;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT tick_id, timestamp, payload FROM tick_history
+              : this.host.sql<{
+                  readonly tick_id: number;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT tick_id, timestamp, payload FROM tick_history
               WHERE rowid <= ${snapshot.tickHighWaterRowId} AND tick_id > ${cursor.ticks.after}
               ORDER BY tick_id ASC LIMIT ${safeLimit + 1}`;
-        const eventRows = cursor.events.done || snapshot.eventHighWaterRowId === 0
-          ? []
-          : cursor.events.timestamp === undefined || cursor.events.id === undefined
-          ? this.host.sql<{
-              readonly id: string;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT id, timestamp, payload FROM event_history
+        const eventRows =
+          cursor.events.done || snapshot.eventHighWaterRowId === 0
+            ? []
+            : cursor.events.timestamp === undefined || cursor.events.id === undefined
+              ? this.host.sql<{
+                  readonly id: string;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT id, timestamp, payload FROM event_history
               WHERE rowid <= ${snapshot.eventHighWaterRowId}
               ORDER BY timestamp ASC, id ASC LIMIT ${safeLimit + 1}`
-          : this.host.sql<{
-              readonly id: string;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT id, timestamp, payload FROM event_history
+              : this.host.sql<{
+                  readonly id: string;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT id, timestamp, payload FROM event_history
               WHERE rowid <= ${snapshot.eventHighWaterRowId}
                 AND (timestamp > ${cursor.events.timestamp}
                   OR (timestamp = ${cursor.events.timestamp} AND id > ${cursor.events.id}))
               ORDER BY timestamp ASC, id ASC LIMIT ${safeLimit + 1}`;
-        const snapshotRows = cursor.snapshots.done || snapshot.snapshotHighWaterRowId === 0
-          ? []
-          : cursor.snapshots.after === undefined
-          ? this.host.sql<{
-              readonly tick_id: number;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT tick_id, timestamp, payload FROM snapshot_history
+        const snapshotRows =
+          cursor.snapshots.done || snapshot.snapshotHighWaterRowId === 0
+            ? []
+            : cursor.snapshots.after === undefined
+              ? this.host.sql<{
+                  readonly tick_id: number;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT tick_id, timestamp, payload FROM snapshot_history
               WHERE rowid <= ${snapshot.snapshotHighWaterRowId}
               ORDER BY tick_id ASC LIMIT ${safeLimit + 1}`
-          : this.host.sql<{
-              readonly tick_id: number;
-              readonly timestamp: number;
-              readonly payload: string;
-            }>`SELECT tick_id, timestamp, payload FROM snapshot_history
+              : this.host.sql<{
+                  readonly tick_id: number;
+                  readonly timestamp: number;
+                  readonly payload: string;
+                }>`SELECT tick_id, timestamp, payload FROM snapshot_history
               WHERE rowid <= ${snapshot.snapshotHighWaterRowId}
                 AND tick_id > ${cursor.snapshots.after}
               ORDER BY tick_id ASC LIMIT ${safeLimit + 1}`;
@@ -385,36 +384,43 @@ export class SqlSessionArchiveRepository implements SessionArchiveRepository {
         const eventLast = pageEvents.at(-1);
         const snapshotLast = pageSnapshots.at(-1);
         const nextCursor: SessionArchiveExportCursor = {
-          ticks: tickRows.length > safeLimit && tickLast !== undefined
-            ? { done: false, after: tickLast.tick_id }
-            : { done: true, ...(tickLast === undefined ? {} : { after: tickLast.tick_id }) },
-          events: eventRows.length > safeLimit && eventLast !== undefined
-            ? { done: false, timestamp: eventLast.timestamp, id: eventLast.id }
-            : {
-                done: true,
-                ...(eventLast === undefined
-                  ? {}
-                  : { timestamp: eventLast.timestamp, id: eventLast.id }),
-              },
-          snapshots: snapshotRows.length > safeLimit && snapshotLast !== undefined
-            ? { done: false, after: snapshotLast.tick_id }
-            : {
-                done: true,
-                ...(snapshotLast === undefined ? {} : { after: snapshotLast.tick_id }),
-              },
+          ticks:
+            tickRows.length > safeLimit && tickLast !== undefined
+              ? { done: false, after: tickLast.tick_id }
+              : { done: true, ...(tickLast === undefined ? {} : { after: tickLast.tick_id }) },
+          events:
+            eventRows.length > safeLimit && eventLast !== undefined
+              ? { done: false, timestamp: eventLast.timestamp, id: eventLast.id }
+              : {
+                  done: true,
+                  ...(eventLast === undefined
+                    ? {}
+                    : { timestamp: eventLast.timestamp, id: eventLast.id }),
+                },
+          snapshots:
+            snapshotRows.length > safeLimit && snapshotLast !== undefined
+              ? { done: false, after: snapshotLast.tick_id }
+              : {
+                  done: true,
+                  ...(snapshotLast === undefined ? {} : { after: snapshotLast.tick_id }),
+                },
         };
         return Effect.all({
           ticks: Effect.forEach(pageTicks, (row) =>
             Schema.decodeUnknownEffect(Schema.fromJsonString(TickRequest))(row.payload).pipe(
-              Effect.map((request): ArchivedTick => ({
-                tickId: row.tick_id,
-                timestamp: row.timestamp,
-                kind: request.type,
-                request,
-              })),
-            )),
+              Effect.map(
+                (request): ArchivedTick => ({
+                  tickId: row.tick_id,
+                  timestamp: row.timestamp,
+                  kind: request.type,
+                  request,
+                }),
+              ),
+            ),
+          ),
           events: Effect.forEach(pageEvents, (row) =>
-            Schema.decodeUnknownEffect(Schema.fromJsonString(GameEvent))(row.payload)),
+            Schema.decodeUnknownEffect(Schema.fromJsonString(GameEvent))(row.payload),
+          ),
           snapshots: Effect.forEach(pageSnapshots, decodeArchivedSnapshot),
         }).pipe(
           Effect.map((archive): SessionArchiveExportPage => ({ archive, cursor: nextCursor })),

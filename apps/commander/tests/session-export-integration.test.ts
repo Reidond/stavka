@@ -9,19 +9,20 @@ import {
   type R2ObjectMetadataLike,
 } from "../src/logging/r2-session-export-repository";
 
-const logPayload = (sequence: number): string => JSON.stringify({
-  id: `dec_${String(sequence).padStart(6, "0")}`,
-  timestamp: new Date(sequence * 1_000).toISOString(),
-  agent: "commander",
-  trigger: "scheduled_tick",
-  input: { stateSnapshot: null, events: [], prompt: "" },
-  output: { rawResponse: "", parsedCommands: [], summary: `Decision ${sequence}` },
-  commandsIssued: [],
-  model: "mock:commander",
-  latencyMs: 0,
-  tokenUsage: { input: 0, output: 0 },
-  costUsd: 0,
-});
+const logPayload = (sequence: number): string =>
+  JSON.stringify({
+    id: `dec_${String(sequence).padStart(6, "0")}`,
+    timestamp: new Date(sequence * 1_000).toISOString(),
+    agent: "commander",
+    trigger: "scheduled_tick",
+    input: { stateSnapshot: null, events: [], prompt: "" },
+    output: { rawResponse: "", parsedCommands: [], summary: `Decision ${sequence}` },
+    commandsIssued: [],
+    model: "mock:commander",
+    latencyMs: 0,
+    tokenUsage: { input: 0, output: 0 },
+    costUsd: 0,
+  });
 
 vi.mock("agents", () => ({
   Agent: class {
@@ -42,19 +43,16 @@ vi.mock("agents", () => ({
       }
       if (query.includes("SELECT id, timestamp, payload FROM decision_logs")) {
         const limit = values.at(-1) as number;
-        const cursorId = values.length > 2 ? values.at(-2) as string : undefined;
+        const cursorId = values.length > 2 ? (values.at(-2) as string) : undefined;
         const start = cursorId === undefined ? 1 : Number(cursorId.slice(-6)) + 1;
-        return Array.from(
-          { length: Math.min(limit, Math.max(0, 502 - start)) },
-          (_, index) => {
-            const sequence = start + index;
-            return {
-              id: `dec_${String(sequence).padStart(6, "0")}`,
-              timestamp: new Date(sequence * 1_000).toISOString(),
-              payload: logPayload(sequence),
-            };
-          },
-        ) as T[];
+        return Array.from({ length: Math.min(limit, Math.max(0, 502 - start)) }, (_, index) => {
+          const sequence = start + index;
+          return {
+            id: `dec_${String(sequence).padStart(6, "0")}`,
+            timestamp: new Date(sequence * 1_000).toISOString(),
+            payload: logPayload(sequence),
+          };
+        }) as T[];
       }
       return [];
     }
@@ -84,9 +82,7 @@ class FakeR2Bucket implements R2BucketLike {
       size: new TextEncoder().encode(value).byteLength,
       etag: `etag:${key}`,
       uploaded: new Date("2026-08-02T12:00:00.000Z"),
-      ...(options?.customMetadata === undefined
-        ? {}
-        : { customMetadata: options.customMetadata }),
+      ...(options?.customMetadata === undefined ? {} : { customMetadata: options.customMetadata }),
     };
     this.objects.set(key, { body: value, metadata });
     return metadata;
@@ -94,9 +90,7 @@ class FakeR2Bucket implements R2BucketLike {
 
   async get(key: string): Promise<R2ObjectBodyLike | null> {
     const stored = this.objects.get(key);
-    return stored === undefined
-      ? null
-      : { ...stored.metadata, text: async () => stored.body };
+    return stored === undefined ? null : { ...stored.metadata, text: async () => stored.body };
   }
 
   async list(): Promise<{ readonly objects: readonly R2ObjectMetadataLike[] }> {

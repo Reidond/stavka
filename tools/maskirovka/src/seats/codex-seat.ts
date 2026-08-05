@@ -1,25 +1,18 @@
-import type {
-  ModelReasoningEffort,
-  ThreadOptions,
-  TurnOptions,
-  Usage,
-} from "@openai/codex-sdk";
+import type { ModelReasoningEffort, ThreadOptions, TurnOptions, Usage } from "@openai/codex-sdk";
 import { Effect } from "effect";
 
 import { GatewayError, type SeatInvocation, type SeatResult } from "../domain/types";
 import { estimateTokens, type SeatAdapter } from "./seat-adapter";
 
-const codexSubscriptionCredentialKeys = new Set([
-  "CODEX_API_KEY",
-  "OPENAI_API_KEY",
-]);
+const codexSubscriptionCredentialKeys = new Set(["CODEX_API_KEY", "OPENAI_API_KEY"]);
 
 export const sanitizeCodexSubscriptionEnvironment = (
   environment: Readonly<Record<string, string | undefined>>,
 ): Record<string, string> =>
   Object.fromEntries(
-    Object.entries(environment)
-      .filter(([key, value]) => !codexSubscriptionCredentialKeys.has(key) && value !== undefined),
+    Object.entries(environment).filter(
+      ([key, value]) => !codexSubscriptionCredentialKeys.has(key) && value !== undefined,
+    ),
   ) as Record<string, string>;
 
 interface CodexThreadPort {
@@ -52,7 +45,8 @@ const reasoningEffort = (request: SeatInvocation): ModelReasoningEffort | undefi
     effort !== "high" &&
     effort !== "xhigh" &&
     effort !== "max"
-  ) return undefined;
+  )
+    return undefined;
   return effort === "max" ? "xhigh" : effort;
 };
 
@@ -68,19 +62,16 @@ export class CodexSeat implements SeatAdapter {
     return Effect.tryPromise({
       try: async (signal) => {
         const effort = reasoningEffort(request);
-        const thread = await this.createThread(
-          sanitizeCodexSubscriptionEnvironment(process.env),
-          {
-            model: request.model,
-            workingDirectory: this.workingDirectory,
-            skipGitRepoCheck: true,
-            approvalPolicy: "never",
-            sandboxMode: "read-only",
-            networkAccessEnabled: false,
-            webSearchMode: "disabled",
-            ...(effort ? { modelReasoningEffort: effort } : {}),
-          },
-        );
+        const thread = await this.createThread(sanitizeCodexSubscriptionEnvironment(process.env), {
+          model: request.model,
+          workingDirectory: this.workingDirectory,
+          skipGitRepoCheck: true,
+          approvalPolicy: "never",
+          sandboxMode: "read-only",
+          networkAccessEnabled: false,
+          webSearchMode: "disabled",
+          ...(effort ? { modelReasoningEffort: effort } : {}),
+        });
         const prompt = [
           request.system ?? "Return only the requested answer.",
           "Do not use tools, inspect files, or perform actions. Answer only from the supplied request.",
@@ -108,11 +99,12 @@ export class CodexSeat implements SeatAdapter {
           },
         };
       },
-      catch: (cause) => new GatewayError(
-        502,
-        "CODEX_SEAT_FAILURE",
-        cause instanceof Error ? cause.message : "Codex SDK invocation failed",
-      ),
+      catch: (cause) =>
+        new GatewayError(
+          502,
+          "CODEX_SEAT_FAILURE",
+          cause instanceof Error ? cause.message : "Codex SDK invocation failed",
+        ),
     });
   }
 }

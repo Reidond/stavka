@@ -71,10 +71,13 @@ const request = (
 ): Promise<Response> =>
   handleTestRequest(
     app.handler,
-    new Request(`${env.ENVIRONMENT === "local" ? "http://127.0.0.1" : "http://seat.test"}${path}`, init),
+    new Request(
+      `${env.ENVIRONMENT === "local" ? "http://127.0.0.1" : "http://seat.test"}${path}`,
+      init,
+    ),
     env,
     {
-    resolveSeat: () => stub,
+      resolveSeat: () => stub,
     },
   );
 

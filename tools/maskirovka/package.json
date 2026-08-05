@@ -2,10 +2,10 @@
   "name": "@stavka/maskirovka",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "bin": {
     "maskirovka": "./dist/cli.js"
   },
+  "type": "module",
   "scripts": {
     "dev": "pnpm build:dashboard && tsx src/cli.ts up",
     "serve": "pnpm build:dashboard && tsx src/cli.ts serve",

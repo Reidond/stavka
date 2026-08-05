@@ -14,25 +14,53 @@ import {
 } from "@stavka/protocol";
 import { Effect, Layer, Redacted, Schema } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpClientRequest,
-} from "effect/unstable/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 
 import type { CommanderConfig } from "../config";
 
 const ProposalBase = { priority: Schema.optional(CommandPriority) };
 
 export const AiCommandProposal = Schema.Union([
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("spawn_group"), params: SpawnGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("despawn_group"), params: DespawnGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("move_group"), params: MoveGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("attack_group"), params: AttackGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("defend_group"), params: DefendGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("patrol_group"), params: PatrolGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("sweep_group"), params: SweepGroupCommand.fields.params }),
-  Schema.Struct({ ...ProposalBase, type: Schema.Literal("set_objective"), params: SetObjectiveCommand.fields.params }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("spawn_group"),
+    params: SpawnGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("despawn_group"),
+    params: DespawnGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("move_group"),
+    params: MoveGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("attack_group"),
+    params: AttackGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("defend_group"),
+    params: DefendGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("patrol_group"),
+    params: PatrolGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("sweep_group"),
+    params: SweepGroupCommand.fields.params,
+  }),
+  Schema.Struct({
+    ...ProposalBase,
+    type: Schema.Literal("set_objective"),
+    params: SetObjectiveCommand.fields.params,
+  }),
 ]);
 export type AiCommandProposal = typeof AiCommandProposal.Type;
 
@@ -72,9 +100,7 @@ export const rewriteAnthropicGatewayRequest = (
     const body = JSON.parse(new TextDecoder().decode(request.body.body)) as Record<string, unknown>;
     rewritten = HttpClientRequest.bodyJsonUnsafe(rewritten, { ...body, model });
   }
-  return apiKey === undefined
-    ? rewritten
-    : HttpClientRequest.bearerToken(rewritten, apiKey);
+  return apiKey === undefined ? rewritten : HttpClientRequest.bearerToken(rewritten, apiKey);
 };
 
 const tierRates: Record<LlmTierAlias, { readonly input: number; readonly output: number }> = {
@@ -93,7 +119,11 @@ export const estimateCost = (
 
 const generatedDecision = (
   prompt: string,
-): Effect.Effect<LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>, unknown, LanguageModel.LanguageModel> =>
+): Effect.Effect<
+  LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>,
+  unknown,
+  LanguageModel.LanguageModel
+> =>
   LanguageModel.generateObject({
     prompt,
     schema: AiDecision,
@@ -103,7 +133,11 @@ const generatedDecision = (
 const withOpenAi = (
   config: CommanderConfig,
   model: string,
-  program: Effect.Effect<LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>, unknown, LanguageModel.LanguageModel>,
+  program: Effect.Effect<
+    LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>,
+    unknown,
+    LanguageModel.LanguageModel
+  >,
 ) => {
   const client = OpenAiClient.layer({
     apiUrl: openAiUrl(config.aiBaseUrl),
@@ -116,12 +150,17 @@ const withOpenAi = (
 const withAnthropic = (
   config: CommanderConfig,
   model: LlmTierAlias,
-  program: Effect.Effect<LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>, unknown, LanguageModel.LanguageModel>,
+  program: Effect.Effect<
+    LanguageModel.GenerateObjectResponse<Record<string, never>, AiDecision>,
+    unknown,
+    LanguageModel.LanguageModel
+  >,
 ) => {
   const transformClient = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
     client.pipe(
       HttpClient.mapRequest((request) =>
-        rewriteAnthropicGatewayRequest(request, model, config.aiKey)),
+        rewriteAnthropicGatewayRequest(request, model, config.aiKey),
+      ),
     );
   const client = AnthropicClient.layer({
     apiUrl: anthropicUrl(config.aiBaseUrl),
@@ -146,9 +185,10 @@ export const runAiDecision = (
     });
   }
   const program = generatedDecision(options.prompt);
-  const provided = config.aiProvider === "openai"
-    ? withOpenAi(config, options.model, program)
-    : withAnthropic(config, options.model, program);
+  const provided =
+    config.aiProvider === "openai"
+      ? withOpenAi(config, options.model, program)
+      : withAnthropic(config, options.model, program);
   return provided.pipe(
     Effect.map((response): AiDecisionResult => {
       const tokenUsage = {

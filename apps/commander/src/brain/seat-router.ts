@@ -66,19 +66,13 @@ export const servesTier = (seat: SeatRegistration, tier: LlmTierAlias): boolean 
   seat.models.includes(tier);
 
 const hasBudget = (seat: SeatRegistration): boolean =>
-  seat.monthlyBudgetUsd > 0 &&
-  seat.spentUsd + seat.reservedUsd < seat.monthlyBudgetUsd;
+  seat.monthlyBudgetUsd > 0 && seat.spentUsd + seat.reservedUsd < seat.monthlyBudgetUsd;
 
-const hasIsolatedCredential = (
-  seat: SeatRegistration,
-  config: CommanderConfig,
-): boolean => seat.mode === "contributor" || config.seatKeys[seat.id] !== undefined;
+const hasIsolatedCredential = (seat: SeatRegistration, config: CommanderConfig): boolean =>
+  seat.mode === "contributor" || config.seatKeys[seat.id] !== undefined;
 
-export const seatIsHealthy = (
-  seat: SeatRegistration,
-  nowSeconds = Date.now() / 1_000,
-): boolean => seat.healthy &&
-  (seat.healthExpiresAt === undefined || seat.healthExpiresAt > nowSeconds);
+export const seatIsHealthy = (seat: SeatRegistration, nowSeconds = Date.now() / 1_000): boolean =>
+  seat.healthy && (seat.healthExpiresAt === undefined || seat.healthExpiresAt > nowSeconds);
 
 /** Resolve registered HTTP seats first; Maskirovka remains the metered fallback. */
 export const resolveLlmRoute = (
@@ -89,11 +83,13 @@ export const resolveLlmRoute = (
 ): ResolvedLlmRoute => {
   const registered = seats.filter((seat) => servesTier(seat, tier));
   const selected = registered
-    .filter((seat) =>
-      seatIsHealthy(seat, nowSeconds) &&
-      !seat.exhausted &&
-      hasBudget(seat) &&
-      hasIsolatedCredential(seat, config))
+    .filter(
+      (seat) =>
+        seatIsHealthy(seat, nowSeconds) &&
+        !seat.exhausted &&
+        hasBudget(seat) &&
+        hasIsolatedCredential(seat, config),
+    )
     .sort((left, right) => right.priority - left.priority)[0];
   if (selected?.mode === "contributor") {
     return {
@@ -110,9 +106,7 @@ export const resolveLlmRoute = (
         ...config,
         aiProvider: selected.provider === "claude" ? "anthropic" : "openai",
         aiBaseUrl: selected.endpoint,
-        ...(config.seatKeys[selected.id]
-          ? { aiKey: config.seatKeys[selected.id] }
-          : {}),
+        ...(config.seatKeys[selected.id] ? { aiKey: config.seatKeys[selected.id] } : {}),
       },
       seatId: selected.id,
       fallback: false,
@@ -156,8 +150,15 @@ export const invokeContributorSeat = (
     // Durable Object RPC does not promise to preserve Error subclasses. The
     // registry therefore returns known contributor failures as a data result,
     // so the protocol retryable flag survives this boundary verbatim.
-    try: (): Promise<unknown> => env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME)
-      .invokeContributorOutcome(seatId, tier, prompt, timeoutSeconds, jobId, leaseId),
+    try: (): Promise<unknown> =>
+      env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).invokeContributorOutcome(
+        seatId,
+        tier,
+        prompt,
+        timeoutSeconds,
+        jobId,
+        leaseId,
+      ),
     catch: (cause) => cause,
   }).pipe(
     Effect.mapError((cause) => new ContributorSeatError({ seatId, cause })),
@@ -165,19 +166,22 @@ export const invokeContributorSeat = (
     Effect.flatMap((outcome) => {
       if (outcome.ok) return Effect.succeed(outcome.result);
       const failure = outcome.failure;
-      return Effect.fail(new ContributorResultError({
-        code: failure.code,
-        message: failure.message,
-        retryable: failure.retryable,
-        ...(failure.tokenUsage === undefined ? {} : { tokenUsage: failure.tokenUsage }),
-        ...(failure.costUsd === undefined ? {} : { costUsd: failure.costUsd }),
-        ...(failure.resolvedModel === undefined ? {} : { resolvedModel: failure.resolvedModel }),
-      }));
+      return Effect.fail(
+        new ContributorResultError({
+          code: failure.code,
+          message: failure.message,
+          retryable: failure.retryable,
+          ...(failure.tokenUsage === undefined ? {} : { tokenUsage: failure.tokenUsage }),
+          ...(failure.costUsd === undefined ? {} : { costUsd: failure.costUsd }),
+          ...(failure.resolvedModel === undefined ? {} : { resolvedModel: failure.resolvedModel }),
+        }),
+      );
     }),
-    Effect.mapError((cause) => cause instanceof ContributorSeatError ||
-      cause instanceof ContributorResultError
-      ? cause
-      : new ContributorSeatError({ seatId, cause })),
+    Effect.mapError((cause) =>
+      cause instanceof ContributorSeatError || cause instanceof ContributorResultError
+        ? cause
+        : new ContributorSeatError({ seatId, cause }),
+    ),
   );
 
 const seatConfig = (
@@ -196,16 +200,17 @@ const seatConfig = (
 
 export const estimatedSeatReservationUsd = (tier: LlmTierAlias): number => {
   switch (tier) {
-    case "stavka/sergeant": return 0.05;
-    case "stavka/commander": return 0.25;
-    case "stavka/heavy": return 0.5;
+    case "stavka/sergeant":
+      return 0.05;
+    case "stavka/commander":
+      return 0.25;
+    case "stavka/heavy":
+      return 0.5;
   }
 };
 
 const errorRecord = (cause: unknown): Record<string, unknown> | undefined =>
-  typeof cause === "object" && cause !== null
-    ? cause as Record<string, unknown>
-    : undefined;
+  typeof cause === "object" && cause !== null ? (cause as Record<string, unknown>) : undefined;
 
 /** Only transport, timeout, rate-limit, and unavailable failures may fail over. */
 export const isRetryableSeatFailure = (cause: unknown): boolean => {
@@ -220,14 +225,16 @@ export const isRetryableSeatFailure = (cause: unknown): boolean => {
     tag === "InvalidRequestError" ||
     tag === "AuthenticationError" ||
     tag === "ContentPolicyError"
-  ) return false;
+  )
+    return false;
   if (
     tag === "TimeoutException" ||
     tag === "RequestError" ||
     tag === "ResponseError" ||
     tag === "NetworkError" ||
     tag === "RateLimitError"
-  ) return true;
+  )
+    return true;
   if ("cause" in record && record.cause !== cause) {
     const nested = isRetryableSeatFailure(record.cause);
     if (nested) return true;
@@ -276,9 +283,7 @@ export const reportedSeatFailureUsage = (
 export const routedFailureCostAttributions = (
   cause: unknown,
 ): readonly RoutedAiCostAttribution[] =>
-  cause instanceof RoutedAiFailure
-    ? cause.costAttributions
-    : [];
+  cause instanceof RoutedAiFailure ? cause.costAttributions : [];
 
 const providerAttribution = (
   model: string,
@@ -298,9 +303,7 @@ const providerAttribution = (
 });
 
 const hasMeasuredUsage = (attribution: RoutedAiCostAttribution): boolean =>
-  attribution.costUsd > 0 ||
-  attribution.tokenUsage.input > 0 ||
-  attribution.tokenUsage.output > 0;
+  attribution.costUsd > 0 || attribution.tokenUsage.input > 0 || attribution.tokenUsage.output > 0;
 
 const registryFailure = (operation: string, cause: unknown): Error =>
   new Error(`Seat registry ${operation} failed`, { cause });
@@ -318,166 +321,178 @@ export const runRoutedAiDecision = (
   tier: LlmTierAlias,
   prompt: string,
   invocationId: string = crypto.randomUUID(),
-): Effect.Effect<RoutedAiDecision, unknown> => Effect.gen(function*() {
-  const registered = seats.filter((seat) => servesTier(seat, tier));
-  const candidates = registered
-    .filter((seat) =>
-      seatIsHealthy(seat) &&
-      !seat.exhausted &&
-      hasBudget(seat) &&
-      hasIsolatedCredential(seat, config))
-    .sort((left, right) => right.priority - left.priority);
-  const registry = env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME);
-  const reservationUsd = estimatedSeatReservationUsd(tier);
-  const costAttributions: RoutedAiCostAttribution[] = [];
-  let availabilityFailure = false;
-  let registryUnavailable = false;
+): Effect.Effect<RoutedAiDecision, unknown> =>
+  Effect.gen(function* () {
+    const registered = seats.filter((seat) => servesTier(seat, tier));
+    const candidates = registered
+      .filter(
+        (seat) =>
+          seatIsHealthy(seat) &&
+          !seat.exhausted &&
+          hasBudget(seat) &&
+          hasIsolatedCredential(seat, config),
+      )
+      .sort((left, right) => right.priority - left.priority);
+    const registry = env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME);
+    const reservationUsd = estimatedSeatReservationUsd(tier);
+    const costAttributions: RoutedAiCostAttribution[] = [];
+    let availabilityFailure = false;
+    let registryUnavailable = false;
 
-  for (const seat of candidates) {
-    const reservationId = `${invocationId}:${seat.id}`;
-    const reservation = yield* Effect.result(Effect.tryPromise({
-      try: () => registry.reserveSeatBudget(seat.id, reservationUsd, reservationId),
-      catch: (cause) => registryFailure("reservation", cause),
-    }));
-    if (reservation._tag === "Failure") {
-      registryUnavailable = true;
-      break;
-    }
-    if (!reservation.success.accepted) continue;
+    for (const seat of candidates) {
+      const reservationId = `${invocationId}:${seat.id}`;
+      const reservation = yield* Effect.result(
+        Effect.tryPromise({
+          try: () => registry.reserveSeatBudget(seat.id, reservationUsd, reservationId),
+          catch: (cause) => registryFailure("reservation", cause),
+        }),
+      );
+      if (reservation._tag === "Failure") {
+        registryUnavailable = true;
+        break;
+      }
+      if (!reservation.success.accepted) continue;
 
-    const attempted = yield* Effect.result(
-      seat.mode === "contributor"
-        ? invokeContributorSeat(
-            env,
-            seat.id,
-            tier,
-            prompt,
-            config.seatJobTimeoutSeconds,
-            invocationId,
-            reservationId,
-          )
-        : runAiDecision(seatConfig(seat, config), { model: tier, prompt }),
-    );
-    if (attempted._tag === "Success") {
-      // A successful provider response is not committed until its reservation
-      // is reconciled. Let the durable caller retain/retry this invocation if
-      // the registry is temporarily unavailable; returning the decision here
-      // would strand the conservative reservation indefinitely.
-      yield* Effect.tryPromise({
-        try: () => registry.reconcileSeatBudget(
-          seat.id,
-          reservationUsd,
-          attempted.success.costUsd,
-          reservationId,
-        ),
-        catch: (cause) => registryFailure("reconciliation", cause),
-      });
-      return {
-        ...attempted.success,
-        resolvedModel: attempted.success.resolvedModel ?? `${tier}@${seat.id}`,
-        seatId: seat.id,
-        fallback: false,
-        costAttributions: [
-          ...costAttributions,
-          providerAttribution(
-            attempted.success.resolvedModel ?? `${tier}@${seat.id}`,
-            attempted.success,
-            seat.id,
-          ),
-        ],
-      };
-    }
+      const attempted = yield* Effect.result(
+        seat.mode === "contributor"
+          ? invokeContributorSeat(
+              env,
+              seat.id,
+              tier,
+              prompt,
+              config.seatJobTimeoutSeconds,
+              invocationId,
+              reservationId,
+            )
+          : runAiDecision(seatConfig(seat, config), { model: tier, prompt }),
+      );
+      if (attempted._tag === "Success") {
+        // A successful provider response is not committed until its reservation
+        // is reconciled. Let the durable caller retain/retry this invocation if
+        // the registry is temporarily unavailable; returning the decision here
+        // would strand the conservative reservation indefinitely.
+        yield* Effect.tryPromise({
+          try: () =>
+            registry.reconcileSeatBudget(
+              seat.id,
+              reservationUsd,
+              attempted.success.costUsd,
+              reservationId,
+            ),
+          catch: (cause) => registryFailure("reconciliation", cause),
+        });
+        return {
+          ...attempted.success,
+          resolvedModel: attempted.success.resolvedModel ?? `${tier}@${seat.id}`,
+          seatId: seat.id,
+          fallback: false,
+          costAttributions: [
+            ...costAttributions,
+            providerAttribution(
+              attempted.success.resolvedModel ?? `${tier}@${seat.id}`,
+              attempted.success,
+              seat.id,
+            ),
+          ],
+        };
+      }
 
-    const reportedFailure = reportedSeatFailureUsage(attempted.failure);
-    const failedAttribution = providerAttribution(
-      reportedFailure.resolvedModel ?? `${tier}@${seat.id}`,
-      reportedFailure,
-      seat.id,
-    );
-    if (hasMeasuredUsage(failedAttribution)) costAttributions.push(failedAttribution);
-
-    const refunded = yield* Effect.result(Effect.tryPromise({
-      try: () => registry.reconcileSeatBudget(
+      const reportedFailure = reportedSeatFailureUsage(attempted.failure);
+      const failedAttribution = providerAttribution(
+        reportedFailure.resolvedModel ?? `${tier}@${seat.id}`,
+        reportedFailure,
         seat.id,
-        reservationUsd,
-        reportedFailure.costUsd,
-        reservationId,
-      ),
-      catch: (cause) => registryFailure("refund", cause),
-    }));
-    // Do not continue to another seat with an unresolved reservation. The
-    // registry ledger is the accounting source of truth, and retrying this
-    // durable decision later reuses the invocation id.
-    if (refunded._tag === "Failure") {
-      return yield* Effect.fail(refunded.failure);
-    }
-    if (!isRetryableSeatFailure(attempted.failure)) {
-      return yield* Effect.fail(new RoutedAiFailure({
-        cause: attempted.failure,
-        costAttributions,
-      }));
-    }
-    availabilityFailure = true;
-    yield* Effect.result(Effect.tryPromise({
-      try: () => registry.markSeatUnhealthy(seat.id),
-      catch: (cause) => registryFailure("health downgrade", cause),
-    }));
-  }
+      );
+      if (hasMeasuredUsage(failedAttribution)) costAttributions.push(failedAttribution);
 
-  if (
-    registered.length > 0 &&
-    config.seatExhaustionPolicy === "stretch" &&
-    !availabilityFailure &&
-    !registryUnavailable
-  ) {
-    return yield* new LlmRouteUnavailable({ stretched: true });
-  }
-  const fallbackAttempt = yield* Effect.result(runAiDecision(config, { model: tier, prompt }));
-  if (fallbackAttempt._tag === "Failure") {
-    const reportedFailure = reportedSeatFailureUsage(fallbackAttempt.failure);
-    const attribution = providerAttribution(
-      reportedFailure.resolvedModel ?? (registered.length > 0 ? `${tier}:api-fallback` : tier),
-      reportedFailure,
-    );
-    if (hasMeasuredUsage(attribution)) costAttributions.push(attribution);
-    return yield* Effect.fail(new RoutedAiFailure({
-      cause: fallbackAttempt.failure,
-      costAttributions,
-    }));
-  }
-  const fallback = fallbackAttempt.success;
-  const fallbackModel = fallback.resolvedModel ?? (
-    registered.length > 0 ? `${tier}:api-fallback` : tier
-  );
-  return {
-    ...fallback,
-    resolvedModel: fallbackModel,
-    fallback: registered.length > 0,
-    costAttributions: [
-      ...costAttributions,
-      providerAttribution(fallbackModel, fallback),
-    ],
-  };
-});
+      const refunded = yield* Effect.result(
+        Effect.tryPromise({
+          try: () =>
+            registry.reconcileSeatBudget(
+              seat.id,
+              reservationUsd,
+              reportedFailure.costUsd,
+              reservationId,
+            ),
+          catch: (cause) => registryFailure("refund", cause),
+        }),
+      );
+      // Do not continue to another seat with an unresolved reservation. The
+      // registry ledger is the accounting source of truth, and retrying this
+      // durable decision later reuses the invocation id.
+      if (refunded._tag === "Failure") {
+        return yield* Effect.fail(refunded.failure);
+      }
+      if (!isRetryableSeatFailure(attempted.failure)) {
+        return yield* Effect.fail(
+          new RoutedAiFailure({
+            cause: attempted.failure,
+            costAttributions,
+          }),
+        );
+      }
+      availabilityFailure = true;
+      yield* Effect.result(
+        Effect.tryPromise({
+          try: () => registry.markSeatUnhealthy(seat.id),
+          catch: (cause) => registryFailure("health downgrade", cause),
+        }),
+      );
+    }
+
+    if (
+      registered.length > 0 &&
+      config.seatExhaustionPolicy === "stretch" &&
+      !availabilityFailure &&
+      !registryUnavailable
+    ) {
+      return yield* new LlmRouteUnavailable({ stretched: true });
+    }
+    const fallbackAttempt = yield* Effect.result(runAiDecision(config, { model: tier, prompt }));
+    if (fallbackAttempt._tag === "Failure") {
+      const reportedFailure = reportedSeatFailureUsage(fallbackAttempt.failure);
+      const attribution = providerAttribution(
+        reportedFailure.resolvedModel ?? (registered.length > 0 ? `${tier}:api-fallback` : tier),
+        reportedFailure,
+      );
+      if (hasMeasuredUsage(attribution)) costAttributions.push(attribution);
+      return yield* Effect.fail(
+        new RoutedAiFailure({
+          cause: fallbackAttempt.failure,
+          costAttributions,
+        }),
+      );
+    }
+    const fallback = fallbackAttempt.success;
+    const fallbackModel =
+      fallback.resolvedModel ?? (registered.length > 0 ? `${tier}:api-fallback` : tier);
+    return {
+      ...fallback,
+      resolvedModel: fallbackModel,
+      fallback: registered.length > 0,
+      costAttributions: [...costAttributions, providerAttribution(fallbackModel, fallback)],
+    };
+  });
 
 export const chargeSeat = (
   seats: readonly SeatRegistration[],
   seatId: string | undefined,
   costUsd: number,
-): readonly SeatRegistration[] => seatId === undefined || costUsd <= 0
-  ? seats
-  : seats.map((seat) => {
-      if (seat.id !== seatId) return seat;
-      const spentUsd = seat.spentUsd + costUsd;
-      return {
-        ...seat,
-        spentUsd,
-        exhausted: spentUsd + seat.reservedUsd >= seat.monthlyBudgetUsd,
-      };
-    });
+): readonly SeatRegistration[] =>
+  seatId === undefined || costUsd <= 0
+    ? seats
+    : seats.map((seat) => {
+        if (seat.id !== seatId) return seat;
+        const spentUsd = seat.spentUsd + costUsd;
+        return {
+          ...seat,
+          spentUsd,
+          exhausted: spentUsd + seat.reservedUsd >= seat.monthlyBudgetUsd,
+        };
+      });
 
 export const stretchedInterval = (
   route: ResolvedLlmRoute,
   interval: number,
   multiplier: number,
-): number => route.stretched ? Math.round(interval * multiplier) : interval;
+): number => (route.stretched ? Math.round(interval * multiplier) : interval);

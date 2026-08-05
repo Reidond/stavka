@@ -16,15 +16,15 @@ vi.mock("agents", () => ({
   routeAgentRequest: vi.fn(async () => null),
 }));
 
-const { handleRequest: handleCommanderRequest } = await import(
-  "../../../apps/commander/src/api/router"
-);
+const { handleRequest: handleCommanderRequest } =
+  await import("../../../apps/commander/src/api/router");
 
 const directories: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(directories.splice(0).map((directory) =>
-    rm(directory, { recursive: true, force: true })));
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
 });
 
 const makeRoot = async (): Promise<string> => {
@@ -51,12 +51,12 @@ describe("safe local development variables", () => {
     const repository = new FileDevVarsRepository();
 
     const report = await runDoctor(root, repository);
-    const commander = await repository.read(join(root, "apps/commander/.dev.vars")).pipe(
-      Effect.runPromise,
-    );
-    const poligon = await repository.read(join(root, "apps/poligon/.dev.vars")).pipe(
-      Effect.runPromise,
-    );
+    const commander = await repository
+      .read(join(root, "apps/commander/.dev.vars"))
+      .pipe(Effect.runPromise);
+    const poligon = await repository
+      .read(join(root, "apps/poligon/.dev.vars"))
+      .pipe(Effect.runPromise);
 
     expect(report.ok).toBe(true);
     expect(report.wroteDevVars).toHaveLength(3);
@@ -89,9 +89,8 @@ describe("safe local development variables", () => {
       new Request("http://127.0.0.1/healthz"),
       commanderEnv,
     );
-    const tickRequest = (authorization?: string) => new Request(
-      "http://127.0.0.1/api/tick",
-      {
+    const tickRequest = (authorization?: string) =>
+      new Request("http://127.0.0.1/api/tick", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -99,8 +98,7 @@ describe("safe local development variables", () => {
           ...(authorization ? { authorization } : {}),
         },
         body: JSON.stringify(test12Fixture.request),
-      },
-    );
+      });
     const unauthenticated = await handleCommanderRequest(tickRequest(), commanderEnv);
     const authenticated = await handleCommanderRequest(
       tickRequest(`Bearer ${commander.values.API_KEY}`),
@@ -118,9 +116,9 @@ describe("safe local development variables", () => {
     const repository = new FileDevVarsRepository();
     const commanderFile = join(root, "apps/commander/.dev.vars");
     const poligonFile = join(root, "apps/poligon/.dev.vars");
-    await repository.write(commanderFile, {} as Readonly<Record<string, string>>).pipe(
-      Effect.runPromise,
-    );
+    await repository
+      .write(commanderFile, {} as Readonly<Record<string, string>>)
+      .pipe(Effect.runPromise);
     await writeFile(
       commanderFile,
       "API_KEY=operator-secret\nENVIRONMENT=preview\nCUSTOM_VALUE=keep-me\n",

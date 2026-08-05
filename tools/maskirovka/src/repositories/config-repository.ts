@@ -20,9 +20,12 @@ export class GatewayConfigRepository extends Context.Service<
 >()("@stavka/maskirovka/GatewayConfigRepository") {}
 
 const repositoryFailure = (operation: string, cause: unknown): GatewayError =>
-  new GatewayError(500, "CONFIG_REPOSITORY_FAILURE", `Unable to ${operation} gateway configuration`, [
-    cause instanceof Error ? cause.message : "Unknown gateway configuration error",
-  ]);
+  new GatewayError(
+    500,
+    "CONFIG_REPOSITORY_FAILURE",
+    `Unable to ${operation} gateway configuration`,
+    [cause instanceof Error ? cause.message : "Unknown gateway configuration error"],
+  );
 
 export class FileGatewayConfigRepository implements GatewayConfigRepositoryService {
   constructor(private readonly filename: string) {}

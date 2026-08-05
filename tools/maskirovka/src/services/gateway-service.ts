@@ -22,12 +22,13 @@ import { FairGovernor } from "./fair-governor";
 import { SeatRegistry } from "./seat-registry";
 import { estimateApiListCost, WindowTracker } from "./window-tracker";
 
-const cacheKey = (request: NormalizedRequest): string => contentHash({
-  version: 1,
-  tier: request.tier,
-  dialect: request.dialect,
-  request: request.request,
-});
+const cacheKey = (request: NormalizedRequest): string =>
+  contentHash({
+    version: 1,
+    tier: request.tier,
+    dialect: request.dialect,
+    request: request.request,
+  });
 
 interface RoutedSeatResult {
   readonly resolution: SeatResolution;
@@ -44,9 +45,7 @@ interface RoutedSeatResult {
 const MAX_SEAT_ATTEMPTS = 3;
 
 const positiveInteger = (value: unknown): number | undefined =>
-  typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : undefined;
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 
 const expectedUsage = (request: NormalizedRequest): SeatUsage => {
   const inputTokens = Math.max(
@@ -72,8 +71,8 @@ const accountingAmounts = (
   const apiListCostUsd = estimateApiListCost(tier, usage);
   return {
     actualCostUsd: usage.actualCostUsd ?? (seat === "api" ? apiListCostUsd : 0),
-    planCreditUsd: usage.planCreditUsd ??
-      (seat === "claude" || seat === "codex" ? apiListCostUsd : 0),
+    planCreditUsd:
+      usage.planCreditUsd ?? (seat === "claude" || seat === "codex" ? apiListCostUsd : 0),
   };
 };
 
@@ -91,12 +90,14 @@ export class GatewayService {
     adapters: readonly SeatAdapter[],
     tracker?: WindowTracker,
   ) {
-    this.tracker = tracker ?? new WindowTracker({
-      claudeMonthlyCreditUsd: config.claudeMonthlyCreditUsd,
-      codexWindowCalls: config.codexWindowCallLimit,
-      codexWindowTokens: config.codexWindowTokenLimit,
-      codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
-    });
+    this.tracker =
+      tracker ??
+      new WindowTracker({
+        claudeMonthlyCreditUsd: config.claudeMonthlyCreditUsd,
+        codexWindowCalls: config.codexWindowCallLimit,
+        codexWindowTokens: config.codexWindowTokenLimit,
+        codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
+      });
     this.adapters = new Map(adapters.map((adapter) => [adapter.id, adapter]));
     this.governors = new Map<SeatKind, FairGovernor>([
       ["mock", new FairGovernor(64)],
@@ -115,31 +116,29 @@ export class GatewayService {
   }
 
   run(request: NormalizedRequest): Effect.Effect<GatewayResponse, GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       const started = performance.now();
       const key = cacheKey(request);
-      const shouldReadCache = this.config.mode === "record" ||
+      const shouldReadCache =
+        this.config.mode === "record" ||
         this.config.mode === "replay" ||
         request.tier === "stavka/sergeant";
       if (shouldReadCache) {
         const cached = yield* this.cache.get(key);
         if (cached) return yield* this.recordCacheHit(request, cached, started);
         if (this.config.mode === "replay") {
-          return yield* Effect.fail(new GatewayError(
-            409,
-            "REPLAY_MISS",
-            `No replay entry for ${key}`,
-            ["Replay mode never invokes a seat or the network"],
-          ));
+          return yield* Effect.fail(
+            new GatewayError(409, "REPLAY_MISS", `No replay entry for ${key}`, [
+              "Replay mode never invokes a seat or the network",
+            ]),
+          );
         }
       }
 
       if (this.registry.isKilled()) {
-        return yield* Effect.fail(new GatewayError(
-          503,
-          "KILL_SWITCH",
-          "Maskirovka seat traffic is disabled",
-        ));
+        return yield* Effect.fail(
+          new GatewayError(503, "KILL_SWITCH", "Maskirovka seat traffic is disabled"),
+        );
       }
 
       yield* this.refreshBudgetExhaustion();
@@ -154,11 +153,13 @@ export class GatewayService {
       }
       if (request.tier === "stavka/sergeant" && initialResolution.seat !== "mock") {
         if (this.liveSergeantsUsed >= this.config.liveSergeantBudget) {
-          return yield* Effect.fail(new GatewayError(
-            429,
-            "LIVE_SERGEANT_BUDGET",
-            "Live sergeant budget exhausted; use cache/replay or raise --live-sergeants",
-          ));
+          return yield* Effect.fail(
+            new GatewayError(
+              429,
+              "LIVE_SERGEANT_BUDGET",
+              "Live sergeant budget exhausted; use cache/replay or raise --live-sergeants",
+            ),
+          );
         }
         this.liveSergeantsUsed += 1;
       }
@@ -166,14 +167,11 @@ export class GatewayService {
       const routed = yield* this.invokeWithFailover(request, initialResolution);
       const { accounting, queued, resolution, result } = routed;
       const requestId = crypto.randomUUID();
-      const body = result.raw ?? (request.dialect === "openai-responses"
-        ? openAiResponse(requestId, resolution.model, result)
-        : anthropicMessage(
-            requestId,
-            resolution.model,
-            result,
-            request.structuredOutputName,
-          ));
+      const body =
+        result.raw ??
+        (request.dialect === "openai-responses"
+          ? openAiResponse(requestId, resolution.model, result)
+          : anthropicMessage(requestId, resolution.model, result, request.structuredOutputName));
       yield* this.refreshBudgetExhaustion();
       const metadata: RequestMetadata = {
         requestId,
@@ -192,9 +190,7 @@ export class GatewayService {
         planCreditUsd: accounting.planCreditUsd,
         apiListCostUsd: accounting.apiListCostUsd,
         estimatedSavedUsd: accounting.savedUsd,
-        ...(resolution.fallbackFromSeat
-          ? { fallbackFromSeat: resolution.fallbackFromSeat }
-          : {}),
+        ...(resolution.fallbackFromSeat ? { fallbackFromSeat: resolution.fallbackFromSeat } : {}),
         ...(resolution.routingReason ? { routingReason: resolution.routingReason } : {}),
       };
       const response = { status: 200, body, metadata } satisfies GatewayResponse;
@@ -216,7 +212,7 @@ export class GatewayService {
   }
 
   health(): Effect.Effect<GatewayHealth> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       yield* this.refreshBudgetExhaustion();
       return {
         ok: !this.registry.isKilled(),
@@ -233,17 +229,18 @@ export class GatewayService {
           return {
             id: seat.id,
             name: seat.name,
-            status: seat.exhausted ? "exhausted" as const : seat.status,
+            status: seat.exhausted ? ("exhausted" as const) : seat.status,
             active: governor.active,
             queueDepth: governor.queueDepth,
             callsInWindow: window.calls,
             tokensInWindow: window.tokens,
             windowResetsAt: window.resetsAt,
-            budgetKind: seat.id === "api"
-              ? "metered-cash" as const
-              : seat.id === "claude" || seat.id === "codex"
-                ? "plan-credit" as const
-                : "none" as const,
+            budgetKind:
+              seat.id === "api"
+                ? ("metered-cash" as const)
+                : seat.id === "claude" || seat.id === "codex"
+                  ? ("plan-credit" as const)
+                  : ("none" as const),
             budgetLimitUsd: seat.monthlyBudgetUsd,
             budgetUsedUsd: this.tracker.monthlySeatUsage(seat.id),
             headroom: this.tracker.headroom(seat.id),
@@ -267,7 +264,7 @@ export class GatewayService {
     cached: CachedGatewayResponse,
     started: number,
   ): Effect.Effect<GatewayResponse, GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       const original = cached.response.metadata;
       const usage: SeatUsage = {
         inputTokens: original.inputTokens,
@@ -309,7 +306,7 @@ export class GatewayService {
     request: NormalizedRequest,
     initialResolution: SeatResolution,
   ): Effect.Effect<RoutedSeatResult, GatewayError> {
-    return Effect.gen({ self: this }, function*() {
+    return Effect.gen({ self: this }, function* () {
       const excluded = new Set<SeatKind>();
       let resolution = initialResolution;
       let firstFailure: GatewayError | undefined;
@@ -317,65 +314,71 @@ export class GatewayService {
         const adapter = this.adapters.get(resolution.seat);
         const governor = this.governors.get(resolution.seat);
         const queued = governor?.snapshot().queueDepth ?? 0;
-        const invocation = !adapter || !governor
-          ? Effect.fail(new GatewayError(
-              503,
-              "SEAT_UNAVAILABLE",
-              `Seat ${resolution.seat} has no adapter`,
-            ))
-          : governor.run(
-              Effect.acquireUseRelease(
-                this.tracker.reserve({
-                  seat: resolution.seat,
-                  tier: request.tier,
-                  expectedUsage: expectedUsage(request),
-                }),
-                (reservation) => adapter.invoke({ ...request, model: resolution.model }).pipe(
-                  Effect.flatMap((result) => {
-                    const { actualCostUsd, planCreditUsd } = accountingAmounts(
-                      request.tier,
-                      resolution.seat,
-                      result.usage,
-                    );
-                    return this.tracker.reconcile(reservation, {
-                      seat: resolution.seat,
-                      tier: request.tier,
-                      usage: result.usage,
-                      cacheHit: false,
-                      actualCostUsd,
-                      planCreditUsd,
-                    }).pipe(Effect.map((accounting) => ({
-                      result,
-                      accounting: {
-                        actualCostUsd,
-                        planCreditUsd,
-                        apiListCostUsd: accounting.apiListCostUsd,
-                        savedUsd: accounting.savedUsd,
-                      },
-                    })));
+        const invocation =
+          !adapter || !governor
+            ? Effect.fail(
+                new GatewayError(503, "SEAT_UNAVAILABLE", `Seat ${resolution.seat} has no adapter`),
+              )
+            : governor.run(
+                Effect.acquireUseRelease(
+                  this.tracker.reserve({
+                    seat: resolution.seat,
+                    tier: request.tier,
+                    expectedUsage: expectedUsage(request),
                   }),
-                  Effect.catch((error) => {
-                    if (error.providerUsage === undefined) return Effect.fail(error);
-                    const { actualCostUsd, planCreditUsd } = accountingAmounts(
-                      request.tier,
-                      resolution.seat,
-                      error.providerUsage,
-                    );
-                    return this.tracker.reconcile(reservation, {
-                      seat: resolution.seat,
-                      tier: request.tier,
-                      usage: error.providerUsage,
-                      cacheHit: false,
-                      actualCostUsd,
-                      planCreditUsd,
-                      outcome: "failure",
-                      failureCode: error.code,
-                    }).pipe(Effect.andThen(Effect.fail(error)));
-                  }),
+                  (reservation) =>
+                    adapter.invoke({ ...request, model: resolution.model }).pipe(
+                      Effect.flatMap((result) => {
+                        const { actualCostUsd, planCreditUsd } = accountingAmounts(
+                          request.tier,
+                          resolution.seat,
+                          result.usage,
+                        );
+                        return this.tracker
+                          .reconcile(reservation, {
+                            seat: resolution.seat,
+                            tier: request.tier,
+                            usage: result.usage,
+                            cacheHit: false,
+                            actualCostUsd,
+                            planCreditUsd,
+                          })
+                          .pipe(
+                            Effect.map((accounting) => ({
+                              result,
+                              accounting: {
+                                actualCostUsd,
+                                planCreditUsd,
+                                apiListCostUsd: accounting.apiListCostUsd,
+                                savedUsd: accounting.savedUsd,
+                              },
+                            })),
+                          );
+                      }),
+                      Effect.catch((error) => {
+                        if (error.providerUsage === undefined) return Effect.fail(error);
+                        const { actualCostUsd, planCreditUsd } = accountingAmounts(
+                          request.tier,
+                          resolution.seat,
+                          error.providerUsage,
+                        );
+                        return this.tracker
+                          .reconcile(reservation, {
+                            seat: resolution.seat,
+                            tier: request.tier,
+                            usage: error.providerUsage,
+                            cacheHit: false,
+                            actualCostUsd,
+                            planCreditUsd,
+                            outcome: "failure",
+                            failureCode: error.code,
+                          })
+                          .pipe(Effect.andThen(Effect.fail(error)));
+                      }),
+                    ),
+                  (reservation) => this.tracker.refund(reservation),
                 ),
-                (reservation) => this.tracker.refund(reservation),
-              ),
-            );
+              );
         const outcome = yield* Effect.result(invocation);
         if (outcome._tag === "Success") {
           return { resolution, ...outcome.success, queued };
@@ -395,11 +398,9 @@ export class GatewayService {
         }
         firstFailure ??= failure;
         excluded.add(resolution.seat);
-        const next = yield* Effect.result(this.registry.resolve(
-          request.tier,
-          "fallback",
-          excluded,
-        ));
+        const next = yield* Effect.result(
+          this.registry.resolve(request.tier, "fallback", excluded),
+        );
         if (next._tag === "Failure") {
           return yield* Effect.fail(firstFailure);
         }
@@ -413,11 +414,14 @@ export class GatewayService {
           `${request.tier} retry-fallback after ${failure.code}: ${fallbackFromSeat} -> ${resolution.seat}`,
         );
       }
-      return yield* Effect.fail(firstFailure ?? new GatewayError(
-        503,
-        "SEAT_ATTEMPTS_EXHAUSTED",
-        `No seat completed ${request.tier} within ${MAX_SEAT_ATTEMPTS} attempts`,
-      ));
+      return yield* Effect.fail(
+        firstFailure ??
+          new GatewayError(
+            503,
+            "SEAT_ATTEMPTS_EXHAUSTED",
+            `No seat completed ${request.tier} within ${MAX_SEAT_ATTEMPTS} attempts`,
+          ),
+      );
     });
   }
 
@@ -426,19 +430,21 @@ export class GatewayService {
       error.code === "WINDOW_TRACKER_REPOSITORY_FAILURE" ||
       error.code === "PLAN_RESERVATION_MISSING" ||
       error.code === "PLAN_RESERVATION_SEAT_MISMATCH"
-    ) return false;
+    )
+      return false;
     return error.status === 429 || error.status >= 500;
   }
 
   private refreshBudgetExhaustion(): Effect.Effect<void> {
     return Effect.forEach(
       this.config.seats,
-      (seat) => this.registry.setBudgetExhausted(
-        seat.id,
-        this.tracker.isExhausted(seat.id) ||
-          (seat.monthlyBudgetUsd > 0 &&
-            this.tracker.monthlySeatUsage(seat.id) >= seat.monthlyBudgetUsd),
-      ),
+      (seat) =>
+        this.registry.setBudgetExhausted(
+          seat.id,
+          this.tracker.isExhausted(seat.id) ||
+            (seat.monthlyBudgetUsd > 0 &&
+              this.tracker.monthlySeatUsage(seat.id) >= seat.monthlyBudgetUsd),
+        ),
       { discard: true },
     );
   }
@@ -457,7 +463,7 @@ export const GatewayLive = (
 ): Layer.Layer<Gateway, GatewayError> =>
   Layer.effect(
     Gateway,
-    Effect.gen(function*() {
+    Effect.gen(function* () {
       const service = new GatewayService(config, registry, cache, logs, adapters);
       yield* service.initialize();
       return service;

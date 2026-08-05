@@ -9,16 +9,8 @@ export interface SqlRepositoryHost {
   ): T[];
 }
 
-export class DecisionLogRepositoryError extends Data.TaggedError(
-  "DecisionLogRepositoryError",
-)<{
-  readonly operation:
-    | "initialize"
-    | "save"
-    | "list"
-    | "count"
-    | "snapshot"
-    | "snapshotPage";
+export class DecisionLogRepositoryError extends Data.TaggedError("DecisionLogRepositoryError")<{
+  readonly operation: "initialize" | "save" | "list" | "count" | "snapshot" | "snapshotPage";
   readonly cause: unknown;
 }> {}
 
@@ -72,25 +64,23 @@ export class SqlDecisionLogRepository implements DecisionLogRepository {
         trigger TEXT NOT NULL,
         payload TEXT NOT NULL
       )`;
-      void this.host.sql`CREATE INDEX IF NOT EXISTS decision_logs_timestamp ON decision_logs(timestamp)`;
+      void this.host
+        .sql`CREATE INDEX IF NOT EXISTS decision_logs_timestamp ON decision_logs(timestamp)`;
     },
     catch: (cause) => new DecisionLogRepositoryError({ operation: "initialize", cause }),
   });
 
-  readonly save = (
-    entry: DecisionLogEntry,
-  ): Effect.Effect<void, DecisionLogRepositoryError> =>
+  readonly save = (entry: DecisionLogEntry): Effect.Effect<void, DecisionLogRepositoryError> =>
     Effect.try({
       try: () => {
-        void this.host.sql`INSERT OR IGNORE INTO decision_logs (id, timestamp, agent, trigger, payload)
+        void this.host
+          .sql`INSERT OR IGNORE INTO decision_logs (id, timestamp, agent, trigger, payload)
           VALUES (${entry.id}, ${entry.timestamp}, ${entry.agent}, ${entry.trigger}, ${JSON.stringify(entry)})`;
       },
       catch: (cause) => new DecisionLogRepositoryError({ operation: "save", cause }),
     });
 
-  readonly list = (
-    limit: number,
-  ): Effect.Effect<DecisionLogEntry[], DecisionLogRepositoryError> =>
+  readonly list = (limit: number): Effect.Effect<DecisionLogEntry[], DecisionLogRepositoryError> =>
     Effect.try({
       try: () => {
         const safeLimit = Math.min(500, Math.max(1, Math.floor(limit)));
@@ -102,7 +92,8 @@ export class SqlDecisionLogRepository implements DecisionLogRepository {
     }).pipe(
       Effect.flatMap((rows) =>
         Effect.forEach(rows, (row) =>
-          Schema.decodeUnknownEffect(Schema.fromJsonString(DecisionLogEntry))(row.payload)),
+          Schema.decodeUnknownEffect(Schema.fromJsonString(DecisionLogEntry))(row.payload),
+        ),
       ),
       Effect.mapError((cause) =>
         cause instanceof DecisionLogRepositoryError
@@ -177,15 +168,20 @@ export class SqlDecisionLogRepository implements DecisionLogRepository {
         const hasMore = rows.length > safeLimit;
         const last = pageRows.at(-1);
         return Effect.forEach(pageRows, (row) =>
-          Schema.decodeUnknownEffect(Schema.fromJsonString(DecisionLogEntry))(row.payload)).pipe(
-          Effect.map((entries): DecisionLogExportPage => ({
-            entries,
-            cursor: hasMore && last !== undefined
-              ? { done: false, timestamp: last.timestamp, id: last.id }
-              : { done: true, ...(last === undefined
-                ? {}
-                : { timestamp: last.timestamp, id: last.id }) },
-          })),
+          Schema.decodeUnknownEffect(Schema.fromJsonString(DecisionLogEntry))(row.payload),
+        ).pipe(
+          Effect.map(
+            (entries): DecisionLogExportPage => ({
+              entries,
+              cursor:
+                hasMore && last !== undefined
+                  ? { done: false, timestamp: last.timestamp, id: last.id }
+                  : {
+                      done: true,
+                      ...(last === undefined ? {} : { timestamp: last.timestamp, id: last.id }),
+                    },
+            }),
+          ),
         );
       }),
       Effect.mapError((cause) =>

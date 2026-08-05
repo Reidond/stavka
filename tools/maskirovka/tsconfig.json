@@ -4,5 +4,11 @@
     "types": ["@cloudflare/workers-types", "node", "react", "react-dom"],
     "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vite.dashboard.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vite.dashboard.config.ts"
+  ]
 }

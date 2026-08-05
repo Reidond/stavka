@@ -32,7 +32,7 @@ export class ClaudeSeat implements SeatAdapter {
               permissionMode: "dontAsk",
               systemPrompt: request.system ?? "Return only the requested answer. Do not use tools.",
               ...(request.dialect === "anthropic-messages" &&
-                  typeof request.request.max_tokens === "number"
+              typeof request.request.max_tokens === "number"
                 ? { taskBudget: { total: request.request.max_tokens } }
                 : {}),
               ...(request.outputSchema
@@ -74,13 +74,14 @@ export class ClaudeSeat implements SeatAdapter {
           signal.removeEventListener("abort", abort);
         }
       },
-      catch: (cause) => cause instanceof GatewayError
-        ? cause
-        : new GatewayError(
-            502,
-            "CLAUDE_SEAT_FAILURE",
-            cause instanceof Error ? cause.message : "Claude Agent SDK invocation failed",
-          ),
+      catch: (cause) =>
+        cause instanceof GatewayError
+          ? cause
+          : new GatewayError(
+              502,
+              "CLAUDE_SEAT_FAILURE",
+              cause instanceof Error ? cause.message : "Claude Agent SDK invocation failed",
+            ),
     });
   }
 }

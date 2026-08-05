@@ -8,7 +8,8 @@ export const commanderPrompt = (state: CommanderSessionState, trigger: string): 
   const mapBriefing = state.mapBriefing;
   const terrainCells = mapBriefing?.terrain_grid ?? [];
   const slopes = terrainCells.flatMap((cell) =>
-    cell.slope_degrees === undefined ? [] : [cell.slope_degrees]);
+    cell.slope_degrees === undefined ? [] : [cell.slope_degrees],
+  );
   const terrain = mapBriefing
     ? {
         map: mapBriefing.map_name,
@@ -44,9 +45,10 @@ export const commanderPrompt = (state: CommanderSessionState, trigger: string): 
         mobility: {
           traversableCells: terrainCells.filter((cell) => cell.traversable).length,
           blockedCells: terrainCells.filter((cell) => !cell.traversable).length,
-          averageSlopeDegrees: slopes.length === 0
-            ? null
-            : slopes.reduce((total, slope) => total + slope, 0) / slopes.length,
+          averageSlopeDegrees:
+            slopes.length === 0
+              ? null
+              : slopes.reduce((total, slope) => total + slope, 0) / slopes.length,
           maximumSlopeDegrees: slopes.length === 0 ? null : Math.max(...slopes),
         },
         traversableRoadCorridors: terrainCells
@@ -54,8 +56,7 @@ export const commanderPrompt = (state: CommanderSessionState, trigger: string): 
           .slice(0, 12)
           .map((cell) => cell.grid),
         defensibleCells: terrainCells
-          .filter((cell) =>
-            cell.traversable && (cell.cover === "heavy" || cell.cover === "urban"))
+          .filter((cell) => cell.traversable && (cell.cover === "heavy" || cell.cover === "urban"))
           .sort((left, right) => right.elevation - left.elevation)
           .slice(0, 12)
           .map((cell) => ({
@@ -91,9 +92,10 @@ export const sergeantPrompt = (
   groupId: string,
   report: unknown,
   snapshot: GameSnapshot | undefined,
-): string => [
-  `You are the tactical sergeant for group ${groupId}.`,
-  "Return zero or more validated orders for this group only. Do not command other groups or spawn units.",
-  `Report: ${JSON.stringify(report)}`,
-  `Authorized local context: ${JSON.stringify(snapshot ?? null)}`,
-].join("\n");
+): string =>
+  [
+    `You are the tactical sergeant for group ${groupId}.`,
+    "Return zero or more validated orders for this group only. Do not command other groups or spawn units.",
+    `Report: ${JSON.stringify(report)}`,
+    `Authorized local context: ${JSON.stringify(snapshot ?? null)}`,
+  ].join("\n");

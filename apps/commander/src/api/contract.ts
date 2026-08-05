@@ -20,14 +20,8 @@ import {
 
 import { DecisionLogEntry } from "../logging/types";
 import { CommanderEnvironment } from "../config";
-import {
-  CommanderSessionStateSchema,
-  SeatRegistrationSchema,
-} from "../state/types";
-import {
-  SessionExportHeader,
-  SessionExportPage,
-} from "../logging/r2-session-export-repository";
+import { CommanderSessionStateSchema, SeatRegistrationSchema } from "../state/types";
+import { SessionExportHeader, SessionExportPage } from "../logging/r2-session-export-repository";
 
 const BadRequest = ErrorEnvelope.pipe(HttpApiSchema.status(400));
 const Unauthorized = ErrorEnvelope.pipe(HttpApiSchema.status(401));
@@ -66,9 +60,7 @@ const AdminQuery = {
   epoch: Schema.optional(Schema.NumberFromString),
 };
 
-const ExportId = Schema.String.pipe(
-  Schema.check(Schema.isTrimmed(), Schema.isNonEmpty()),
-);
+const ExportId = Schema.String.pipe(Schema.check(Schema.isTrimmed(), Schema.isNonEmpty()));
 
 const SessionExportMetadataResponse = Schema.Struct({
   key: Schema.String,

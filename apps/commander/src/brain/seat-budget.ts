@@ -6,18 +6,16 @@ const roundedUsd = (value: number): number =>
 export const utcBudgetPeriod = (timestamp = Date.now()): string =>
   new Date(timestamp).toISOString().slice(0, 7);
 
-export const rollSeatBudgetPeriod = (
-  seat: SeatRegistration,
-  period: string,
-): SeatRegistration => seat.budgetPeriod === period
-  ? seat
-  : {
-      ...seat,
-      budgetPeriod: period,
-      spentUsd: 0,
-      reservedUsd: 0,
-      exhausted: false,
-    };
+export const rollSeatBudgetPeriod = (seat: SeatRegistration, period: string): SeatRegistration =>
+  seat.budgetPeriod === period
+    ? seat
+    : {
+        ...seat,
+        budgetPeriod: period,
+        spentUsd: 0,
+        reservedUsd: 0,
+        exhausted: false,
+      };
 
 export interface SeatBudgetMutation {
   readonly accepted: boolean;
@@ -39,10 +37,7 @@ export const reserveSeatBudgetState = (
   const next = seats.map((candidate): SeatRegistration => {
     if (candidate.id !== seatId) return candidate;
     const seat = rollSeatBudgetPeriod(candidate, period);
-    const available = Math.max(
-      0,
-      seat.monthlyBudgetUsd - seat.spentUsd - seat.reservedUsd,
-    );
+    const available = Math.max(0, seat.monthlyBudgetUsd - seat.spentUsd - seat.reservedUsd);
     if (reservation <= 0 || reservation > available) return seat;
     accepted = true;
     const reservedUsd = roundedUsd(seat.reservedUsd + reservation);
@@ -62,15 +57,16 @@ export const reconcileSeatBudgetState = (
   reservedAmountUsd: number,
   actualCostUsd: number,
   period: string,
-): readonly SeatRegistration[] => seats.map((candidate): SeatRegistration => {
-  if (candidate.id !== seatId) return candidate;
-  const seat = rollSeatBudgetPeriod(candidate, period);
-  const reservedUsd = roundedUsd(seat.reservedUsd - roundedUsd(reservedAmountUsd));
-  const spentUsd = roundedUsd(seat.spentUsd + roundedUsd(actualCostUsd));
-  return {
-    ...seat,
-    reservedUsd,
-    spentUsd,
-    exhausted: spentUsd + reservedUsd >= seat.monthlyBudgetUsd,
-  };
-});
+): readonly SeatRegistration[] =>
+  seats.map((candidate): SeatRegistration => {
+    if (candidate.id !== seatId) return candidate;
+    const seat = rollSeatBudgetPeriod(candidate, period);
+    const reservedUsd = roundedUsd(seat.reservedUsd - roundedUsd(reservedAmountUsd));
+    const spentUsd = roundedUsd(seat.spentUsd + roundedUsd(actualCostUsd));
+    return {
+      ...seat,
+      reservedUsd,
+      spentUsd,
+      exhausted: spentUsd + reservedUsd >= seat.monthlyBudgetUsd,
+    };
+  });

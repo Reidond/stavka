@@ -34,8 +34,15 @@
     min-height: 100vh;
     min-height: 100dvh;
     background-image:
-      linear-gradient(color-mix(in srgb, var(--color-contour) 22%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--color-contour) 22%, transparent) 1px, transparent 1px);
+      linear-gradient(
+        color-mix(in srgb, var(--color-contour) 22%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--color-contour) 22%, transparent) 1px,
+        transparent 1px
+      );
     background-size: 24px 24px;
   }
 

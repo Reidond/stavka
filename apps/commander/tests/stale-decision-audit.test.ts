@@ -40,10 +40,11 @@ vi.mock("agents", () => ({
 vi.mock("../src/brain/planner", async () => {
   const { Effect } = await import("effect");
   return {
-    planDecision: () => Effect.sync(() => {
-      mocks.mutateDuringPlan?.();
-      return mocks.plannedDecision;
-    }),
+    planDecision: () =>
+      Effect.sync(() => {
+        mocks.mutateDuringPlan?.();
+        return mocks.plannedDecision;
+      }),
   };
 });
 
@@ -143,7 +144,8 @@ describe("stale commander decision accounting", () => {
       pendingDecisionTrigger: "scheduled_tick",
       seats: [seat],
     };
-    const refreshSeats = vi.fn()
+    const refreshSeats = vi
+      .fn()
       .mockResolvedValueOnce([seat])
       .mockResolvedValueOnce([{ ...seat, spentUsd: 0.03 }]);
     agent.env = {
@@ -181,15 +183,17 @@ describe("stale commander decision accounting", () => {
         cost_usd: 0.02,
       },
     ]);
-    expect(agent.state.recentLogs).toMatchObject([{
-      id: "audit_stale_000001_v4",
-      trigger: "scheduled_tick:stale_discarded",
-      output: { parsedCommands: [] },
-      model: "final-seat-model",
-      latencyMs: 123,
-      tokenUsage: { input: 12, output: 5 },
-      costUsd: 0.03,
-    }]);
+    expect(agent.state.recentLogs).toMatchObject([
+      {
+        id: "audit_stale_000001_v4",
+        trigger: "scheduled_tick:stale_discarded",
+        output: { parsedCommands: [] },
+        model: "final-seat-model",
+        latencyMs: 123,
+        tokenUsage: { input: 12, output: 5 },
+        costUsd: 0.03,
+      },
+    ]);
     expect(mocks.sqlCalls).toHaveLength(1);
     expect(JSON.parse(mocks.sqlCalls[0]?.at(-1) as string)).toMatchObject({
       id: "audit_stale_000001_v4",

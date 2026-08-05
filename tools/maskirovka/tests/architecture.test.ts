@@ -3,10 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const source = (relative: string): string => readFileSync(
-  fileURLToPath(new URL(relative, import.meta.url)),
-  "utf8",
-);
+const source = (relative: string): string =>
+  readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
 describe("Maskirovka architecture boundaries", () => {
   it("defines routes contract-first with Effect HttpApi", () => {

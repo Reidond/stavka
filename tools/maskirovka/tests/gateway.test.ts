@@ -34,44 +34,58 @@ const makeService = (
     readonly adapters?: readonly SeatAdapter[];
     readonly tracker?: WindowTracker;
   } = {},
-): Effect.Effect<GatewayService, GatewayError> => Effect.gen(function*() {
-  const registry = new SeatRegistry(
-    config.aliases,
-    config.seats,
-    new MemoryGatewayConfigRepository(),
-    config.apiFallbackAliases,
-  );
-  const service = new GatewayService(
-    config,
-    registry,
-    options.cache ?? new MemoryCacheRepository(),
-    new MemoryRequestLogRepository(),
-    options.adapters ?? [options.adapter ?? new MockSeat()],
-    options.tracker,
-  );
-  yield* service.initialize();
-  return service;
-});
+): Effect.Effect<GatewayService, GatewayError> =>
+  Effect.gen(function* () {
+    const registry = new SeatRegistry(
+      config.aliases,
+      config.seats,
+      new MemoryGatewayConfigRepository(),
+      config.apiFallbackAliases,
+    );
+    const service = new GatewayService(
+      config,
+      registry,
+      options.cache ?? new MemoryCacheRepository(),
+      new MemoryRequestLogRepository(),
+      options.adapters ?? [options.adapter ?? new MockSeat()],
+      options.tracker,
+    );
+    yield* service.initialize();
+    return service;
+  });
 
 const withWebApp = <A>(
   dependencies: RouterDependencies,
   use: (request: (path: string, init?: RequestInit) => Promise<Response>) => Promise<A>,
-): Promise<A> => Effect.runPromise(Effect.scoped(
-  Effect.acquireRelease(
-    Effect.sync(() => HttpRouter.toWebHandler(createMaskirovkaApp(dependencies), {
-      disableLogger: true,
-      routerConfig: { ignoreTrailingSlash: false },
-    })),
-    ({ dispose }) => Effect.promise(() => dispose()),
-  ).pipe(Effect.flatMap(({ handler }) => Effect.tryPromise(() => use(
-    (path, init) => handler(new Request(
-      path.startsWith("http://") || path.startsWith("https://")
-        ? path
-        : `http://127.0.0.1${path}`,
-      init,
-    )),
-  )))),
-));
+): Promise<A> =>
+  Effect.runPromise(
+    Effect.scoped(
+      Effect.acquireRelease(
+        Effect.sync(() =>
+          HttpRouter.toWebHandler(createMaskirovkaApp(dependencies), {
+            disableLogger: true,
+            routerConfig: { ignoreTrailingSlash: false },
+          }),
+        ),
+        ({ dispose }) => Effect.promise(() => dispose()),
+      ).pipe(
+        Effect.flatMap(({ handler }) =>
+          Effect.tryPromise(() =>
+            use((path, init) =>
+              handler(
+                new Request(
+                  path.startsWith("http://") || path.startsWith("https://")
+                    ? path
+                    : `http://127.0.0.1${path}`,
+                  init,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
 const noAssets = { read: () => Effect.succeed(undefined) };
 
@@ -121,11 +135,15 @@ describe("Maskirovka Effect HttpApi router", () => {
       expect(await anthropic.json()).toMatchObject({ type: "message", role: "assistant" });
 
       expect((await request("/v1/chat/completions", { method: "POST" })).status).toBe(404);
-      expect((await request("/v1/responses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ model: "gpt-5.6-sol", input: "wrong: concrete model" }),
-      })).status).toBe(400);
+      expect(
+        (
+          await request("/v1/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ model: "gpt-5.6-sol", input: "wrong: concrete model" }),
+          })
+        ).status,
+      ).toBe(400);
     });
   });
 
@@ -141,11 +159,15 @@ describe("Maskirovka Effect HttpApi router", () => {
     };
     const service = await Effect.runPromise(makeService(config));
     await withWebApp({ config, service, assets: noAssets }, async (request) => {
-      expect((await request("/v1/responses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(openAiBody()),
-      })).status).toBe(401);
+      expect(
+        (
+          await request("/v1/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(openAiBody()),
+          })
+        ).status,
+      ).toBe(401);
       expect((await request("/admin/status")).status).toBe(401);
       expect((await request("/v1/models")).status).toBe(200);
 
@@ -164,16 +186,24 @@ describe("Maskirovka Effect HttpApi router", () => {
         "content-type": "application/json",
       };
       expect((await request("/admin/status", { headers: machineHeaders })).status).toBe(200);
-      expect((await request("/admin/aliases/stavka%2Fheavy", {
-        method: "PUT",
-        headers: machineHeaders,
-        body: JSON.stringify({ seat: "mock", model: "machine-must-not-remap" }),
-      })).status).toBe(403);
-      expect((await request("/admin/kill-switch", {
-        method: "POST",
-        headers: machineHeaders,
-        body: JSON.stringify({ enabled: true }),
-      })).status).toBe(403);
+      expect(
+        (
+          await request("/admin/aliases/stavka%2Fheavy", {
+            method: "PUT",
+            headers: machineHeaders,
+            body: JSON.stringify({ seat: "mock", model: "machine-must-not-remap" }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await request("/admin/kill-switch", {
+            method: "POST",
+            headers: machineHeaders,
+            body: JSON.stringify({ enabled: true }),
+          })
+        ).status,
+      ).toBe(403);
     });
   });
 
@@ -224,10 +254,7 @@ describe("Maskirovka Effect HttpApi router", () => {
       });
       expect(supportedAnthropic.status).toBe(200);
 
-      for (const controls of [
-        { temperature: 0.2 },
-        { stop_sequences: ["STOP"] },
-      ]) {
+      for (const controls of [{ temperature: 0.2 }, { stop_sequences: ["STOP"] }]) {
         const response = await request("/v1/messages", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -293,13 +320,14 @@ describe("Maskirovka Effect HttpApi router", () => {
     const config = baseConfig();
     const failingAdapter: SeatAdapter = {
       id: "mock",
-      invoke: () => Effect.fail(new GatewayError(
-        502,
-        "MOCK_PROVIDER_FAILURE",
-        "provider failed",
-        [],
-        { inputTokens: 12, outputTokens: 3, actualCostUsd: 0.01 },
-      )),
+      invoke: () =>
+        Effect.fail(
+          new GatewayError(502, "MOCK_PROVIDER_FAILURE", "provider failed", [], {
+            inputTokens: 12,
+            outputTokens: 3,
+            actualCostUsd: 0.01,
+          }),
+        ),
     };
     const service = await Effect.runPromise(makeService(config, { adapter: failingAdapter }));
     await withWebApp({ config, service, assets: noAssets }, async (request) => {
@@ -328,24 +356,30 @@ describe("Maskirovka Effect HttpApi router", () => {
     const config = baseConfig();
     const service = await Effect.runPromise(makeService(config));
     const index = new TextEncoder().encode("<main>maskirovka</main>");
-    await withWebApp({
-      config,
-      service,
-      assets: {
-        read: (path) => Effect.succeed(path === "index.html"
-          ? { content: index, contentType: "text/html; charset=utf-8" }
-          : undefined),
+    await withWebApp(
+      {
+        config,
+        service,
+        assets: {
+          read: (path) =>
+            Effect.succeed(
+              path === "index.html"
+                ? { content: index, contentType: "text/html; charset=utf-8" }
+                : undefined,
+            ),
+        },
       },
-    }, async (request) => {
-      const redirect = await request("/_", { redirect: "manual" });
-      expect(redirect.status).toBe(308);
-      expect(redirect.headers.get("location")).toBe("/_/");
+      async (request) => {
+        const redirect = await request("/_", { redirect: "manual" });
+        expect(redirect.status).toBe(308);
+        expect(redirect.headers.get("location")).toBe("/_/");
 
-      const nested = await request("/_/missing/client-route");
-      expect(nested.status).toBe(200);
-      expect(await nested.text()).toBe("<main>maskirovka</main>");
-      expect(nested.headers.get("cache-control")).toBe("no-cache");
-    });
+        const nested = await request("/_/missing/client-route");
+        expect(nested.status).toBe(200);
+        expect(await nested.text()).toBe("<main>maskirovka</main>");
+        expect(nested.headers.get("cache-control")).toBe("no-cache");
+      },
+    );
   });
 
   it("refuses local synthetic dashboard identity on a public URL", async () => {
@@ -387,17 +421,25 @@ describe("Maskirovka Effect HttpApi router", () => {
         model: "mock-heavy",
       });
 
-      expect((await request("/admin/kill-switch", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: true }),
-      })).status).toBe(200);
+      expect(
+        (
+          await request("/admin/kill-switch", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ enabled: true }),
+          })
+        ).status,
+      ).toBe(200);
       expect(repository.value?.killed).toBe(true);
-      expect((await request("/v1/responses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(openAiBody()),
-      })).status).toBe(503);
+      expect(
+        (
+          await request("/v1/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(openAiBody()),
+          })
+        ).status,
+      ).toBe(503);
     });
   });
 });
@@ -408,10 +450,11 @@ describe("record and replay", () => {
     let calls = 0;
     const adapter: SeatAdapter = {
       id: "mock",
-      invoke: (): Effect.Effect<SeatResult> => Effect.sync(() => {
-        calls += 1;
-        return { text: "fixed", usage: { inputTokens: 2, outputTokens: 1 } };
-      }),
+      invoke: (): Effect.Effect<SeatResult> =>
+        Effect.sync(() => {
+          calls += 1;
+          return { text: "fixed", usage: { inputTokens: 2, outputTokens: 1 } };
+        }),
     };
     const record = await Effect.runPromise(makeService(baseConfig("record"), { cache, adapter }));
     const first = normalizeRequest("openai-responses", openAiBody());
@@ -430,29 +473,34 @@ describe("record and replay", () => {
       id: "mock",
       invoke: () => Effect.die(new Error("replay invoked a seat")),
     };
-    const replay = await Effect.runPromise(makeService(baseConfig("replay"), {
-      cache,
-      adapter: replayAdapter,
-    }));
+    const replay = await Effect.runPromise(
+      makeService(baseConfig("replay"), {
+        cache,
+        adapter: replayAdapter,
+      }),
+    );
     const replayed = await Effect.runPromise(replay.run(first));
     expect(replayed.body).toEqual(recorded.body);
     expect(replayed.metadata.cacheHit).toBe(true);
     expect(replayed.metadata.seat).toBe(recorded.metadata.seat);
     expect(replayed.metadata.model).toBe(recorded.metadata.model);
 
-    await expect(Effect.runPromise(replay.run(
-      normalizeRequest("openai-responses", openAiBody("novel prompt")),
-    ))).rejects.toMatchObject({ code: "REPLAY_MISS" });
+    await expect(
+      Effect.runPromise(
+        replay.run(normalizeRequest("openai-responses", openAiBody("novel prompt"))),
+      ),
+    ).rejects.toMatchObject({ code: "REPLAY_MISS" });
   });
 
   it("bypasses cache in live mode", async () => {
     let calls = 0;
     const adapter: SeatAdapter = {
       id: "mock",
-      invoke: (_request: SeatInvocation) => Effect.sync(() => ({
-        text: String(++calls),
-        usage: { inputTokens: 1, outputTokens: 1 },
-      })),
+      invoke: (_request: SeatInvocation) =>
+        Effect.sync(() => ({
+          text: String(++calls),
+          usage: { inputTokens: 1, outputTokens: 1 },
+        })),
     };
     const service = await Effect.runPromise(makeService(baseConfig("live"), { adapter }));
     const request = normalizeRequest("openai-responses", openAiBody());
@@ -465,17 +513,19 @@ describe("record and replay", () => {
 describe("seat budgets and routing", () => {
   const meteredAdapter: SeatAdapter = {
     id: "api",
-    invoke: () => Effect.succeed({
-      text: "metered fallback",
-      usage: { inputTokens: 10, outputTokens: 5, actualCostUsd: 0.001 },
-    }),
+    invoke: () =>
+      Effect.succeed({
+        text: "metered fallback",
+        usage: { inputTokens: 10, outputTokens: 5, actualCostUsd: 0.001 },
+      }),
   };
   const costlyMock: SeatAdapter = {
     id: "mock",
-    invoke: () => Effect.succeed({
-      text: "subscription result",
-      usage: { inputTokens: 1_000, outputTokens: 1_000, planCreditUsd: 0.035 },
-    }),
+    invoke: () =>
+      Effect.succeed({
+        text: "subscription result",
+        usage: { inputTokens: 1_000, outputTokens: 1_000, planCreditUsd: 0.035 },
+      }),
   };
 
   it("accounts subscription plan credit separately from metered cash", async () => {
@@ -483,28 +533,31 @@ describe("seat budgets and routing", () => {
     const config: MaskirovkaConfig = {
       ...base,
       claudeMonthlyCreditUsd: 1,
-      aliases: base.aliases.map((alias) => alias.tier === "stavka/commander"
-        ? { ...alias, seat: "claude" as const, model: "claude-fable-5" }
-        : alias),
-      seats: base.seats.map((seat) => seat.id === "claude"
-        ? { ...seat, status: "healthy" as const, monthlyBudgetUsd: 1 }
-        : seat),
+      aliases: base.aliases.map((alias) =>
+        alias.tier === "stavka/commander"
+          ? { ...alias, seat: "claude" as const, model: "claude-fable-5" }
+          : alias,
+      ),
+      seats: base.seats.map((seat) =>
+        seat.id === "claude" ? { ...seat, status: "healthy" as const, monthlyBudgetUsd: 1 } : seat,
+      ),
     };
     const subscription: SeatAdapter = {
       id: "claude",
-      invoke: () => Effect.succeed({
-        text: "subscription result",
-        usage: {
-          inputTokens: 1_000,
-          outputTokens: 100,
-          planCreditUsd: 0.25,
-        },
-      }),
+      invoke: () =>
+        Effect.succeed({
+          text: "subscription result",
+          usage: {
+            inputTokens: 1_000,
+            outputTokens: 100,
+            planCreditUsd: 0.25,
+          },
+        }),
     };
     const service = await Effect.runPromise(makeService(config, { adapter: subscription }));
-    const response = await Effect.runPromise(service.run(
-      normalizeRequest("openai-responses", openAiBody()),
-    ));
+    const response = await Effect.runPromise(
+      service.run(normalizeRequest("openai-responses", openAiBody())),
+    );
     expect(response.metadata).toMatchObject({
       seat: "claude",
       actualCostUsd: 0,
@@ -524,19 +577,23 @@ describe("seat budgets and routing", () => {
     return {
       ...config,
       budgetPolicy: policy,
-      seats: config.seats.map((seat) => seat.id === "mock"
-        ? { ...seat, monthlyBudgetUsd: 0.000_001 }
-        : seat.id === "api"
-          ? { ...seat, status: "healthy" as const }
-          : seat),
+      seats: config.seats.map((seat) =>
+        seat.id === "mock"
+          ? { ...seat, monthlyBudgetUsd: 0.000_001 }
+          : seat.id === "api"
+            ? { ...seat, status: "healthy" as const }
+            : seat,
+      ),
     };
   };
 
   it("marks exhausted seats and routes the next request to metered API", async () => {
     const config = budgetedConfig("fallback");
-    const service = await Effect.runPromise(makeService(config, {
-      adapters: [costlyMock, meteredAdapter],
-    }));
+    const service = await Effect.runPromise(
+      makeService(config, {
+        adapters: [costlyMock, meteredAdapter],
+      }),
+    );
     const request = normalizeRequest("openai-responses", openAiBody());
     const first = await Effect.runPromise(service.run(request));
     const second = await Effect.runPromise(service.run(request));
@@ -555,9 +612,11 @@ describe("seat budgets and routing", () => {
 
   it("returns a typed 429 when the operator selects stretch", async () => {
     const config = budgetedConfig("stretch");
-    const service = await Effect.runPromise(makeService(config, {
-      adapters: [costlyMock, meteredAdapter],
-    }));
+    const service = await Effect.runPromise(
+      makeService(config, {
+        adapters: [costlyMock, meteredAdapter],
+      }),
+    );
     const request = normalizeRequest("openai-responses", openAiBody());
     await Effect.runPromise(service.run(request));
     await expect(Effect.runPromise(service.run(request))).rejects.toMatchObject({
@@ -571,18 +630,23 @@ describe("seat budgets and routing", () => {
     let primaryCalls = 0;
     const failingPrimary: SeatAdapter = {
       id: "mock",
-      invoke: () => Effect.sync(() => { primaryCalls += 1; }).pipe(
-        Effect.andThen(Effect.fail(
-          new GatewayError(502, "MOCK_TRANSIENT", "temporary seat failure"),
-        )),
-      ),
+      invoke: () =>
+        Effect.sync(() => {
+          primaryCalls += 1;
+        }).pipe(
+          Effect.andThen(
+            Effect.fail(new GatewayError(502, "MOCK_TRANSIENT", "temporary seat failure")),
+          ),
+        ),
     };
-    const service = await Effect.runPromise(makeService(config, {
-      adapters: [failingPrimary, meteredAdapter],
-    }));
-    const response = await Effect.runPromise(service.run(
-      normalizeRequest("openai-responses", openAiBody()),
-    ));
+    const service = await Effect.runPromise(
+      makeService(config, {
+        adapters: [failingPrimary, meteredAdapter],
+      }),
+    );
+    const response = await Effect.runPromise(
+      service.run(normalizeRequest("openai-responses", openAiBody())),
+    );
     expect(primaryCalls).toBe(1);
     expect(response.metadata).toMatchObject({
       seat: "api",
@@ -595,37 +659,49 @@ describe("seat budgets and routing", () => {
     const base = baseConfig();
     const config: MaskirovkaConfig = {
       ...base,
-      aliases: base.aliases.map((alias) => alias.tier === "stavka/commander"
-        ? { ...alias, seat: "claude" as const, model: "claude-fable-5" }
-        : alias),
-      seats: base.seats.map((seat) => seat.id === "claude"
-        ? { ...seat, status: "healthy" as const, monthlyBudgetUsd: 1 }
-        : seat),
+      aliases: base.aliases.map((alias) =>
+        alias.tier === "stavka/commander"
+          ? { ...alias, seat: "claude" as const, model: "claude-fable-5" }
+          : alias,
+      ),
+      seats: base.seats.map((seat) =>
+        seat.id === "claude" ? { ...seat, status: "healthy" as const, monthlyBudgetUsd: 1 } : seat,
+      ),
     };
     const repository = new MemoryWindowTrackerRepository();
-    const tracker = new WindowTracker({
-      claudeMonthlyCreditUsd: 1,
-      codexWindowCalls: 0,
-      codexWindowTokens: 0,
-      codexWindowMs: 5 * 60 * 60 * 1_000,
-    }, repository);
+    const tracker = new WindowTracker(
+      {
+        claudeMonthlyCreditUsd: 1,
+        codexWindowCalls: 0,
+        codexWindowTokens: 0,
+        codexWindowMs: 5 * 60 * 60 * 1_000,
+      },
+      repository,
+    );
     const failingSeat: SeatAdapter = {
       id: "claude",
-      invoke: () => Effect.fail(new GatewayError(
-        502,
-        "CLAUDE_SEAT_FAILURE",
-        "provider rejected secret-provider-payload",
-        [],
-        { inputTokens: 90, outputTokens: 10, planCreditUsd: 0.2 },
-      )),
+      invoke: () =>
+        Effect.fail(
+          new GatewayError(
+            502,
+            "CLAUDE_SEAT_FAILURE",
+            "provider rejected secret-provider-payload",
+            [],
+            { inputTokens: 90, outputTokens: 10, planCreditUsd: 0.2 },
+          ),
+        ),
     };
-    const service = await Effect.runPromise(makeService(config, {
-      adapter: failingSeat,
-      tracker,
-    }));
-    await expect(Effect.runPromise(service.run(
-      normalizeRequest("openai-responses", openAiBody("secret-user-prompt")),
-    ))).rejects.toMatchObject({
+    const service = await Effect.runPromise(
+      makeService(config, {
+        adapter: failingSeat,
+        tracker,
+      }),
+    );
+    await expect(
+      Effect.runPromise(
+        service.run(normalizeRequest("openai-responses", openAiBody("secret-user-prompt"))),
+      ),
+    ).rejects.toMatchObject({
       code: "CLAUDE_SEAT_FAILURE",
       resolvedModel: "claude-fable-5",
       providerUsage: { inputTokens: 90, outputTokens: 10, planCreditUsd: 0.2 },
@@ -636,12 +712,14 @@ describe("seat budgets and routing", () => {
       outputTokens: 10,
       planCreditUsd: 0.2,
     });
-    expect(repository.value?.entries).toContainEqual(expect.objectContaining({
-      seat: "claude",
-      outcome: "failure",
-      failureCode: "CLAUDE_SEAT_FAILURE",
-      tokens: 100,
-    }));
+    expect(repository.value?.entries).toContainEqual(
+      expect.objectContaining({
+        seat: "claude",
+        outcome: "failure",
+        failureCode: "CLAUDE_SEAT_FAILURE",
+        tokens: 100,
+      }),
+    );
     const persisted = JSON.stringify(repository.value);
     expect(persisted).not.toContain("secret-provider-payload");
     expect(persisted).not.toContain("secret-user-prompt");
@@ -664,9 +742,8 @@ describe("seat budgets and routing", () => {
   it("chooses healthy tier candidates in descending priority", async () => {
     const config = baseConfig();
     const healthySeats = config.seats.map((seat) =>
-      seat.id === "claude" || seat.id === "codex"
-        ? { ...seat, status: "healthy" as const }
-        : seat);
+      seat.id === "claude" || seat.id === "codex" ? { ...seat, status: "healthy" as const } : seat,
+    );
     const registry = new SeatRegistry(
       [
         { tier: "stavka/commander", seat: "claude", model: "claude-model" },
@@ -688,45 +765,53 @@ describe("Commander Effect AI compatibility", () => {
   it("decodes Maskirovka mock output through both Effect AI provider layers", async () => {
     const config = { ...baseConfig("live"), port: 0 };
     const service = await Effect.runPromise(makeService(config));
-    const program = Effect.scoped(Effect.gen(function*() {
-      const server = yield* startServer(config, service);
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        return yield* Effect.die(new Error("Expected TCP server address"));
-      }
-      const shared = {
-        commanderModel: "stavka/commander" as const,
-        sergeantModel: "stavka/sergeant" as const,
-        heavyModel: "stavka/heavy" as const,
-        decisionIntervalSeconds: 45,
-        doctrine: "balanced" as const,
-        maxActiveUnits: 50,
-        difficulty: 0.5,
-        playerScaling: true,
-        tickIdleMs: 2_000,
-        tickActiveMs: 750,
-        tickBurstMs: 300,
-        aiBaseUrl: `http://127.0.0.1:${address.port}`,
-        seatExhaustionPolicy: "fallback" as const,
-        seatStretchMultiplier: 4,
-        seatHeartbeatTtlSeconds: 45,
-        seatJobTimeoutSeconds: 30,
-        seatKeys: {},
-      };
-      const decision = yield* runAiDecision({ ...shared, aiProvider: "openai" }, {
-        model: "stavka/commander",
-        prompt: "Hold position.",
-      });
-      expect(decision.decision.commands).toEqual([]);
-      expect(decision.decision.summary).toMatch(/^mock-/u);
+    const program = Effect.scoped(
+      Effect.gen(function* () {
+        const server = yield* startServer(config, service);
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          return yield* Effect.die(new Error("Expected TCP server address"));
+        }
+        const shared = {
+          commanderModel: "stavka/commander" as const,
+          sergeantModel: "stavka/sergeant" as const,
+          heavyModel: "stavka/heavy" as const,
+          decisionIntervalSeconds: 45,
+          doctrine: "balanced" as const,
+          maxActiveUnits: 50,
+          difficulty: 0.5,
+          playerScaling: true,
+          tickIdleMs: 2_000,
+          tickActiveMs: 750,
+          tickBurstMs: 300,
+          aiBaseUrl: `http://127.0.0.1:${address.port}`,
+          seatExhaustionPolicy: "fallback" as const,
+          seatStretchMultiplier: 4,
+          seatHeartbeatTtlSeconds: 45,
+          seatJobTimeoutSeconds: 30,
+          seatKeys: {},
+        };
+        const decision = yield* runAiDecision(
+          { ...shared, aiProvider: "openai" },
+          {
+            model: "stavka/commander",
+            prompt: "Hold position.",
+          },
+        );
+        expect(decision.decision.commands).toEqual([]);
+        expect(decision.decision.summary).toMatch(/^mock-/u);
 
-      const anthropicDecision = yield* runAiDecision({ ...shared, aiProvider: "anthropic" }, {
-        model: "stavka/commander",
-        prompt: "Hold position.",
-      });
-      expect(anthropicDecision.decision.commands).toEqual([]);
-      expect(anthropicDecision.decision.summary).toMatch(/^mock-/u);
-    }));
+        const anthropicDecision = yield* runAiDecision(
+          { ...shared, aiProvider: "anthropic" },
+          {
+            model: "stavka/commander",
+            prompt: "Hold position.",
+          },
+        );
+        expect(anthropicDecision.decision.commands).toEqual([]);
+        expect(anthropicDecision.decision.summary).toMatch(/^mock-/u);
+      }),
+    );
     // The Commander integration currently exposes an overly broad `unknown`
     // requirement even though both provider layers are fully supplied.
     await Effect.runPromise(program as Effect.Effect<void, unknown>);

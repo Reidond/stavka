@@ -6,10 +6,7 @@ import {
   type SeatResult,
   type TierAlias,
 } from "./types";
-import {
-  decodeAnthropicMessagesRequest,
-  decodeOpenAiResponsesRequest,
-} from "@stavka/protocol";
+import { decodeAnthropicMessagesRequest, decodeOpenAiResponsesRequest } from "@stavka/protocol";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -42,24 +39,36 @@ const textFromMessages = (messages: unknown): string => {
     .join("\n");
 };
 
-const schemaFromOpenAi = (request: Record<string, unknown>): Readonly<Record<string, unknown>> | undefined => {
+const schemaFromOpenAi = (
+  request: Record<string, unknown>,
+): Readonly<Record<string, unknown>> | undefined => {
   if (!isRecord(request.text) || !isRecord(request.text.format)) return undefined;
   return isRecord(request.text.format.schema) ? request.text.format.schema : undefined;
 };
 
-const structuredOutputFromAnthropic = (request: Record<string, unknown>): {
-  readonly schema: Readonly<Record<string, unknown>>;
-  readonly name?: string;
-} | undefined => {
-  if (isRecord(request.output_config) && isRecord(request.output_config.format) && isRecord(request.output_config.format.schema)) {
+const structuredOutputFromAnthropic = (
+  request: Record<string, unknown>,
+):
+  | {
+      readonly schema: Readonly<Record<string, unknown>>;
+      readonly name?: string;
+    }
+  | undefined => {
+  if (
+    isRecord(request.output_config) &&
+    isRecord(request.output_config.format) &&
+    isRecord(request.output_config.format.schema)
+  ) {
     return { schema: request.output_config.format.schema };
   }
   if (!Array.isArray(request.tools)) return undefined;
-  const requestedName = isRecord(request.tool_choice) && typeof request.tool_choice.name === "string"
-    ? request.tool_choice.name
-    : undefined;
-  const tool = request.tools.find((candidate) =>
-    isRecord(candidate) && (!requestedName || candidate.name === requestedName));
+  const requestedName =
+    isRecord(request.tool_choice) && typeof request.tool_choice.name === "string"
+      ? request.tool_choice.name
+      : undefined;
+  const tool = request.tools.find(
+    (candidate) => isRecord(candidate) && (!requestedName || candidate.name === requestedName),
+  );
   if (!isRecord(tool) || !isRecord(tool.input_schema)) return undefined;
   return {
     schema: tool.input_schema,
@@ -68,7 +77,8 @@ const structuredOutputFromAnthropic = (request: Record<string, unknown>): {
 };
 
 export const normalizeRequest = (dialect: Dialect, value: unknown): NormalizedRequest => {
-  if (!isRecord(value)) throw new GatewayError(400, "INVALID_REQUEST", "Request body must be an object");
+  if (!isRecord(value))
+    throw new GatewayError(400, "INVALID_REQUEST", "Request body must be an object");
   try {
     if (dialect === "openai-responses") decodeOpenAiResponsesRequest(value);
     else decodeAnthropicMessagesRequest(value);
@@ -83,9 +93,12 @@ export const normalizeRequest = (dialect: Dialect, value: unknown): NormalizedRe
     ]);
   }
   if (Array.isArray(value.tools) && value.tools.length > 0) {
-    throw new GatewayError(400, "UNSUPPORTED_PARAMETER", "Tools are disabled on language-model seats", [
-      "param=tools",
-    ]);
+    throw new GatewayError(
+      400,
+      "UNSUPPORTED_PARAMETER",
+      "Tools are disabled on language-model seats",
+      ["param=tools"],
+    );
   }
   if (dialect === "openai-responses") {
     if (value.max_output_tokens !== undefined) {
@@ -128,18 +141,20 @@ export const normalizeRequest = (dialect: Dialect, value: unknown): NormalizedRe
     }
   }
   const tier = assertTier(value.model);
-  const input = dialect === "openai-responses"
-    ? (typeof value.input === "string" ? value.input : textFromMessages(value.input))
-    : textFromMessages(value.messages);
-  if (!input.trim()) throw new GatewayError(400, "INVALID_REQUEST", "Request must contain textual input");
+  const input =
+    dialect === "openai-responses"
+      ? typeof value.input === "string"
+        ? value.input
+        : textFromMessages(value.input)
+      : textFromMessages(value.messages);
+  if (!input.trim())
+    throw new GatewayError(400, "INVALID_REQUEST", "Request must contain textual input");
   const systemValue = dialect === "openai-responses" ? value.instructions : value.system;
   const system = typeof systemValue === "string" ? systemValue : textFromPart(systemValue);
-  const anthropicOutput = dialect === "anthropic-messages"
-    ? structuredOutputFromAnthropic(value)
-    : undefined;
-  const outputSchema = dialect === "openai-responses"
-    ? schemaFromOpenAi(value)
-    : anthropicOutput?.schema;
+  const anthropicOutput =
+    dialect === "anthropic-messages" ? structuredOutputFromAnthropic(value) : undefined;
+  const outputSchema =
+    dialect === "openai-responses" ? schemaFromOpenAi(value) : anthropicOutput?.schema;
   return {
     dialect,
     tier,
@@ -170,13 +185,15 @@ export const openAiResponse = (
     incomplete_details: null,
     instructions: null,
     model,
-    output: [{
-      id: `msg_${requestId.replaceAll("-", "")}`,
-      type: "message",
-      status: "completed",
-      role: "assistant",
-      content: [{ type: "output_text", text, annotations: [], logprobs: [] }],
-    }],
+    output: [
+      {
+        id: `msg_${requestId.replaceAll("-", "")}`,
+        type: "message",
+        status: "completed",
+        role: "assistant",
+        content: [{ type: "output_text", text, annotations: [], logprobs: [] }],
+      },
+    ],
     output_text: text,
     parallel_tool_calls: true,
     tools: [],
@@ -206,14 +223,17 @@ export const anthropicMessage = (
     type: "message",
     role: "assistant",
     model,
-    content: structuredOutputName && result.structured !== undefined
-      ? [{
-          type: "tool_use",
-          id: `toolu_${requestId.replaceAll("-", "")}`,
-          name: structuredOutputName,
-          input: result.structured,
-        }]
-      : [{ type: "text", text }],
+    content:
+      structuredOutputName && result.structured !== undefined
+        ? [
+            {
+              type: "tool_use",
+              id: `toolu_${requestId.replaceAll("-", "")}`,
+              name: structuredOutputName,
+              input: result.structured,
+            },
+          ]
+        : [{ type: "text", text }],
     stop_reason: structuredOutputName && result.structured !== undefined ? "tool_use" : "end_turn",
     stop_sequence: null,
     container: null,

@@ -51,8 +51,7 @@ export const balanced = {
 export const doctrines = { aggressive, defensive, balanced } as const;
 export type DoctrineId = keyof typeof doctrines;
 
-export const getDoctrine = (id: string): Doctrine =>
-  doctrines[id as DoctrineId] ?? balanced;
+export const getDoctrine = (id: string): Doctrine => doctrines[id as DoctrineId] ?? balanced;
 
 export const doctrinePrompt = (doctrine: Doctrine, difficulty: number): string =>
   [

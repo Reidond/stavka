@@ -110,9 +110,16 @@ pnpm lint:tailwind
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm verify
 pnpm eval -- --replay
 pnpm ai:smoke
 ```
+
+Commander sessions are isolated by `(session_id, mission_epoch, faction)`.
+After a local Commander/Poligon smoke, delete the ignored `.dev.vars` copies and
+rebuild Poligon so `dist/server` does not retain them. Exact gate results and
+the local browser acceptance evidence are recorded in
+[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 These checks use mocks, fakes, and replay data. They do not prove a real
 Cloudflare deployment, Access policy, subscription seat, production addon, or

@@ -153,18 +153,12 @@ export const decodeAnthropicMessagesRequest = (
       }
       if (request.temperature !== undefined) {
         return Effect.fail(
-          invalidDialect(
-            "The Claude Agent SDK does not expose temperature control",
-            "temperature",
-          ),
+          invalidDialect("The Claude Agent SDK does not expose temperature control", "temperature"),
         );
       }
       if (request.stop_sequences && request.stop_sequences.length > 0) {
         return Effect.fail(
-          invalidDialect(
-            "The Claude Agent SDK does not expose stop_sequences",
-            "stop_sequences",
-          ),
+          invalidDialect("The Claude Agent SDK does not expose stop_sequences", "stop_sequences"),
         );
       }
       return Effect.succeed(request);

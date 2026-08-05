@@ -79,9 +79,7 @@ const SeatKeys = Schema.Record(
 );
 
 const seatKeysFrom = (value: string | undefined): Readonly<Record<string, string>> =>
-  value === undefined
-    ? {}
-    : Schema.decodeUnknownSync(SeatKeys)(JSON.parse(value));
+  value === undefined ? {} : Schema.decodeUnknownSync(SeatKeys)(JSON.parse(value));
 
 const tierAliasFrom = (value: string | undefined, fallback: LlmTierAlias): LlmTierAlias =>
   value === "stavka/commander" || value === "stavka/sergeant" || value === "stavka/heavy"
@@ -99,8 +97,11 @@ const maskirovkaBaseUrl = (value: string | undefined): string => {
   } catch {
     throw new Error("STAVKA_AI_BASE_URL must be a valid Maskirovka HTTP(S) URL");
   }
-  if ((url.protocol !== "http:" && url.protocol !== "https:") ||
-    url.hostname === "api.openai.com" || url.hostname === "api.anthropic.com") {
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.hostname === "api.openai.com" ||
+    url.hostname === "api.anthropic.com"
+  ) {
     throw new Error("STAVKA_AI_BASE_URL must point to Maskirovka, not a provider API");
   }
   return normalized;
@@ -125,8 +126,7 @@ export const readConfig = (env: Env): CommanderConfig => {
     aiProvider,
     aiBaseUrl: maskirovkaBaseUrl(env.STAVKA_AI_BASE_URL),
     ...(env.STAVKA_AI_KEY ? { aiKey: env.STAVKA_AI_KEY } : {}),
-    seatExhaustionPolicy:
-      env.STAVKA_SEAT_EXHAUSTION_POLICY === "stretch" ? "stretch" : "fallback",
+    seatExhaustionPolicy: env.STAVKA_SEAT_EXHAUSTION_POLICY === "stretch" ? "stretch" : "fallback",
     seatStretchMultiplier: Math.min(
       20,
       Math.max(1, numberFrom(env.STAVKA_SEAT_STRETCH_MULTIPLIER, 4)),
@@ -144,9 +144,7 @@ export const readConfig = (env: Env): CommanderConfig => {
 };
 
 /** Resolve Worker bindings at the Effect boundary and report invalid configuration as data. */
-export const readConfigEffect = (
-  env: Env,
-): Effect.Effect<CommanderConfig, CommanderConfigError> =>
+export const readConfigEffect = (env: Env): Effect.Effect<CommanderConfig, CommanderConfigError> =>
   Effect.try({
     try: () => readConfig(env),
     catch: (cause) =>
@@ -156,15 +154,20 @@ export const readConfigEffect = (
       }),
   });
 
-export const commanderConfig: Effect.Effect<CommanderConfig, CommanderConfigError, CommanderEnvironment> =
-  CommanderEnvironment.pipe(Effect.flatMap(readConfigEffect));
+export const commanderConfig: Effect.Effect<
+  CommanderConfig,
+  CommanderConfigError,
+  CommanderEnvironment
+> = CommanderEnvironment.pipe(Effect.flatMap(readConfigEffect));
 
 const automationPermissions = (value: string | undefined): readonly AccessPermission[] => {
   const allowed = new Set<AccessPermission>(["read", "operate", "admin"]);
   const configured = (value ?? "")
     .split(",")
     .map((permission) => permission.trim())
-    .filter((permission): permission is AccessPermission => allowed.has(permission as AccessPermission));
+    .filter((permission): permission is AccessPermission =>
+      allowed.has(permission as AccessPermission),
+    );
   return [...new Set<AccessPermission>(["read", ...configured])];
 };
 
@@ -173,8 +176,8 @@ export const accessConfig = (env: Env): AccessConfig => ({
     env.ENVIRONMENT === "local"
       ? "local"
       : env.ENVIRONMENT === "preview"
-      ? "preview"
-      : "production",
+        ? "preview"
+        : "production",
   teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
   audience: env.ACCESS_AUD ?? "",
   ...(env.DEV_ACCESS_EMAIL ? { devEmail: env.DEV_ACCESS_EMAIL } : {}),

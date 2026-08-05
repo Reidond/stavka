@@ -18,12 +18,13 @@ export class FileRuntimeDirectoryRepository implements RuntimeDirectoryRepositor
       try: async () => {
         await Promise.all(paths.map((path) => mkdir(path, { recursive: true, mode: 0o700 })));
       },
-      catch: (cause) => new GatewayError(
-        500,
-        "RUNTIME_DIRECTORY_REPOSITORY_FAILURE",
-        "Unable to prepare Maskirovka runtime directories",
-        [cause instanceof Error ? cause.message : "Unknown runtime directory error"],
-      ),
+      catch: (cause) =>
+        new GatewayError(
+          500,
+          "RUNTIME_DIRECTORY_REPOSITORY_FAILURE",
+          "Unable to prepare Maskirovka runtime directories",
+          [cause instanceof Error ? cause.message : "Unknown runtime directory error"],
+        ),
     });
   }
 }

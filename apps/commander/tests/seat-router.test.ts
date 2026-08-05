@@ -69,11 +69,11 @@ const seat = (
 
 describe("registered seat routing", () => {
   it("selects the highest-priority healthy seat serving the tier", () => {
-    const route = resolveLlmRoute([
-      seat("low", 5),
-      seat("unhealthy", 100, { healthy: false }),
-      seat("high", 20),
-    ], config, "stavka/commander");
+    const route = resolveLlmRoute(
+      [seat("low", 5), seat("unhealthy", 100, { healthy: false }), seat("high", 20)],
+      config,
+      "stavka/commander",
+    );
 
     expect(route.seatId).toBe("high");
     expect(route.config.aiProvider).toBe("anthropic");
@@ -87,16 +87,24 @@ describe("registered seat routing", () => {
       fallback: true,
       stretched: false,
     });
-    const stretched = resolveLlmRoute(exhausted, {
-      ...config,
-      seatExhaustionPolicy: "stretch",
-    }, "stavka/commander");
+    const stretched = resolveLlmRoute(
+      exhausted,
+      {
+        ...config,
+        seatExhaustionPolicy: "stretch",
+      },
+      "stavka/commander",
+    );
     expect(stretched).toMatchObject({ fallback: false, stretched: true });
     expect(stretchedInterval(stretched, 45, 4)).toBe(180);
   });
 
   it("charges only the selected seat and marks its budget exhausted", () => {
-    const seats = chargeSeat([seat("chosen", 20, { spentUsd: 99 }), seat("other", 10)], "chosen", 2);
+    const seats = chargeSeat(
+      [seat("chosen", 20, { spentUsd: 99 }), seat("other", 10)],
+      "chosen",
+      2,
+    );
 
     expect(seats.find((item) => item.id === "chosen")).toMatchObject({
       spentUsd: 101,
@@ -106,11 +114,15 @@ describe("registered seat routing", () => {
   });
 
   it("never routes an HTTP seat through the metered fallback credential", () => {
-    const route = resolveLlmRoute([seat("revoked", 100)], {
-      ...config,
-      aiKey: "global-metered-key",
-      seatKeys: {},
-    }, "stavka/commander");
+    const route = resolveLlmRoute(
+      [seat("revoked", 100)],
+      {
+        ...config,
+        aiKey: "global-metered-key",
+        seatKeys: {},
+      },
+      "stavka/commander",
+    );
 
     expect(route.seatId).toBeUndefined();
     expect(route).toMatchObject({
@@ -155,15 +167,9 @@ describe("registered seat routing", () => {
     } as unknown as Env;
     let failure: unknown;
 
-    await Effect.runPromise(invokeContributorSeat(
-      env,
-      "contributor",
-      "stavka/commander",
-      "prompt",
-      30,
-      "job",
-      "lease",
-    )).catch((cause) => {
+    await Effect.runPromise(
+      invokeContributorSeat(env, "contributor", "stavka/commander", "prompt", 30, "job", "lease"),
+    ).catch((cause) => {
       failure = cause;
     });
 

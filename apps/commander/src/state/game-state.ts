@@ -52,9 +52,7 @@ const compactObservations = (
       `${report.payload.report_type} report(s) from ${report.payload.group_id}`,
     );
   }
-  return [...indexed.values()]
-    .sort((left, right) => left.timestamp - right.timestamp)
-    .slice(-100);
+  return [...indexed.values()].sort((left, right) => left.timestamp - right.timestamp).slice(-100);
 };
 
 const upsertById = <T extends { readonly id: string }>(
@@ -66,7 +64,10 @@ const upsertById = <T extends { readonly id: string }>(
   return [...indexed.values()];
 };
 
-const applyDelta = (snapshot: GameSnapshot, request: Extract<TickRequest, { type: "delta" }>): GameSnapshot => {
+const applyDelta = (
+  snapshot: GameSnapshot,
+  request: Extract<TickRequest, { type: "delta" }>,
+): GameSnapshot => {
   let groups = upsertById(snapshot.friendly_groups, request.changes.groups_upserted);
   const movement = new Map(request.changes.groups_moved.map((item) => [item.id, item.position]));
   groups = groups
@@ -98,7 +99,9 @@ const calculateDifficulty = (
   state: CommanderSessionState,
   snapshot: GameSnapshot,
 ): CommanderSessionState["difficulty"] => {
-  const friendlyObjectives = snapshot.objectives.filter((item) => item.status === "friendly").length;
+  const friendlyObjectives = snapshot.objectives.filter(
+    (item) => item.status === "friendly",
+  ).length;
   const enemyObjectives = snapshot.objectives.filter((item) => item.status === "enemy").length;
   const totalObjectives = Math.max(1, snapshot.objectives.length);
   const objectiveMomentum = (enemyObjectives - friendlyObjectives) / totalObjectives;
@@ -123,8 +126,8 @@ export const cachedTickResponse = (
   request: TickRequest,
 ): TickResponse | undefined =>
   state.sessionId === request.session_id &&
-    state.faction === request.faction &&
-    state.lastTickId === request.tick_id
+  state.faction === request.faction &&
+  state.lastTickId === request.tick_id
     ? state.lastTickResponse
     : undefined;
 
@@ -149,7 +152,8 @@ export const applyTick = (
   if (
     request.type === "delta" &&
     request.tick_id - state.lastFullTickId >= Math.max(1, request.full_snapshot_interval)
-  ) requestFullSnapshot = true;
+  )
+    requestFullSnapshot = true;
 
   if (!snapshot) return { state, requestFullSnapshot: true, accepted: false };
   const now = request.timestamp;
@@ -159,10 +163,12 @@ export const applyTick = (
   );
   const shortTermCutoff = now - SHORT_TERM_WINDOW_SECONDS;
   const rawCutoff = now - RAW_OBSERVATION_WINDOW_SECONDS;
-  const retainedEvents = [...state.memory.shortTerm.events, ...request.events]
-    .filter((event) => event.timestamp >= shortTermCutoff);
-  const retainedReports = [...state.memory.shortTerm.reports, ...request.sergeant_reports]
-    .filter((report) => report.timestamp >= shortTermCutoff);
+  const retainedEvents = [...state.memory.shortTerm.events, ...request.events].filter(
+    (event) => event.timestamp >= shortTermCutoff,
+  );
+  const retainedReports = [...state.memory.shortTerm.reports, ...request.sergeant_reports].filter(
+    (report) => report.timestamp >= shortTermCutoff,
+  );
   const summaries = compactObservations(
     state,
     retainedEvents.filter((event) => event.timestamp < rawCutoff),
@@ -177,33 +183,39 @@ export const applyTick = (
   const outcomes = [
     ...(state.memory.shortTerm.outcomes ?? []),
     ...request.command_results.map((result) => ({ timestamp: now, result })),
-  ].filter((outcome) => outcome.timestamp >= shortTermCutoff).slice(-100);
-  const terminal = new Set(request.command_results
-    .filter((result) => result.status !== "accepted")
-    .map((result) => result.command_id));
+  ]
+    .filter((outcome) => outcome.timestamp >= shortTermCutoff)
+    .slice(-100);
+  const terminal = new Set(
+    request.command_results
+      .filter((result) => result.status !== "accepted")
+      .map((result) => result.command_id),
+  );
   const pendingCommands = state.pendingCommands.filter(
     (command) => !terminal.has(command.command_id),
   );
   const previousReportedManpower = state.budget.reportedManpower;
   const previousReportedVehicles = state.budget.reportedVehiclePool;
-  let manpower = previousReportedManpower === undefined
-    ? snapshot.resources.manpower
-    : Math.min(
-        snapshot.resources.manpower,
-        Math.max(
-          0,
-          state.budget.manpower + snapshot.resources.manpower - previousReportedManpower,
-        ),
-      );
-  let vehiclePool = previousReportedVehicles === undefined
-    ? snapshot.resources.vehicle_pool
-    : Math.min(
-        snapshot.resources.vehicle_pool,
-        Math.max(
-          0,
-          state.budget.vehiclePool + snapshot.resources.vehicle_pool - previousReportedVehicles,
-        ),
-      );
+  let manpower =
+    previousReportedManpower === undefined
+      ? snapshot.resources.manpower
+      : Math.min(
+          snapshot.resources.manpower,
+          Math.max(
+            0,
+            state.budget.manpower + snapshot.resources.manpower - previousReportedManpower,
+          ),
+        );
+  let vehiclePool =
+    previousReportedVehicles === undefined
+      ? snapshot.resources.vehicle_pool
+      : Math.min(
+          snapshot.resources.vehicle_pool,
+          Math.max(
+            0,
+            state.budget.vehiclePool + snapshot.resources.vehicle_pool - previousReportedVehicles,
+          ),
+        );
   for (const result of request.command_results) {
     if (result.status !== "failed" && result.status !== "ignored") continue;
     const command = state.pendingCommands.find((item) => item.command_id === result.command_id);
@@ -241,8 +253,7 @@ export const applyTick = (
       manpower,
       vehiclePool,
       reinforcementReadyAt:
-        snapshot.mission.time_elapsed_seconds +
-        snapshot.resources.reinforcement_cooldown_seconds,
+        snapshot.mission.time_elapsed_seconds + snapshot.resources.reinforcement_cooldown_seconds,
       maxActiveUnits: Math.min(
         50,
         config.maxActiveUnits,
@@ -314,11 +325,10 @@ export const requestCommanderDecision = (
 ): CommanderSessionState => {
   const pendingDecisionTrigger =
     state.pendingDecisionTrigger === undefined ||
-      triggerPriority(trigger) > triggerPriority(state.pendingDecisionTrigger)
+    triggerPriority(trigger) > triggerPriority(state.pendingDecisionTrigger)
       ? trigger
       : state.pendingDecisionTrigger;
-  const changed = !state.decisionPending ||
-    pendingDecisionTrigger !== state.pendingDecisionTrigger;
+  const changed = !state.decisionPending || pendingDecisionTrigger !== state.pendingDecisionTrigger;
   return {
     ...state,
     decisionPending: true,
@@ -340,7 +350,7 @@ export const requeueCommanderDecision = (
 ): CommanderSessionState => {
   const pendingDecisionTrigger =
     state.pendingDecisionTrigger === undefined ||
-      triggerPriority(trigger) > triggerPriority(state.pendingDecisionTrigger)
+    triggerPriority(trigger) > triggerPriority(state.pendingDecisionTrigger)
       ? trigger
       : state.pendingDecisionTrigger;
   return {
@@ -351,9 +361,7 @@ export const requeueCommanderDecision = (
   };
 };
 
-export const recoverPendingDecision = (
-  state: CommanderSessionState,
-): CommanderSessionState => {
+export const recoverPendingDecision = (state: CommanderSessionState): CommanderSessionState => {
   if (!state.decisionPending && state.pendingDecisionTrigger === undefined) return state;
   const { pendingDecisionTrigger: _pendingDecisionTrigger, ...rest } = state;
   return { ...rest, decisionPending: false, mode: "degraded" };

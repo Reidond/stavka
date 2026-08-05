@@ -25,5 +25,7 @@ const missing = sharedUtilities
   .map(([utility]) => utility);
 
 if (missing.length > 0) {
-  throw new Error(`Generated Poligon CSS is missing shared @stavka/ui utilities: ${missing.join(", ")}`);
+  throw new Error(
+    `Generated Poligon CSS is missing shared @stavka/ui utilities: ${missing.join(", ")}`,
+  );
 }

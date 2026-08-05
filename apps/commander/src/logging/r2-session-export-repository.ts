@@ -173,11 +173,7 @@ interface R2PutOptionsLike {
 }
 
 export interface R2BucketLike {
-  put(
-    key: string,
-    value: string,
-    options?: R2PutOptionsLike,
-  ): Promise<R2ObjectMetadataLike | null>;
+  put(key: string, value: string, options?: R2PutOptionsLike): Promise<R2ObjectMetadataLike | null>;
   get(key: string): Promise<R2ObjectBodyLike | null>;
   list(options?: {
     readonly prefix?: string;
@@ -347,7 +343,8 @@ const DEFAULT_MAX_MANIFEST_BYTES = 8 * 1_024 * 1_024;
  */
 export const sanitizeSessionExportKeySegment = (value: string): string =>
   `u${Array.from({ length: value.length }, (_, index) =>
-    value.charCodeAt(index).toString(16).padStart(4, "0")).join("")}`;
+    value.charCodeAt(index).toString(16).padStart(4, "0"),
+  ).join("")}`;
 
 export const decodeSessionExportKeySegment = (value: string): string => {
   if (!/^u(?:[0-9a-f]{4})*$/u.test(value)) {
@@ -483,7 +480,8 @@ const decodeObjectMetadata = (
             objectSha256: custom.objectSha256,
           },
         })),
-      )),
+      ),
+    ),
   );
 
 const writeOptionsFromMetadata = (metadata: SessionExportMetadata): SessionExportWriteOptions => ({
@@ -517,21 +515,23 @@ const headerDigest = (
 const payloadDigestInput = (
   headerSha256: string,
   pages: readonly SessionExportPageDescriptor[],
-): string => JSON.stringify({
-  headerSha256,
-  pages: pages.map((page) => ({
-    index: page.index,
-    key: page.key,
-    byteLength: page.byteLength,
-    sha256: page.sha256,
-    counts: page.counts,
-  })),
-});
+): string =>
+  JSON.stringify({
+    headerSha256,
+    pages: pages.map((page) => ({
+      index: page.index,
+      key: page.key,
+      byteLength: page.byteLength,
+      sha256: page.sha256,
+      counts: page.counts,
+    })),
+  });
 
 const payloadDigest = (
   headerSha256: string,
   pages: readonly SessionExportPageDescriptor[],
-): Effect.Effect<string, SessionExportRepositoryError> => sha256(payloadDigestInput(headerSha256, pages));
+): Effect.Effect<string, SessionExportRepositoryError> =>
+  sha256(payloadDigestInput(headerSha256, pages));
 
 const decodeSessionExport = (
   encoded: string,
@@ -609,10 +609,7 @@ const sameIdentity = (
   session.faction === identity.faction &&
   session.mission_epoch === identity.missionEpoch;
 
-const sameReplayIdentity = (
-  left: ReplaySessionMetadata,
-  right: ReplaySessionMetadata,
-): boolean =>
+const sameReplayIdentity = (left: ReplaySessionMetadata, right: ReplaySessionMetadata): boolean =>
   left.session_id === right.session_id &&
   left.faction === right.faction &&
   left.mission_epoch === right.mission_epoch;
@@ -638,20 +635,27 @@ const validateMetadataKey = (
   operation: "read" | "list",
 ): Effect.Effect<SessionExportMetadata, SessionExportRepositoryError> => {
   const expectedKey = expectedMetadataKey(metadata);
-  return metadata.key === expectedKey && (metadata.storage !== "inline" || metadata.chunkCount === 0)
+  return metadata.key === expectedKey &&
+    (metadata.storage !== "inline" || metadata.chunkCount === 0)
     ? Effect.succeed(metadata)
-    : Effect.fail(new SessionExportRepositoryError({
-        operation,
-        key: metadata.key,
-        cause: new Error(`Export metadata belongs at ${expectedKey}`),
-      }));
+    : Effect.fail(
+        new SessionExportRepositoryError({
+          operation,
+          key: metadata.key,
+          cause: new Error(`Export metadata belongs at ${expectedKey}`),
+        }),
+      );
 };
 
-const parsePageCursor = (cursor: string | undefined, key: string): Effect.Effect<number, SessionExportRepositoryError> =>
+const parsePageCursor = (
+  cursor: string | undefined,
+  key: string,
+): Effect.Effect<number, SessionExportRepositoryError> =>
   Effect.try({
     try: () => {
       if (cursor === undefined) return 0;
-      if (!/^(?:0|[1-9][0-9]*)$/u.test(cursor)) throw new Error("Invalid session export page cursor");
+      if (!/^(?:0|[1-9][0-9]*)$/u.test(cursor))
+        throw new Error("Invalid session export page cursor");
       const index = Number(cursor);
       if (!Number.isSafeInteger(index)) throw new Error("Invalid session export page cursor");
       return index;
@@ -699,22 +703,28 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
         const header = headerOf(validData);
         if (utf8ByteLength(encoded) <= this.#chunkSizeBytes) {
           return this.begin(header, validOptions, 0).pipe(
-            Effect.flatMap((result) => result._tag === "published"
-              ? Effect.succeed(result.metadata)
-              : this.#writeInline(result.lease, encoded)),
+            Effect.flatMap((result) =>
+              result._tag === "published"
+                ? Effect.succeed(result.metadata)
+                : this.#writeInline(result.lease, encoded),
+            ),
           );
         }
         const pages = splitSessionExport(validData, this.#chunkSizeBytes);
         return headerDigest(header).pipe(
           Effect.flatMap((digest) =>
             Effect.forEach(pages, (page, index) =>
-              this.#encodePage(header, digest, index, page).pipe(Effect.asVoid))),
+              this.#encodePage(header, digest, index, page).pipe(Effect.asVoid),
+            ),
+          ),
           Effect.flatMap(() => this.begin(header, validOptions, pages.length)),
-          Effect.flatMap((result) => result._tag === "published"
-            ? Effect.succeed(result.metadata)
-            : Effect.forEach(pages, (page, index) => this.writePage(result.lease, index, page)).pipe(
-                Effect.flatMap((descriptors) => this.complete(result.lease, descriptors)),
-              )),
+          Effect.flatMap((result) =>
+            result._tag === "published"
+              ? Effect.succeed(result.metadata)
+              : Effect.forEach(pages, (page, index) =>
+                  this.writePage(result.lease, index, page),
+                ).pipe(Effect.flatMap((descriptors) => this.complete(result.lease, descriptors))),
+          ),
         );
       }),
     );
@@ -726,31 +736,36 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     pageCount: number,
   ): Effect.Effect<SessionExportBeginResult, SessionExportRepositoryError> {
     return Effect.all({
-      header: Schema.decodeUnknownEffect(SessionExportHeader)(header, { onExcessProperty: "error" }),
+      header: Schema.decodeUnknownEffect(SessionExportHeader)(header, {
+        onExcessProperty: "error",
+      }),
       options: Schema.decodeUnknownEffect(SessionExportWriteOptionsSchema)(options, {
         onExcessProperty: "error",
       }).pipe(Effect.map(normalizeWriteOptions)),
       pageCount: Schema.decodeUnknownEffect(NaturalNumber)(pageCount),
     }).pipe(
       Effect.mapError((cause) => new SessionExportRepositoryError({ operation: "encode", cause })),
-      Effect.flatMap(({ header: validHeader, options: validOptions, pageCount: validPageCount }) => {
-        const key = sessionExportKey(validHeader, validOptions);
-        if (validPageCount > this.#maxPages) {
-          return Effect.fail(new SessionExportRepositoryError({
-            operation: "encode",
-            key,
-            cause: new Error(`Session export has ${validPageCount} pages; maximum is ${this.#maxPages}`),
-          }));
-        }
-        return headerDigest(validHeader).pipe(
-          Effect.flatMap((digest) => this.#beginReserved(
-            validHeader,
-            validOptions,
-            validPageCount,
-            digest,
-          )),
-        );
-      }),
+      Effect.flatMap(
+        ({ header: validHeader, options: validOptions, pageCount: validPageCount }) => {
+          const key = sessionExportKey(validHeader, validOptions);
+          if (validPageCount > this.#maxPages) {
+            return Effect.fail(
+              new SessionExportRepositoryError({
+                operation: "encode",
+                key,
+                cause: new Error(
+                  `Session export has ${validPageCount} pages; maximum is ${this.#maxPages}`,
+                ),
+              }),
+            );
+          }
+          return headerDigest(validHeader).pipe(
+            Effect.flatMap((digest) =>
+              this.#beginReserved(validHeader, validOptions, validPageCount, digest),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -768,17 +783,24 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
         this.#assertLease(lease).pipe(
           Effect.flatMap(() => {
             if (validIndex >= lease.pageCount) {
-              return Effect.fail(new SessionExportRepositoryError({
-                operation: "encode",
-                key: lease.key,
-                cause: new Error(`Page index ${validIndex} exceeds reserved page count ${lease.pageCount}`),
-              }));
+              return Effect.fail(
+                new SessionExportRepositoryError({
+                  operation: "encode",
+                  key: lease.key,
+                  cause: new Error(
+                    `Page index ${validIndex} exceeds reserved page count ${lease.pageCount}`,
+                  ),
+                }),
+              );
             }
             return this.#encodePage(lease.header, lease.headerSha256, validIndex, validPage).pipe(
-              Effect.flatMap(({ encoded, descriptor }) => this.#putPageIfAbsent(lease, encoded, descriptor)),
+              Effect.flatMap(({ encoded, descriptor }) =>
+                this.#putPageIfAbsent(lease, encoded, descriptor),
+              ),
             );
           }),
-        )),
+        ),
+      ),
     );
   }
 
@@ -789,10 +811,14 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     return Schema.decodeUnknownEffect(Schema.Array(SessionExportPageDescriptor))(pages, {
       onExcessProperty: "error",
     }).pipe(
-      Effect.mapError((cause) => new SessionExportRepositoryError({ operation: "encode", key: lease.key, cause })),
-      Effect.flatMap((validPages) => this.#assertLease(lease).pipe(
-        Effect.flatMap(() => this.#completeReserved(lease, validPages)),
-      )),
+      Effect.mapError(
+        (cause) => new SessionExportRepositoryError({ operation: "encode", key: lease.key, cause }),
+      ),
+      Effect.flatMap((validPages) =>
+        this.#assertLease(lease).pipe(
+          Effect.flatMap(() => this.#completeReserved(lease, validPages)),
+        ),
+      ),
     );
   }
 
@@ -820,9 +846,11 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
           },
         },
         { onExcessProperty: "error" },
-      ).pipe(Effect.mapError(
-        (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
-      ));
+      ).pipe(
+        Effect.mapError(
+          (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
+        ),
+      );
       return { metadata: root.metadata, data };
     });
   }
@@ -881,7 +909,12 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
           cause: new Error("Session export page cursor is outside the manifest"),
         });
       }
-      const page = yield* this.#readVerifiedPage(key, manifest.header, manifest.headerSha256, descriptor);
+      const page = yield* this.#readVerifiedPage(
+        key,
+        manifest.header,
+        manifest.headerSha256,
+        descriptor,
+      );
       return {
         metadata: root.metadata,
         header: manifest.header,
@@ -898,32 +931,42 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     const limit = Math.min(1_000, Math.max(1, Math.floor(scope.limit ?? 100)));
     const prefix = keyPrefix(scope.sessionId, scope.faction, scope.missionEpoch);
     return Effect.tryPromise({
-      try: () => this.bucket.list({
-        prefix,
-        limit,
-        ...(scope.cursor === undefined ? {} : { cursor: scope.cursor }),
-        include: ["customMetadata"],
-      }),
+      try: () =>
+        this.bucket.list({
+          prefix,
+          limit,
+          ...(scope.cursor === undefined ? {} : { cursor: scope.cursor }),
+          include: ["customMetadata"],
+        }),
       catch: (cause) => new SessionExportRepositoryError({ operation: "list", cause }),
     }).pipe(
       Effect.flatMap((listed) =>
         Effect.forEach(listed.objects, (object) =>
           decodeObjectMetadata(object, "list").pipe(
             Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "list")),
-          )).pipe(
+          ),
+        ).pipe(
           Effect.flatMap((exports) => {
-            if (listed.truncated === true && (listed.cursor === undefined || listed.cursor.length === 0)) {
-              return Effect.fail(new SessionExportRepositoryError({
-                operation: "list",
-                cause: new Error("R2 returned a truncated export list without a continuation cursor"),
-              }));
+            if (
+              listed.truncated === true &&
+              (listed.cursor === undefined || listed.cursor.length === 0)
+            ) {
+              return Effect.fail(
+                new SessionExportRepositoryError({
+                  operation: "list",
+                  cause: new Error(
+                    "R2 returned a truncated export list without a continuation cursor",
+                  ),
+                }),
+              );
             }
             return Effect.succeed({
               exports,
               ...(listed.truncated === true ? { cursor: listed.cursor } : {}),
             });
           }),
-        )),
+        ),
+      ),
     );
   }
 
@@ -960,23 +1003,31 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       }
       const encodedReservation = yield* Schema.encodeEffect(
         Schema.fromJsonString(SessionExportReservation),
-      )(reservation).pipe(Effect.mapError(
-        (cause) => new SessionExportRepositoryError({ operation: "encode", key: reservationKey, cause }),
-      ));
+      )(reservation).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SessionExportRepositoryError({ operation: "encode", key: reservationKey, cause }),
+        ),
+      );
       const created = yield* Effect.tryPromise({
-        try: () => this.bucket.put(reservationKey, encodedReservation, {
-          httpMetadata: { contentType: "application/json; charset=utf-8" },
-          customMetadata: { kind: "stavka-session-export-reservation", parentKey: key },
-          onlyIf: { etagDoesNotMatch: "*" },
-        }),
-        catch: (cause) => new SessionExportRepositoryError({ operation: "reserve", key: reservationKey, cause }),
+        try: () =>
+          this.bucket.put(reservationKey, encodedReservation, {
+            httpMetadata: { contentType: "application/json; charset=utf-8" },
+            customMetadata: { kind: "stavka-session-export-reservation", parentKey: key },
+            onlyIf: { etagDoesNotMatch: "*" },
+          }),
+        catch: (cause) =>
+          new SessionExportRepositoryError({ operation: "reserve", key: reservationKey, cause }),
       });
       if (created !== null) return { _tag: "pending", lease } as const;
 
       const afterRace = yield* this.#publishedMetadata(key);
       if (afterRace !== undefined) {
         if (options.id !== undefined) return { _tag: "published", metadata: afterRace } as const;
-        return yield* conflict(key, "A timestamp-derived session export key was published concurrently");
+        return yield* conflict(
+          key,
+          "A timestamp-derived session export key was published concurrently",
+        );
       }
       const existingReservation = yield* this.#readReservation(reservationKey);
       if (existingReservation === undefined || !sameReservation(existingReservation, reservation)) {
@@ -993,24 +1044,37 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     const payloadSize = utf8ByteLength(encoded);
     return this.#assertLease(lease).pipe(
       Effect.flatMap(() => sha256(encoded)),
-      Effect.flatMap((digest) => Effect.tryPromise({
-        try: () => this.bucket.put(lease.key, encoded, {
-          httpMetadata: { contentType: "application/json; charset=utf-8" },
-          customMetadata: metadataStrings(lease.header, lease.options, "inline", 0, payloadSize, {
-            payloadSha256: digest,
-            headerSha256: lease.headerSha256,
-            objectSha256: digest,
-          }),
-          onlyIf: { etagDoesNotMatch: "*" },
-        }),
-        catch: (cause) => new SessionExportRepositoryError({ operation: "write", key: lease.key, cause }),
-      }).pipe(
-        Effect.flatMap((object) => object === null
-          ? this.#sameInlineOrConflict(lease.key, encoded)
-          : decodeObjectMetadata(object, "read").pipe(
-              Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
-            )),
-      )),
+      Effect.flatMap((digest) =>
+        Effect.tryPromise({
+          try: () =>
+            this.bucket.put(lease.key, encoded, {
+              httpMetadata: { contentType: "application/json; charset=utf-8" },
+              customMetadata: metadataStrings(
+                lease.header,
+                lease.options,
+                "inline",
+                0,
+                payloadSize,
+                {
+                  payloadSha256: digest,
+                  headerSha256: lease.headerSha256,
+                  objectSha256: digest,
+                },
+              ),
+              onlyIf: { etagDoesNotMatch: "*" },
+            }),
+          catch: (cause) =>
+            new SessionExportRepositoryError({ operation: "write", key: lease.key, cause }),
+        }).pipe(
+          Effect.flatMap((object) =>
+            object === null
+              ? this.#sameInlineOrConflict(lease.key, encoded)
+              : decodeObjectMetadata(object, "read").pipe(
+                  Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
+                ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1039,22 +1103,26 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       Effect.flatMap((encoded) => {
         const byteLength = utf8ByteLength(encoded);
         if (byteLength > this.#maxPageBytes) {
-          return Effect.fail(new SessionExportRepositoryError({
-            operation: "encode",
-            cause: new Error(
-              `Session export page is ${byteLength} bytes; maximum is ${this.#maxPageBytes}`,
-            ),
-          }));
+          return Effect.fail(
+            new SessionExportRepositoryError({
+              operation: "encode",
+              cause: new Error(
+                `Session export page is ${byteLength} bytes; maximum is ${this.#maxPageBytes}`,
+              ),
+            }),
+          );
         }
-        return sha256(encoded).pipe(Effect.map((pageDigest) => ({
-          encoded,
-          descriptor: {
-            index,
-            byteLength,
-            sha256: pageDigest,
-            counts: countsOf(page),
-          },
-        })));
+        return sha256(encoded).pipe(
+          Effect.map((pageDigest) => ({
+            encoded,
+            descriptor: {
+              index,
+              byteLength,
+              sha256: pageDigest,
+              counts: countsOf(page),
+            },
+          })),
+        );
       }),
     );
   }
@@ -1067,22 +1135,25 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     const key = sessionExportPageKey(lease.header, lease.options, descriptor.index);
     const completeDescriptor: SessionExportPageDescriptor = { ...descriptor, key };
     return Effect.tryPromise({
-      try: () => this.bucket.put(key, encoded, {
-        httpMetadata: { contentType: "application/json; charset=utf-8" },
-        customMetadata: {
-          kind: "stavka-session-export-page",
-          parentKey: lease.key,
-          index: String(descriptor.index),
-          sha256: descriptor.sha256,
-          headerSha256: lease.headerSha256,
-        },
-        onlyIf: { etagDoesNotMatch: "*" },
-      }),
+      try: () =>
+        this.bucket.put(key, encoded, {
+          httpMetadata: { contentType: "application/json; charset=utf-8" },
+          customMetadata: {
+            kind: "stavka-session-export-page",
+            parentKey: lease.key,
+            index: String(descriptor.index),
+            sha256: descriptor.sha256,
+            headerSha256: lease.headerSha256,
+          },
+          onlyIf: { etagDoesNotMatch: "*" },
+        }),
       catch: (cause) => new SessionExportRepositoryError({ operation: "write", key, cause }),
     }).pipe(
-      Effect.flatMap((object) => object === null
-        ? this.#samePageOrConflict(lease, encoded, completeDescriptor)
-        : Effect.succeed(completeDescriptor)),
+      Effect.flatMap((object) =>
+        object === null
+          ? this.#samePageOrConflict(lease, encoded, completeDescriptor)
+          : Effect.succeed(completeDescriptor),
+      ),
     );
   }
 
@@ -1091,18 +1162,26 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     pages: readonly SessionExportPageDescriptor[],
   ): Effect.Effect<SessionExportMetadata, SessionExportRepositoryError> {
     if (pages.length !== lease.pageCount) {
-      return Effect.fail(new SessionExportRepositoryError({
-        operation: "encode",
-        key: lease.key,
-        cause: new Error(`Expected ${lease.pageCount} page descriptors, received ${pages.length}`),
-      }));
+      return Effect.fail(
+        new SessionExportRepositoryError({
+          operation: "encode",
+          key: lease.key,
+          cause: new Error(
+            `Expected ${lease.pageCount} page descriptors, received ${pages.length}`,
+          ),
+        }),
+      );
     }
     if (pages.length > this.#maxPages) {
-      return Effect.fail(new SessionExportRepositoryError({
-        operation: "encode",
-        key: lease.key,
-        cause: new Error(`Session export has ${pages.length} pages; maximum is ${this.#maxPages}`),
-      }));
+      return Effect.fail(
+        new SessionExportRepositoryError({
+          operation: "encode",
+          key: lease.key,
+          cause: new Error(
+            `Session export has ${pages.length} pages; maximum is ${this.#maxPages}`,
+          ),
+        }),
+      );
     }
     for (let index = 0; index < pages.length; index += 1) {
       const page = pages[index];
@@ -1113,11 +1192,13 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
         page.key !== expectedKey ||
         page.byteLength > this.#maxPageBytes
       ) {
-        return Effect.fail(new SessionExportRepositoryError({
-          operation: "encode",
-          key: lease.key,
-          cause: new Error(`Page descriptor ${index} does not belong to this export`),
-        }));
+        return Effect.fail(
+          new SessionExportRepositoryError({
+            operation: "encode",
+            key: lease.key,
+            cause: new Error(`Page descriptor ${index} does not belong to this export`),
+          }),
+        );
       }
     }
     const payloadSize = pages.reduce((total, page) => total + page.byteLength, 0);
@@ -1135,22 +1216,29 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
           payloadSha256: digest,
           pages,
         };
-        return Schema.encodeEffect(Schema.fromJsonString(ChunkedSessionExportManifest))(manifest).pipe(
-          Effect.mapError((cause) => new SessionExportRepositoryError({
-            operation: "encode",
-            key: lease.key,
-            cause,
-          })),
+        return Schema.encodeEffect(Schema.fromJsonString(ChunkedSessionExportManifest))(
+          manifest,
+        ).pipe(
+          Effect.mapError(
+            (cause) =>
+              new SessionExportRepositoryError({
+                operation: "encode",
+                key: lease.key,
+                cause,
+              }),
+          ),
           Effect.flatMap((encoded) => {
             const manifestBytes = utf8ByteLength(encoded);
             if (manifestBytes > this.#maxManifestBytes) {
-              return Effect.fail(new SessionExportRepositoryError({
-                operation: "encode",
-                key: lease.key,
-                cause: new Error(
-                  `Session export manifest is ${manifestBytes} bytes; maximum is ${this.#maxManifestBytes}`,
-                ),
-              }));
+              return Effect.fail(
+                new SessionExportRepositoryError({
+                  operation: "encode",
+                  key: lease.key,
+                  cause: new Error(
+                    `Session export manifest is ${manifestBytes} bytes; maximum is ${this.#maxManifestBytes}`,
+                  ),
+                }),
+              );
             }
             return Effect.forEach(pages, (page) =>
               this.#readVerifiedPage(lease.key, lease.header, lease.headerSha256, page).pipe(
@@ -1158,35 +1246,41 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
               ),
             ).pipe(
               Effect.flatMap(() => sha256(encoded)),
-              Effect.flatMap((manifestDigest) => Effect.tryPromise({
-                try: () => this.bucket.put(lease.key, encoded, {
-                  httpMetadata: { contentType: "application/json; charset=utf-8" },
-                  customMetadata: metadataStrings(
-                    lease.header,
-                    lease.options,
-                    "chunked",
-                    pages.length,
-                    payloadSize,
-                    {
-                      payloadSha256: digest,
-                      headerSha256: lease.headerSha256,
-                      objectSha256: manifestDigest,
-                    },
+              Effect.flatMap((manifestDigest) =>
+                Effect.tryPromise({
+                  try: () =>
+                    this.bucket.put(lease.key, encoded, {
+                      httpMetadata: { contentType: "application/json; charset=utf-8" },
+                      customMetadata: metadataStrings(
+                        lease.header,
+                        lease.options,
+                        "chunked",
+                        pages.length,
+                        payloadSize,
+                        {
+                          payloadSha256: digest,
+                          headerSha256: lease.headerSha256,
+                          objectSha256: manifestDigest,
+                        },
+                      ),
+                      onlyIf: { etagDoesNotMatch: "*" },
+                    }),
+                  catch: (cause) =>
+                    new SessionExportRepositoryError({
+                      operation: "write",
+                      key: lease.key,
+                      cause,
+                    }),
+                }).pipe(
+                  Effect.flatMap((object) =>
+                    object === null
+                      ? this.#sameManifestOrConflict(lease.key, encoded)
+                      : decodeObjectMetadata(object, "read").pipe(
+                          Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
+                        ),
                   ),
-                  onlyIf: { etagDoesNotMatch: "*" },
-                }),
-                catch: (cause) => new SessionExportRepositoryError({
-                  operation: "write",
-                  key: lease.key,
-                  cause,
-                }),
-              }).pipe(
-                Effect.flatMap((object) => object === null
-                  ? this.#sameManifestOrConflict(lease.key, encoded)
-                  : decodeObjectMetadata(object, "read").pipe(
-                      Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
-                    )),
-              )),
+                ),
+              ),
             );
           }),
         );
@@ -1201,11 +1295,13 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       try: () => this.bucket.get(key),
       catch: (cause) => new SessionExportRepositoryError({ operation: "read", key, cause }),
     }).pipe(
-      Effect.flatMap((object) => object === null
-        ? Effect.succeed(undefined)
-        : decodeObjectMetadata(object, "read").pipe(
-            Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
-          )),
+      Effect.flatMap((object) =>
+        object === null
+          ? Effect.succeed(undefined)
+          : decodeObjectMetadata(object, "read").pipe(
+              Effect.flatMap(({ metadata }) => validateMetadataKey(metadata, "read")),
+            ),
+      ),
     );
   }
 
@@ -1219,13 +1315,17 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       },
       catch: (cause) => new SessionExportRepositoryError({ operation: "reserve", key, cause }),
     }).pipe(
-      Effect.flatMap((encoded) => encoded === null
-        ? Effect.succeed(undefined)
-        : Schema.decodeUnknownEffect(Schema.fromJsonString(SessionExportReservation), {
-            onExcessProperty: "error",
-          })(encoded).pipe(Effect.mapError(
-            (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
-          ))),
+      Effect.flatMap((encoded) =>
+        encoded === null
+          ? Effect.succeed(undefined)
+          : Schema.decodeUnknownEffect(Schema.fromJsonString(SessionExportReservation), {
+              onExcessProperty: "error",
+            })(encoded).pipe(
+              Effect.mapError(
+                (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
+              ),
+            ),
+      ),
     );
   }
 
@@ -1252,12 +1352,16 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
         };
         return reservation !== undefined && sameReservation(reservation, expected)
           ? Effect.succeed(undefined)
-          : Effect.fail(conflict(lease.key, "Session export reservation is missing or does not match"));
+          : Effect.fail(
+              conflict(lease.key, "Session export reservation is missing or does not match"),
+            );
       }),
       Effect.flatMap(() => this.#publishedMetadata(lease.key)),
-      Effect.flatMap((published) => published === undefined
-        ? Effect.succeed(undefined)
-        : Effect.fail(conflict(lease.key, "Session export was already published"))),
+      Effect.flatMap((published) =>
+        published === undefined
+          ? Effect.succeed(undefined)
+          : Effect.fail(conflict(lease.key, "Session export was already published")),
+      ),
     );
   }
 
@@ -1266,12 +1370,16 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     encoded: string,
   ): Effect.Effect<SessionExportMetadata, SessionExportRepositoryError> {
     return this.#readRoot(key).pipe(
-      Effect.flatMap((root) => root.encoded === encoded && root.metadata.storage === "inline"
-        ? Effect.succeed(root.metadata)
-        : Effect.fail(conflict(key, "export_id already refers to a different inline export"))),
-      Effect.mapError((error) => error instanceof SessionExportNotFoundError
-        ? new SessionExportRepositoryError({ operation: "write", key, cause: error })
-        : error),
+      Effect.flatMap((root) =>
+        root.encoded === encoded && root.metadata.storage === "inline"
+          ? Effect.succeed(root.metadata)
+          : Effect.fail(conflict(key, "export_id already refers to a different inline export")),
+      ),
+      Effect.mapError((error) =>
+        error instanceof SessionExportNotFoundError
+          ? new SessionExportRepositoryError({ operation: "write", key, cause: error })
+          : error,
+      ),
     );
   }
 
@@ -1280,12 +1388,16 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     encoded: string,
   ): Effect.Effect<SessionExportMetadata, SessionExportRepositoryError> {
     return this.#readRoot(key).pipe(
-      Effect.flatMap((root) => root.encoded === encoded && root.metadata.storage === "chunked"
-        ? Effect.succeed(root.metadata)
-        : Effect.fail(conflict(key, "export_id already refers to a different page manifest"))),
-      Effect.mapError((error) => error instanceof SessionExportNotFoundError
-        ? new SessionExportRepositoryError({ operation: "write", key, cause: error })
-        : error),
+      Effect.flatMap((root) =>
+        root.encoded === encoded && root.metadata.storage === "chunked"
+          ? Effect.succeed(root.metadata)
+          : Effect.fail(conflict(key, "export_id already refers to a different page manifest")),
+      ),
+      Effect.mapError((error) =>
+        error instanceof SessionExportNotFoundError
+          ? new SessionExportRepositoryError({ operation: "write", key, cause: error })
+          : error,
+      ),
     );
   }
 
@@ -1299,22 +1411,30 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
         const object = await this.bucket.get(descriptor.key);
         return object === null ? null : await object.text();
       },
-      catch: (cause) => new SessionExportRepositoryError({
-        operation: "read",
-        key: descriptor.key,
-        cause,
-      }),
+      catch: (cause) =>
+        new SessionExportRepositoryError({
+          operation: "read",
+          key: descriptor.key,
+          cause,
+        }),
     }).pipe(
-      Effect.flatMap((stored) => stored === encoded
-        ? Effect.succeed(descriptor)
-        : Effect.fail(conflict(lease.key, `Page ${descriptor.index} differs from its reserved export`))),
+      Effect.flatMap((stored) =>
+        stored === encoded
+          ? Effect.succeed(descriptor)
+          : Effect.fail(
+              conflict(lease.key, `Page ${descriptor.index} differs from its reserved export`),
+            ),
+      ),
     );
   }
 
-  #readRoot(
-    key: string,
-  ): Effect.Effect<
-    { readonly object: R2ObjectBodyLike; readonly encoded: string; readonly metadata: SessionExportMetadata; readonly integrity: IntegrityMetadata },
+  #readRoot(key: string): Effect.Effect<
+    {
+      readonly object: R2ObjectBodyLike;
+      readonly encoded: string;
+      readonly metadata: SessionExportMetadata;
+      readonly integrity: IntegrityMetadata;
+    },
     SessionExportRepositoryError | SessionExportNotFoundError
   > {
     return Effect.gen({ self: this }, function* () {
@@ -1332,9 +1452,12 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     });
   }
 
-  #decodeInline(
-    root: { readonly object: R2ObjectBodyLike; readonly encoded: string; readonly metadata: SessionExportMetadata; readonly integrity: IntegrityMetadata },
-  ): Effect.Effect<SessionExport, SessionExportRepositoryError> {
+  #decodeInline(root: {
+    readonly object: R2ObjectBodyLike;
+    readonly encoded: string;
+    readonly metadata: SessionExportMetadata;
+    readonly integrity: IntegrityMetadata;
+  }): Effect.Effect<SessionExport, SessionExportRepositoryError> {
     const { encoded, integrity, key, metadata, object } = {
       ...root,
       key: root.metadata.key,
@@ -1375,9 +1498,12 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     });
   }
 
-  #decodeManifest(
-    root: { readonly object: R2ObjectBodyLike; readonly encoded: string; readonly metadata: SessionExportMetadata; readonly integrity: IntegrityMetadata },
-  ): Effect.Effect<ChunkedSessionExportManifest, SessionExportRepositoryError> {
+  #decodeManifest(root: {
+    readonly object: R2ObjectBodyLike;
+    readonly encoded: string;
+    readonly metadata: SessionExportMetadata;
+    readonly integrity: IntegrityMetadata;
+  }): Effect.Effect<ChunkedSessionExportManifest, SessionExportRepositoryError> {
     const { encoded, integrity, key, metadata, object } = {
       ...root,
       key: root.metadata.key,
@@ -1407,9 +1533,11 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       const manifest = yield* Schema.decodeUnknownEffect(
         Schema.fromJsonString(ChunkedSessionExportManifest),
         { onExcessProperty: "error" },
-      )(encoded).pipe(Effect.mapError(
-        (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
-      ));
+      )(encoded).pipe(
+        Effect.mapError(
+          (cause) => new SessionExportRepositoryError({ operation: "decode", key, cause }),
+        ),
+      );
       const actualHeaderSha = yield* headerDigest(manifest.header);
       const actualPayloadSha = yield* payloadDigest(manifest.headerSha256, manifest.pages);
       if (
@@ -1460,11 +1588,12 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
     return Effect.gen({ self: this }, function* () {
       const object = yield* Effect.tryPromise({
         try: () => this.bucket.get(descriptor.key),
-        catch: (cause) => new SessionExportRepositoryError({
-          operation: "read",
-          key: descriptor.key,
-          cause,
-        }),
+        catch: (cause) =>
+          new SessionExportRepositoryError({
+            operation: "read",
+            key: descriptor.key,
+            cause,
+          }),
       });
       if (object === null) {
         return yield* new SessionExportRepositoryError({
@@ -1475,13 +1604,17 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       }
       const encoded = yield* Effect.tryPromise({
         try: () => object.text(),
-        catch: (cause) => new SessionExportRepositoryError({
-          operation: "read",
-          key: descriptor.key,
-          cause,
-        }),
+        catch: (cause) =>
+          new SessionExportRepositoryError({
+            operation: "read",
+            key: descriptor.key,
+            cause,
+          }),
       });
-      if (utf8ByteLength(encoded) !== descriptor.byteLength || object.size !== descriptor.byteLength) {
+      if (
+        utf8ByteLength(encoded) !== descriptor.byteLength ||
+        object.size !== descriptor.byteLength
+      ) {
         return yield* new SessionExportRepositoryError({
           operation: "decode",
           key: descriptor.key,
@@ -1499,13 +1632,16 @@ export class R2SessionExportRepository implements SessionExportObjectRepositoryS
       const persisted = yield* Schema.decodeUnknownEffect(
         Schema.fromJsonString(PersistedSessionExportPage),
         { onExcessProperty: "error" },
-      )(encoded).pipe(Effect.mapError(
-        (cause) => new SessionExportRepositoryError({
-          operation: "decode",
-          key: descriptor.key,
-          cause,
-        }),
-      ));
+      )(encoded).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SessionExportRepositoryError({
+              operation: "decode",
+              key: descriptor.key,
+              cause,
+            }),
+        ),
+      );
       if (
         persisted.index !== descriptor.index ||
         persisted.headerSha256 !== headerSha ||

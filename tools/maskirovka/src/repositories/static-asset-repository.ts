@@ -33,12 +33,15 @@ export class FileStaticAssetRepository implements StaticAssetRepositoryService {
   read(path: string): Effect.Effect<StaticAsset | undefined, GatewayError> {
     return Effect.tryPromise({
       try: async () => {
-        const safe = normalize(path).replace(/^([.][.][/\\])+/u, "").replace(/^[/\\]+/u, "");
+        const safe = normalize(path)
+          .replace(/^([.][.][/\\])+/u, "")
+          .replace(/^[/\\]+/u, "");
         const filename = join(this.root, safe || "index.html");
         if (
           !filename.startsWith(`${normalize(this.root)}${sep}`) &&
           filename !== normalize(this.root)
-        ) return undefined;
+        )
+          return undefined;
         try {
           return {
             content: await readFile(filename),
@@ -49,17 +52,16 @@ export class FileStaticAssetRepository implements StaticAssetRepositoryService {
           throw error;
         }
       },
-      catch: (cause) => new GatewayError(
-        500,
-        "STATIC_ASSET_REPOSITORY_FAILURE",
-        "Unable to read a dashboard asset",
-        [cause instanceof Error ? cause.message : "Unknown static asset error"],
-      ),
+      catch: (cause) =>
+        new GatewayError(
+          500,
+          "STATIC_ASSET_REPOSITORY_FAILURE",
+          "Unable to read a dashboard asset",
+          [cause instanceof Error ? cause.message : "Unknown static asset error"],
+        ),
     });
   }
 }
 
-export const StaticAssetRepositoryLive = (
-  root: string,
-): Layer.Layer<StaticAssetRepository> =>
+export const StaticAssetRepositoryLive = (root: string): Layer.Layer<StaticAssetRepository> =>
   Layer.succeed(StaticAssetRepository, new FileStaticAssetRepository(root));

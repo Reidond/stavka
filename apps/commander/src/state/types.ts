@@ -165,7 +165,7 @@ export interface CommanderSessionState {
   readonly seatBudgetReservations: readonly SeatBudgetReservationRecord[];
   readonly contributorJobLedger: readonly ContributorJobRecord[];
   readonly processedSergeantAssessmentIds: readonly string[];
-  readonly costAggregates: readonly typeof CommanderCostAggregate.Type[];
+  readonly costAggregates: readonly (typeof CommanderCostAggregate.Type)[];
   readonly disconnectedAt?: number;
   readonly lastTickResponse?: TickResponse;
 }
@@ -211,10 +211,12 @@ const ContributorJobRecordSchema = Schema.Struct({
   result: Schema.optional(AiDecisionResult),
   error: Schema.optional(Schema.String),
   retryable: Schema.optional(Schema.Boolean),
-  failureTokenUsage: Schema.optional(Schema.Struct({
-    input: Schema.Number,
-    output: Schema.Number,
-  })),
+  failureTokenUsage: Schema.optional(
+    Schema.Struct({
+      input: Schema.Number,
+      output: Schema.Number,
+    }),
+  ),
   failureCostUsd: Schema.optional(Schema.Number),
   resolvedModel: Schema.optional(Schema.String),
 });

@@ -15,12 +15,14 @@ const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(reso
 
 describe("codex subscription environment guardrails", () => {
   it("strips both Codex API key variables without dropping ordinary environment values", () => {
-    expect(sanitizeCodexSubscriptionEnvironment({
-      CODEX_API_KEY: "codex-secret",
-      OPENAI_API_KEY: "openai-secret",
-      PATH: "/usr/bin",
-      UNDEFINED_VALUE: undefined,
-    })).toEqual({ PATH: "/usr/bin" });
+    expect(
+      sanitizeCodexSubscriptionEnvironment({
+        CODEX_API_KEY: "codex-secret",
+        OPENAI_API_KEY: "openai-secret",
+        PATH: "/usr/bin",
+        UNDEFINED_VALUE: undefined,
+      }),
+    ).toEqual({ PATH: "/usr/bin" });
   });
 });
 
@@ -29,12 +31,16 @@ describe("fair seat governor", () => {
     const governor = new FairGovernor(2);
     const started: number[] = [];
     const release: Array<() => void> = [];
-    const jobs = [0, 1, 2, 3].map((id) => Effect.runPromise(governor.run(
-      Effect.callback<number>((resume) => {
-        started.push(id);
-        release.push(() => resume(Effect.succeed(id)));
-      }),
-    )));
+    const jobs = [0, 1, 2, 3].map((id) =>
+      Effect.runPromise(
+        governor.run(
+          Effect.callback<number>((resume) => {
+            started.push(id);
+            release.push(() => resume(Effect.succeed(id)));
+          }),
+        ),
+      ),
+    );
     await nextTurn();
     expect(started).toEqual([0, 1]);
     expect(governor.snapshot()).toMatchObject({ active: 2, queueDepth: 2 });
@@ -50,27 +56,33 @@ describe("fair seat governor", () => {
 
   it("releases capacity when queued and active work is interrupted", async () => {
     const governor = new FairGovernor(1);
-    await Effect.runPromise(Effect.gen(function*() {
-      const active = yield* Effect.forkChild(governor.run(Effect.never));
-      yield* Effect.yieldNow;
-      const queued = yield* Effect.forkChild(governor.run(Effect.never));
-      yield* Effect.yieldNow;
-      expect(governor.snapshot()).toMatchObject({ active: 1, queueDepth: 1 });
-      yield* Fiber.interrupt(queued);
-      yield* Fiber.interrupt(active);
-      expect(governor.snapshot()).toMatchObject({ active: 0, queueDepth: 0 });
-    }));
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const active = yield* Effect.forkChild(governor.run(Effect.never));
+        yield* Effect.yieldNow;
+        const queued = yield* Effect.forkChild(governor.run(Effect.never));
+        yield* Effect.yieldNow;
+        expect(governor.snapshot()).toMatchObject({ active: 1, queueDepth: 1 });
+        yield* Fiber.interrupt(queued);
+        yield* Fiber.interrupt(active);
+        expect(governor.snapshot()).toMatchObject({ active: 0, queueDepth: 0 });
+      }),
+    );
   });
 
   it("checks plan headroom at governor admission before starting work", async () => {
     const governor = new FairGovernor(1);
     let invoked = false;
-    await expect(Effect.runPromise(governor.run(
-      Effect.sync(() => {
-        invoked = true;
-      }),
-      Effect.fail(new Error("plan window exhausted")),
-    ))).rejects.toThrow("plan window exhausted");
+    await expect(
+      Effect.runPromise(
+        governor.run(
+          Effect.sync(() => {
+            invoked = true;
+          }),
+          Effect.fail(new Error("plan window exhausted")),
+        ),
+      ),
+    ).rejects.toThrow("plan window exhausted");
     expect(invoked).toBe(false);
     expect(governor.snapshot()).toMatchObject({ active: 0, queueDepth: 0 });
   });
@@ -80,29 +92,34 @@ describe("doctor guardrails", () => {
   it("checks tools, login, override trap, pings, then writes dev vars", async () => {
     const order: string[] = [];
     const probes: CliProbeRepositoryService = {
-      run: (program, arguments_): Effect.Effect<ProbeResult> => Effect.sync(() => {
-        order.push(`${program}:${arguments_.join(" ")}`);
-        return { ok: true, output: "ok", exitCode: 0 };
-      }),
+      run: (program, arguments_): Effect.Effect<ProbeResult> =>
+        Effect.sync(() => {
+          order.push(`${program}:${arguments_.join(" ")}`);
+          return { ok: true, output: "ok", exitCode: 0 };
+        }),
     };
     const writes: string[] = [];
     const writtenValues = new Map<string, Readonly<Record<string, string>>>();
     const devVars: DevVarsRepositoryService = {
       read: () => Effect.succeed({ values: {}, explicitKeys: new Set() }),
-      write: (filename, values) => Effect.sync(() => {
-        writes.push(filename);
-        writtenValues.set(filename, values);
-        expect(values.OPENAI_API_KEY).toBeUndefined();
-        expect(values.CODEX_API_KEY).toBeUndefined();
-        expect(values.ANTHROPIC_API_KEY).toBeUndefined();
-      }),
+      write: (filename, values) =>
+        Effect.sync(() => {
+          writes.push(filename);
+          writtenValues.set(filename, values);
+          expect(values.OPENAI_API_KEY).toBeUndefined();
+          expect(values.CODEX_API_KEY).toBeUndefined();
+          expect(values.ANTHROPIC_API_KEY).toBeUndefined();
+        }),
     };
     const doctor = new DoctorService(
       readConfig({}, "/tmp/stavka-maskirovka-doctor"),
       probes,
       devVars,
       "/repo",
-      (seat) => Effect.sync(() => { order.push(`ping:${seat}`); }),
+      (seat) =>
+        Effect.sync(() => {
+          order.push(`ping:${seat}`);
+        }),
       {
         OPENAI_API_KEY: "openai-secret-value",
         CODEX_API_KEY: "codex-secret-value",
@@ -163,13 +180,18 @@ describe("doctor guardrails", () => {
         write: () => Effect.void,
       },
       "/repo",
-      () => Effect.sync(() => { pings += 1; }),
+      () =>
+        Effect.sync(() => {
+          pings += 1;
+        }),
       {},
     );
     const report = await Effect.runPromise(doctor.run({ live: false, write: false }));
     expect(pings).toBe(0);
-    expect(report.checks
-      .filter((check) => check.id.endsWith("-ping"))
-      .every((check) => check.status === "skip")).toBe(true);
+    expect(
+      report.checks
+        .filter((check) => check.id.endsWith("-ping"))
+        .every((check) => check.status === "skip"),
+    ).toBe(true);
   });
 });

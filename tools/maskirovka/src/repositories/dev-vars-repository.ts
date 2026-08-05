@@ -34,27 +34,28 @@ const snapshotFrom = (content: string): DevVarsSnapshot => {
   }
   return {
     values,
-    explicitKeys: new Set(explicitLines.flatMap((line) => {
-      const match = line.match(/^([A-Z0-9_]+)=(.*)$/u);
-      if (!match?.[1] || match[2] === undefined) return [];
-      return replaceablePlaceholders.has(parseValue(match[2])) ? [] : [match[1]];
-    })),
+    explicitKeys: new Set(
+      explicitLines.flatMap((line) => {
+        const match = line.match(/^([A-Z0-9_]+)=(.*)$/u);
+        if (!match?.[1] || match[2] === undefined) return [];
+        return replaceablePlaceholders.has(parseValue(match[2])) ? [] : [match[1]];
+      }),
+    ),
   };
 };
 
 export interface DevVarsRepositoryService {
-  readonly read: (
-    filename: string,
-  ) => Effect.Effect<DevVarsSnapshot, GatewayError>;
+  readonly read: (filename: string) => Effect.Effect<DevVarsSnapshot, GatewayError>;
   readonly write: (
     filename: string,
     values: Readonly<Record<string, string>>,
   ) => Effect.Effect<void, GatewayError>;
 }
 
-export class DevVarsRepository extends Context.Service<DevVarsRepository, DevVarsRepositoryService>()(
-  "@stavka/maskirovka/DevVarsRepository",
-) {}
+export class DevVarsRepository extends Context.Service<
+  DevVarsRepository,
+  DevVarsRepositoryService
+>()("@stavka/maskirovka/DevVarsRepository") {}
 
 export class FileDevVarsRepository implements DevVarsRepositoryService {
   read(filename: string): Effect.Effect<DevVarsSnapshot, GatewayError> {
@@ -67,12 +68,13 @@ export class FileDevVarsRepository implements DevVarsRepositoryService {
           throw error;
         }
       },
-      catch: (cause) => new GatewayError(
-        500,
-        "DEV_VARS_REPOSITORY_FAILURE",
-        "Unable to read development variables",
-        [cause instanceof Error ? cause.message : "Unknown .dev.vars error"],
-      ),
+      catch: (cause) =>
+        new GatewayError(
+          500,
+          "DEV_VARS_REPOSITORY_FAILURE",
+          "Unable to read development variables",
+          [cause instanceof Error ? cause.message : "Unknown .dev.vars error"],
+        ),
     });
   }
 
@@ -95,12 +97,13 @@ export class FileDevVarsRepository implements DevVarsRepositoryService {
         const kept = operatorLines
           .filter((line) => {
             const match = line.match(/^([A-Z0-9_]+)=(.*)$/u);
-            return !match?.[1] ||
+            return (
+              !match?.[1] ||
               !Object.hasOwn(values, match[1]) ||
-              !replaceablePlaceholders.has(parseValue(match[2] ?? ""));
+              !replaceablePlaceholders.has(parseValue(match[2] ?? ""))
+            );
           })
-          .filter((line, index, lines) =>
-            line !== "" || (index > 0 && lines[index - 1] !== ""));
+          .filter((line, index, lines) => line !== "" || (index > 0 && lines[index - 1] !== ""));
         const generated = Object.entries(values)
           .filter(([key]) => !explicitKeys.has(key))
           .map(([key, value]) => `${key}=${JSON.stringify(value)}`);
@@ -110,15 +113,18 @@ export class FileDevVarsRepository implements DevVarsRepositoryService {
         await writeFile(temporary, content, { encoding: "utf8", mode: 0o600 });
         await rename(temporary, filename);
       },
-      catch: (cause) => new GatewayError(
-        500,
-        "DEV_VARS_REPOSITORY_FAILURE",
-        "Unable to write generated development variables",
-        [cause instanceof Error ? cause.message : "Unknown .dev.vars error"],
-      ),
+      catch: (cause) =>
+        new GatewayError(
+          500,
+          "DEV_VARS_REPOSITORY_FAILURE",
+          "Unable to write generated development variables",
+          [cause instanceof Error ? cause.message : "Unknown .dev.vars error"],
+        ),
     });
   }
 }
 
-export const DevVarsRepositoryLive: Layer.Layer<DevVarsRepository> =
-  Layer.succeed(DevVarsRepository, new FileDevVarsRepository());
+export const DevVarsRepositoryLive: Layer.Layer<DevVarsRepository> = Layer.succeed(
+  DevVarsRepository,
+  new FileDevVarsRepository(),
+);

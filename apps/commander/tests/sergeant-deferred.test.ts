@@ -5,11 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/config";
 
 const mocks = vi.hoisted(() => ({
-  startFiber: vi.fn<(
-    name: string,
-    work: (fiber: { stash: (snapshot: unknown) => void }) => Promise<void>,
-    options: unknown,
-  ) => Promise<{ status: string }>>(),
+  startFiber:
+    vi.fn<
+      (
+        name: string,
+        work: (fiber: { stash: (snapshot: unknown) => void }) => Promise<void>,
+        options: unknown,
+      ) => Promise<{ status: string }>
+    >(),
 }));
 
 vi.mock("agents", () => ({
@@ -57,15 +60,17 @@ const snapshot: GameSnapshot = {
     player_count: { friendly: 1, enemy: 1 },
   },
   objectives: [],
-  friendly_groups: [{
-    id: "alpha",
-    faction: "OPFOR",
-    template: "infantry",
-    position: [100, 0, 100],
-    strength: { current: 8, max: 8 },
-    behavior: "hold",
-    status: "engaged",
-  }],
+  friendly_groups: [
+    {
+      id: "alpha",
+      faction: "OPFOR",
+      template: "infantry",
+      position: [100, 0, 100],
+      strength: { current: 8, max: 8 },
+      behavior: "hold",
+      status: "engaged",
+    },
+  ],
   known_enemies: [],
   resources: {
     manpower: 100,
@@ -173,9 +178,9 @@ describe("deferred sergeant assessments", () => {
     expect(new Set(ids).size).toBe(3);
     expect(completed.map((assessment) => assessment.timestamp)).toEqual([102, 101, 103]);
     expect(agent.state.pendingWorkQueue).toHaveLength(3);
-    expect(agent.state.pendingWorkQueue.every((work) => work.completedAssessment !== undefined)).toBe(
-      true,
-    );
+    expect(
+      agent.state.pendingWorkQueue.every((work) => work.completedAssessment !== undefined),
+    ).toBe(true);
 
     await agent.acknowledgeAssessments(ids.slice(1, 2));
     const retained = await agent.listCompletedAssessments();
@@ -183,9 +188,7 @@ describe("deferred sergeant assessments", () => {
 
     await agent.acknowledgeAssessments(["unknown-assessment"]);
     expect(await agent.listCompletedAssessments()).toEqual(retained);
-    await agent.acknowledgeAssessments(
-      retained.map((assessment) => assessment.log.id),
-    );
+    await agent.acknowledgeAssessments(retained.map((assessment) => assessment.log.id));
     expect(await agent.listCompletedAssessments()).toEqual([]);
   });
 });

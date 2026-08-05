@@ -19,20 +19,21 @@ export const RestCommanderLinkCommandLifecycle = Schema.Struct({
   // The execution descriptor is kept alongside the result, rather than only
   // in memory, so a checkpoint/restart can continue observing an accepted
   // order without re-running it. Older v1 checkpoints legitimately lack it.
-  execution: Schema.optional(Schema.Union([
-    Schema.Struct({ kind: Schema.Literal("immediate") }),
-    Schema.Struct({
-      kind: Schema.Literal("waypoint"),
-      group_id: NonEmptyString,
-      waypoint_kind: Schema.Literals(["forced_move", "attack", "defend", "patrol", "sweep"]),
-      destination: Schema.Tuple([FiniteNumber, FiniteNumber, FiniteNumber]),
-      radius: NonNegativeFinite,
-      issued_at_tick: Natural,
-    }),
-  ])),
+  execution: Schema.optional(
+    Schema.Union([
+      Schema.Struct({ kind: Schema.Literal("immediate") }),
+      Schema.Struct({
+        kind: Schema.Literal("waypoint"),
+        group_id: NonEmptyString,
+        waypoint_kind: Schema.Literals(["forced_move", "attack", "defend", "patrol", "sweep"]),
+        destination: Schema.Tuple([FiniteNumber, FiniteNumber, FiniteNumber]),
+        radius: NonNegativeFinite,
+        issued_at_tick: Natural,
+      }),
+    ]),
+  ),
 });
-export type RestCommanderLinkCommandLifecycle =
-  typeof RestCommanderLinkCommandLifecycle.Type;
+export type RestCommanderLinkCommandLifecycle = typeof RestCommanderLinkCommandLifecycle.Type;
 
 export const RestCommanderLinkState = Schema.Struct({
   version: Schema.Literal(REST_COMMANDER_LINK_STATE_VERSION),

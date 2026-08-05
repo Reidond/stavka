@@ -38,21 +38,31 @@ const tick: TickRequest = {
     },
   },
   sergeant_reports: [],
-  events: [{
-    id: "evt_1",
-    type: "objective_changed",
-    timestamp: 119,
-    significance: "notable",
-    objective_id: "hill",
-    details: { from: "neutral", to: "enemy" },
-  }],
+  events: [
+    {
+      id: "evt_1",
+      type: "objective_changed",
+      timestamp: 119,
+      significance: "notable",
+      objective_id: "hill",
+      details: { from: "neutral", to: "enemy" },
+    },
+  ],
   command_results: [],
 };
 
 const hostWith = (rows: {
-  readonly ticks: readonly { readonly tick_id: number; readonly timestamp: number; readonly payload: string }[];
+  readonly ticks: readonly {
+    readonly tick_id: number;
+    readonly timestamp: number;
+    readonly payload: string;
+  }[];
   readonly events: readonly { readonly payload: string }[];
-  readonly snapshots: readonly { readonly tick_id: number; readonly timestamp: number; readonly payload: string }[];
+  readonly snapshots: readonly {
+    readonly tick_id: number;
+    readonly timestamp: number;
+    readonly payload: string;
+  }[];
 }): SqlRepositoryHost => ({
   sql: <T>(strings: TemplateStringsArray): T[] => {
     const query = strings.join("?");
@@ -82,10 +92,7 @@ class ArchiveHost implements SqlRepositoryHost {
   #events: EventRow[] = [];
   #snapshots: TickRow[] = [];
 
-  sql<T>(
-    strings: TemplateStringsArray,
-    ...values: (string | number | boolean | null)[]
-  ): T[] {
+  sql<T>(strings: TemplateStringsArray, ...values: (string | number | boolean | null)[]): T[] {
     const query = strings.join("?");
     if (query.includes("INSERT OR IGNORE INTO tick_history")) {
       const [tickId, timestamp, _kind, payload] = values as [number, number, string, string];
@@ -117,16 +124,18 @@ class ArchiveHost implements SqlRepositoryHost {
       const rows = query.includes("tick_history")
         ? this.#ticks
         : query.includes("event_history")
-        ? this.#events
-        : this.#snapshots;
-      return [{
-        high_water_rowid: rows.at(-1)?.rowid ?? 0,
-        total: rows.length,
-      }] as T[];
+          ? this.#events
+          : this.#snapshots;
+      return [
+        {
+          high_water_rowid: rows.at(-1)?.rowid ?? 0,
+          total: rows.length,
+        },
+      ] as T[];
     }
     if (query.includes("SELECT tick_id, timestamp, payload FROM tick_history")) {
       const highWater = values[0] as number;
-      const after = values.length > 2 ? values[1] as number : undefined;
+      const after = values.length > 2 ? (values[1] as number) : undefined;
       const limit = values.at(-1) as number;
       return this.#ticks
         .filter((row) => row.rowid <= highWater && (after === undefined || row.tick_id > after))
@@ -135,19 +144,24 @@ class ArchiveHost implements SqlRepositoryHost {
     }
     if (query.includes("SELECT id, timestamp, payload FROM event_history")) {
       const highWater = values[0] as number;
-      const timestamp = values.length > 2 ? values[1] as number : undefined;
-      const id = values.length > 4 ? values[3] as string : undefined;
+      const timestamp = values.length > 2 ? (values[1] as number) : undefined;
+      const id = values.length > 4 ? (values[3] as string) : undefined;
       const limit = values.at(-1) as number;
       return this.#events
         .filter((row) => row.rowid <= highWater)
-        .filter((row) => timestamp === undefined || id === undefined ||
-          row.timestamp > timestamp || (row.timestamp === timestamp && row.id > id))
+        .filter(
+          (row) =>
+            timestamp === undefined ||
+            id === undefined ||
+            row.timestamp > timestamp ||
+            (row.timestamp === timestamp && row.id > id),
+        )
         .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id))
         .slice(0, limit) as T[];
     }
     if (query.includes("SELECT tick_id, timestamp, payload FROM snapshot_history")) {
       const highWater = values[0] as number;
-      const after = values.length > 2 ? values[1] as number : undefined;
+      const after = values.length > 2 ? (values[1] as number) : undefined;
       const limit = values.at(-1) as number;
       return this.#snapshots
         .filter((row) => row.rowid <= highWater && (after === undefined || row.tick_id > after))
@@ -160,15 +174,19 @@ class ArchiveHost implements SqlRepositoryHost {
 
 describe("session archive repository", () => {
   it("decodes tick, event, and snapshot history at the repository boundary", async () => {
-    const repository = new SqlSessionArchiveRepository(hostWith({
-      ticks: [{ tick_id: 7, timestamp: 120, payload: JSON.stringify(tick) }],
-      events: [{ payload: JSON.stringify(tick.events[0]) }],
-      snapshots: [{
-        tick_id: 7,
-        timestamp: 120,
-        payload: JSON.stringify({ ...initialCommanderState(), snapshot: tick.snapshot }),
-      }],
-    }));
+    const repository = new SqlSessionArchiveRepository(
+      hostWith({
+        ticks: [{ tick_id: 7, timestamp: 120, payload: JSON.stringify(tick) }],
+        events: [{ payload: JSON.stringify(tick.events[0]) }],
+        snapshots: [
+          {
+            tick_id: 7,
+            timestamp: 120,
+            payload: JSON.stringify({ ...initialCommanderState(), snapshot: tick.snapshot }),
+          },
+        ],
+      }),
+    );
 
     const archive = await Effect.runPromise(repository.export(100));
 
@@ -182,11 +200,13 @@ describe("session archive repository", () => {
   });
 
   it("surfaces corrupted persisted JSON as a typed repository failure", async () => {
-    const repository = new SqlSessionArchiveRepository(hostWith({
-      ticks: [{ tick_id: 7, timestamp: 120, payload: "{not-json" }],
-      events: [],
-      snapshots: [],
-    }));
+    const repository = new SqlSessionArchiveRepository(
+      hostWith({
+        ticks: [{ tick_id: 7, timestamp: 120, payload: "{not-json" }],
+        events: [],
+        snapshots: [],
+      }),
+    );
 
     const failure = await Effect.runPromise(Effect.flip(repository.export(100)));
 
@@ -202,38 +222,46 @@ describe("session archive repository", () => {
       ...tick,
       tick_id: 8,
       timestamp: 121,
-      events: [{
-        ...tick.events[0]!,
-        id: "evt_2",
-        timestamp: 120,
-      }],
+      events: [
+        {
+          ...tick.events[0]!,
+          id: "evt_2",
+          timestamp: 120,
+        },
+      ],
     };
     await Effect.runPromise(repository.saveTick(first, state));
     await Effect.runPromise(repository.saveTick(second, state));
     const snapshot = await Effect.runPromise(repository.exportSnapshot);
 
-    await Effect.runPromise(repository.saveTick({
-      ...first,
-      timestamp: 999,
-      events: [{ ...first.events[0]!, timestamp: 999 }],
-    }, state));
-    await Effect.runPromise(repository.saveTick({
-      ...first,
-      tick_id: 1,
-      timestamp: 1,
-      events: [{ ...first.events[0]!, id: "evt_late", timestamp: 1 }],
-    }, state));
+    await Effect.runPromise(
+      repository.saveTick(
+        {
+          ...first,
+          timestamp: 999,
+          events: [{ ...first.events[0]!, timestamp: 999 }],
+        },
+        state,
+      ),
+    );
+    await Effect.runPromise(
+      repository.saveTick(
+        {
+          ...first,
+          tick_id: 1,
+          timestamp: 1,
+          events: [{ ...first.events[0]!, id: "evt_late", timestamp: 1 }],
+        },
+        state,
+      ),
+    );
 
-    const firstPage = await Effect.runPromise(repository.pageFromSnapshot(
-      snapshot,
-      initialSessionArchiveExportCursor(),
-      1,
-    ));
-    const secondPage = await Effect.runPromise(repository.pageFromSnapshot(
-      snapshot,
-      firstPage.cursor,
-      1,
-    ));
+    const firstPage = await Effect.runPromise(
+      repository.pageFromSnapshot(snapshot, initialSessionArchiveExportCursor(), 1),
+    );
+    const secondPage = await Effect.runPromise(
+      repository.pageFromSnapshot(snapshot, firstPage.cursor, 1),
+    );
 
     expect(snapshot.counts).toEqual({ ticks: 2, events: 2, snapshots: 2 });
     expect(firstPage.archive.ticks.map(({ tickId }) => tickId)).toEqual([7]);

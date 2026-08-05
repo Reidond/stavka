@@ -13,8 +13,12 @@ export class FairGovernor {
   private queued = 0;
   private readonly semaphore: Semaphore.Semaphore;
 
-  constructor(private readonly concurrency: number, private readonly maxQueue = 1_000) {
-    if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be positive");
+  constructor(
+    private readonly concurrency: number,
+    private readonly maxQueue = 1_000,
+  ) {
+    if (!Number.isInteger(concurrency) || concurrency < 1)
+      throw new Error("concurrency must be positive");
     this.semaphore = Semaphore.makeUnsafe(concurrency);
   }
 
@@ -28,11 +32,7 @@ export class FairGovernor {
   ): Effect.Effect<A, E | E2 | GatewayError, R | R2> {
     return Effect.suspend<A, E | E2 | GatewayError, R | R2>(() => {
       if (this.queued >= this.maxQueue) {
-        return Effect.fail(new GatewayError(
-          503,
-          "SEAT_QUEUE_FULL",
-          "Seat queue is full",
-        ));
+        return Effect.fail(new GatewayError(503, "SEAT_QUEUE_FULL", "Seat queue is full"));
       }
 
       let acquired = false;
@@ -44,15 +44,19 @@ export class FairGovernor {
       }).pipe(
         Effect.andThen(admission),
         Effect.andThen(task),
-        Effect.ensuring(Effect.sync(() => {
-          this.active -= 1;
-        })),
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.active -= 1;
+          }),
+        ),
       );
 
       return this.semaphore.withPermit(guarded).pipe(
-        Effect.ensuring(Effect.sync(() => {
-          if (!acquired) this.queued -= 1;
-        })),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (!acquired) this.queued -= 1;
+          }),
+        ),
       );
     });
   }

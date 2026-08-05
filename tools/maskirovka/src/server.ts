@@ -16,19 +16,22 @@ export const MaskirovkaServerLive = (
   config: MaskirovkaConfig,
   service: GatewayService,
   evaluate: () => Server = createServer,
-) => HttpRouter.serve(
-  createMaskirovkaApp({
-    config,
-    service,
-    assets: new FileStaticAssetRepository(config.dashboardDirectory),
-  }),
-  routerOptions,
-).pipe(
-  Layer.provide(NodeHttpServer.layer(evaluate, {
-    host: config.host,
-    port: config.port,
-  })),
-);
+) =>
+  HttpRouter.serve(
+    createMaskirovkaApp({
+      config,
+      service,
+      assets: new FileStaticAssetRepository(config.dashboardDirectory),
+    }),
+    routerOptions,
+  ).pipe(
+    Layer.provide(
+      NodeHttpServer.layer(evaluate, {
+        host: config.host,
+        port: config.port,
+      }),
+    ),
+  );
 
 export const serveMaskirovka = (
   config: MaskirovkaConfig,
@@ -49,11 +52,12 @@ const awaitListening = (server: Server): Effect.Effect<void> =>
 export const startServer = (
   config: MaskirovkaConfig,
   service: GatewayService,
-): Effect.Effect<Server, never, Scope.Scope> => Effect.gen(function*() {
-  const server = createServer();
-  yield* Layer.launch(MaskirovkaServerLive(config, service, () => server)).pipe(
-    Effect.forkScoped,
-  );
-  yield* awaitListening(server);
-  return server;
-});
+): Effect.Effect<Server, never, Scope.Scope> =>
+  Effect.gen(function* () {
+    const server = createServer();
+    yield* Layer.launch(MaskirovkaServerLive(config, service, () => server)).pipe(
+      Effect.forkScoped,
+    );
+    yield* awaitListening(server);
+    return server;
+  });

@@ -160,11 +160,13 @@ describe("R2 session export repository", () => {
     const written = await Effect.runPromise(
       repository.write(data, { exportedAt: 1_775_131_200_000 }),
     );
-    const listed = await Effect.runPromise(repository.list({
-      sessionId: "session-1",
-      faction: "OPFOR",
-      missionEpoch: 3,
-    }));
+    const listed = await Effect.runPromise(
+      repository.list({
+        sessionId: "session-1",
+        faction: "OPFOR",
+        missionEpoch: 3,
+      }),
+    );
     const downloaded = await Effect.runPromise(repository.readPage(written.key));
 
     expect(listed).toEqual({ exports: [written] });
@@ -200,13 +202,17 @@ describe("R2 session export repository", () => {
     const repository = new R2SessionExportRepository(bucket);
     const data = makeExport("incremental-session", "BLUFOR", 12);
     const options = { exportedAt: 1_775_131_200_000, id: "incremental" } as const;
-    const lease = pendingLease(await Effect.runPromise(repository.begin(headerOf(data), options, 2)));
+    const lease = pendingLease(
+      await Effect.runPromise(repository.begin(headerOf(data), options, 2)),
+    );
 
     const first = await Effect.runPromise(repository.writePage(lease, 0, page(0)));
-    const second = await Effect.runPromise(repository.writePage(lease, 1, {
-      ...page(1),
-      events: [event(1), event(2), event(3)],
-    }));
+    const second = await Effect.runPromise(
+      repository.writePage(lease, 1, {
+        ...page(1),
+        events: [event(1), event(2), event(3)],
+      }),
+    );
     const completed = await Effect.runPromise(repository.complete(lease, [first, second]));
     const firstDownload = await Effect.runPromise(repository.readPage(completed.key));
     const secondDownload = await Effect.runPromise(
@@ -226,11 +232,11 @@ describe("R2 session export repository", () => {
     const bucket = new FakeR2Bucket();
     const repository = new R2SessionExportRepository(bucket);
     const data = makeExport("empty-incremental-session");
-    const lease = pendingLease(await Effect.runPromise(repository.begin(
-      headerOf(data),
-      { exportedAt: 1_775_131_200_000, id: "empty" },
-      0,
-    )));
+    const lease = pendingLease(
+      await Effect.runPromise(
+        repository.begin(headerOf(data), { exportedAt: 1_775_131_200_000, id: "empty" }, 0),
+      ),
+    );
 
     const completed = await Effect.runPromise(repository.complete(lease, []));
     const downloaded = await Effect.runPromise(repository.readPage(completed.key));
@@ -264,7 +270,9 @@ describe("R2 session export repository", () => {
     const repository = new R2SessionExportRepository(bucket);
     const data = makeExport("idempotent-session");
     const options = { exportedAt: 1_775_131_200_000, id: "stable-export" } as const;
-    const lease = pendingLease(await Effect.runPromise(repository.begin(headerOf(data), options, 1)));
+    const lease = pendingLease(
+      await Effect.runPromise(repository.begin(headerOf(data), options, 1)),
+    );
     const descriptor = await Effect.runPromise(repository.writePage(lease, 0, page(0)));
 
     const conflicting = await Effect.runPromise(
@@ -274,10 +282,15 @@ describe("R2 session export repository", () => {
     expect(bucket.putKeys).toHaveLength(2); // reservation + one page, no competing page write
 
     const published = await Effect.runPromise(repository.complete(lease, [descriptor]));
-    const retried = await Effect.runPromise(repository.write({
-      ...data,
-      archive: { ...data.archive, events: [event(99)] },
-    }, { exportedAt: 1_775_131_200_999, id: "stable-export" }));
+    const retried = await Effect.runPromise(
+      repository.write(
+        {
+          ...data,
+          archive: { ...data.archive, events: [event(99)] },
+        },
+        { exportedAt: 1_775_131_200_999, id: "stable-export" },
+      ),
+    );
 
     expect(retried).toEqual(published);
     expect(bucket.putKeys.filter((key) => key === published.key)).toHaveLength(1);
@@ -296,7 +309,9 @@ describe("R2 session export repository", () => {
       inlineStored.body.replace("inline-corruption", "inline-corruptioX"),
       inlineStored.metadata.customMetadata ?? {},
     );
-    const inlineFailure = await Effect.runPromise(Effect.flip(inlineRepository.readPage(inline.key)));
+    const inlineFailure = await Effect.runPromise(
+      Effect.flip(inlineRepository.readPage(inline.key)),
+    );
     if (!(inlineFailure instanceof SessionExportRepositoryError)) throw inlineFailure;
     expect(inlineFailure.operation).toBe("decode");
     expect(String(inlineFailure.cause)).toContain("checksum");
@@ -305,13 +320,15 @@ describe("R2 session export repository", () => {
     const repository = new R2SessionExportRepository(bucket);
     const data = makeExport("manifest-corruption");
     const options = { exportedAt: 1_775_131_200_000, id: "manifest" } as const;
-    const lease = pendingLease(await Effect.runPromise(repository.begin(headerOf(data), options, 1)));
+    const lease = pendingLease(
+      await Effect.runPromise(repository.begin(headerOf(data), options, 1)),
+    );
     const descriptor = await Effect.runPromise(repository.writePage(lease, 0, page(0)));
     const chunked = await Effect.runPromise(repository.complete(lease, [descriptor]));
     const manifest = bucket.objects.get(chunked.key);
     if (manifest === undefined) throw new Error("Expected manifest");
     const altered = JSON.stringify({
-      ...JSON.parse(manifest.body) as Record<string, unknown>,
+      ...(JSON.parse(manifest.body) as Record<string, unknown>),
       header: { ...headerOf(makeExport("changed-header")) },
     });
     const customMetadata = manifest.metadata.customMetadata;
@@ -347,14 +364,18 @@ describe("R2 session export repository", () => {
 
     const bucket = new FakeR2Bucket();
     const repository = new R2SessionExportRepository(bucket);
-    const first = await Effect.runPromise(repository.write(
-      makeExport(fullWidth, composed, 4),
-      { exportedAt: 1_775_131_200_000, id: "unicode" },
-    ));
-    const second = await Effect.runPromise(repository.write(
-      makeExport(ascii, decomposed, 4),
-      { exportedAt: 1_775_131_200_000, id: "unicode" },
-    ));
+    const first = await Effect.runPromise(
+      repository.write(makeExport(fullWidth, composed, 4), {
+        exportedAt: 1_775_131_200_000,
+        id: "unicode",
+      }),
+    );
+    const second = await Effect.runPromise(
+      repository.write(makeExport(ascii, decomposed, 4), {
+        exportedAt: 1_775_131_200_000,
+        id: "unicode",
+      }),
+    );
     expect(first.key).not.toBe(second.key);
     expect(first.key).not.toContain("../");
   });
@@ -384,20 +405,24 @@ describe("R2 session export repository", () => {
       });
     }
 
-    const first = await Effect.runPromise(repository.list({
-      sessionId: base.session.session_id,
-      faction: base.session.faction,
-      missionEpoch: 1,
-      limit: 1_000,
-    }));
+    const first = await Effect.runPromise(
+      repository.list({
+        sessionId: base.session.session_id,
+        faction: base.session.faction,
+        missionEpoch: 1,
+        limit: 1_000,
+      }),
+    );
     if (first.cursor === undefined) throw new Error("Expected a continuation cursor");
-    const second = await Effect.runPromise(repository.list({
-      sessionId: base.session.session_id,
-      faction: base.session.faction,
-      missionEpoch: 1,
-      limit: 1_000,
-      cursor: first.cursor,
-    }));
+    const second = await Effect.runPromise(
+      repository.list({
+        sessionId: base.session.session_id,
+        faction: base.session.faction,
+        missionEpoch: 1,
+        limit: 1_000,
+        cursor: first.cursor,
+      }),
+    );
 
     expect(first.exports).toHaveLength(1_000);
     expect(first.cursor).toBeDefined();

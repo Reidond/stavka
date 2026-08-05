@@ -20,20 +20,27 @@ const limits = {
 
 describe("durable plan headroom and accounting", () => {
   it("refuses unbounded subscription admission when no positive plan limit is configured", async () => {
-    const tracker = new WindowTracker({
-      claudeMonthlyCreditUsd: 0,
-      codexWindowCalls: 0,
-      codexWindowTokens: 0,
-      codexWindowMs: fiveHours,
-    }, new MemoryWindowTrackerRepository());
+    const tracker = new WindowTracker(
+      {
+        claudeMonthlyCreditUsd: 0,
+        codexWindowCalls: 0,
+        codexWindowTokens: 0,
+        codexWindowMs: fiveHours,
+      },
+      new MemoryWindowTrackerRepository(),
+    );
     await Effect.runPromise(tracker.initialize());
 
     for (const seat of ["claude", "codex"] as const) {
-      await expect(Effect.runPromise(tracker.reserve({
-        seat,
-        tier: "stavka/sergeant",
-        expectedUsage: { inputTokens: 10, outputTokens: 10 },
-      }))).rejects.toMatchObject({ code: "SEAT_PLAN_LIMIT_REQUIRED", status: 503 });
+      await expect(
+        Effect.runPromise(
+          tracker.reserve({
+            seat,
+            tier: "stavka/sergeant",
+            expectedUsage: { inputTokens: 10, outputTokens: 10 },
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "SEAT_PLAN_LIMIT_REQUIRED", status: 503 });
       expect(tracker.isExhausted(seat)).toBe(true);
     }
   });
@@ -41,15 +48,17 @@ describe("durable plan headroom and accounting", () => {
   it("separates subscription plan credit from metered cash and savings", async () => {
     const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
     await Effect.runPromise(tracker.initialize());
-    await Effect.runPromise(tracker.record({
-      seat: "claude",
-      tier: "stavka/commander",
-      usage: { inputTokens: 1_000, outputTokens: 100 },
-      cacheHit: false,
-      actualCostUsd: 0,
-      planCreditUsd: 0.25,
-      at: Date.UTC(2026, 0, 10),
-    }));
+    await Effect.runPromise(
+      tracker.record({
+        seat: "claude",
+        tier: "stavka/commander",
+        usage: { inputTokens: 1_000, outputTokens: 100 },
+        cacheHit: false,
+        actualCostUsd: 0,
+        planCreditUsd: 0.25,
+        at: Date.UTC(2026, 0, 10),
+      }),
+    );
     expect(tracker.snapshot()).toMatchObject({
       actualCostUsd: 0,
       planCreditUsd: 0.25,
@@ -65,22 +74,26 @@ describe("durable plan headroom and accounting", () => {
       const repository = new FileWindowTrackerRepository(join(directory, "usage.json"));
       const first = new WindowTracker(limits, repository);
       await Effect.runPromise(first.initialize());
-      await Effect.runPromise(first.record({
-        seat: "api",
-        tier: "stavka/sergeant",
-        usage: { inputTokens: 100, outputTokens: 20 },
-        cacheHit: false,
-        actualCostUsd: 0.001,
-        planCreditUsd: 0,
-        at: Date.UTC(2026, 0, 10),
-      }));
+      await Effect.runPromise(
+        first.record({
+          seat: "api",
+          tier: "stavka/sergeant",
+          usage: { inputTokens: 100, outputTokens: 20 },
+          cacheHit: false,
+          actualCostUsd: 0.001,
+          planCreditUsd: 0,
+          at: Date.UTC(2026, 0, 10),
+        }),
+      );
       const reservationAt = Date.now();
-      const reservation = await Effect.runPromise(first.reserve({
-        seat: "codex",
-        tier: "stavka/sergeant",
-        expectedUsage: { inputTokens: 10, outputTokens: 20 },
-        at: reservationAt,
-      }));
+      const reservation = await Effect.runPromise(
+        first.reserve({
+          seat: "codex",
+          tier: "stavka/sergeant",
+          expectedUsage: { inputTokens: 10, outputTokens: 20 },
+          at: reservationAt,
+        }),
+      );
 
       const restored = new WindowTracker(limits, repository);
       await Effect.runPromise(restored.initialize());
@@ -107,15 +120,17 @@ describe("durable plan headroom and accounting", () => {
     const at = Date.UTC(2026, 0, 10);
     const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
     await Effect.runPromise(tracker.initialize());
-    await Effect.runPromise(tracker.record({
-      seat: "codex",
-      tier: "stavka/sergeant",
-      usage: { inputTokens: 40, outputTokens: 10 },
-      cacheHit: false,
-      actualCostUsd: 0,
-      planCreditUsd: 0.001,
-      at,
-    }));
+    await Effect.runPromise(
+      tracker.record({
+        seat: "codex",
+        tier: "stavka/sergeant",
+        usage: { inputTokens: 40, outputTokens: 10 },
+        cacheHit: false,
+        actualCostUsd: 0,
+        planCreditUsd: 0.001,
+        at,
+      }),
+    );
     await expect(Effect.runPromise(tracker.admit("codex", at + 1))).rejects.toMatchObject({
       status: 429,
       code: "SEAT_PLAN_WINDOW_EXHAUSTED",
@@ -127,7 +142,9 @@ describe("durable plan headroom and accounting", () => {
       remainingTokens: 50,
     });
 
-    await expect(Effect.runPromise(tracker.admit("codex", at + fiveHours + 1))).resolves.toBeUndefined();
+    await expect(
+      Effect.runPromise(tracker.admit("codex", at + fiveHours + 1)),
+    ).resolves.toBeUndefined();
     expect(tracker.headroom("codex", at + fiveHours + 1)).toMatchObject({
       remainingCalls: 1,
       remainingTokens: 100,
@@ -139,15 +156,17 @@ describe("durable plan headroom and accounting", () => {
     const february = Date.UTC(2026, 1, 1, 0, 1);
     const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
     await Effect.runPromise(tracker.initialize());
-    await Effect.runPromise(tracker.record({
-      seat: "claude",
-      tier: "stavka/commander",
-      usage: { inputTokens: 1, outputTokens: 1 },
-      cacheHit: false,
-      actualCostUsd: 0,
-      planCreditUsd: 1,
-      at: january,
-    }));
+    await Effect.runPromise(
+      tracker.record({
+        seat: "claude",
+        tier: "stavka/commander",
+        usage: { inputTokens: 1, outputTokens: 1 },
+        cacheHit: false,
+        actualCostUsd: 0,
+        planCreditUsd: 1,
+        at: january,
+      }),
+    );
     await expect(Effect.runPromise(tracker.admit("claude", january))).rejects.toMatchObject({
       code: "SEAT_PLAN_WINDOW_EXHAUSTED",
     });
@@ -162,15 +181,19 @@ describe("durable plan headroom and accounting", () => {
     const at = Date.UTC(2026, 0, 10);
     const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
     await Effect.runPromise(tracker.initialize());
-    const reserve = tracker.reserve({
-      seat: "codex",
-      tier: "stavka/sergeant",
-      expectedUsage: { inputTokens: 10, outputTokens: 20 },
-      at,
-    }).pipe(Effect.result);
-    const outcomes = await Effect.runPromise(Effect.all([reserve, reserve], {
-      concurrency: "unbounded",
-    }));
+    const reserve = tracker
+      .reserve({
+        seat: "codex",
+        tier: "stavka/sergeant",
+        expectedUsage: { inputTokens: 10, outputTokens: 20 },
+        at,
+      })
+      .pipe(Effect.result);
+    const outcomes = await Effect.runPromise(
+      Effect.all([reserve, reserve], {
+        concurrency: "unbounded",
+      }),
+    );
     expect(outcomes.filter((outcome) => outcome._tag === "Success")).toHaveLength(1);
     expect(outcomes.filter((outcome) => outcome._tag === "Failure")).toHaveLength(1);
     expect(tracker.headroom("codex", at)).toMatchObject({
@@ -180,36 +203,44 @@ describe("durable plan headroom and accounting", () => {
     const admitted = outcomes.find((outcome) => outcome._tag === "Success");
     if (admitted?._tag !== "Success") throw new Error("reservation was not admitted");
     await Effect.runPromise(tracker.refund(admitted.success));
-    await expect(Effect.runPromise(tracker.reserve({
-      seat: "codex",
-      tier: "stavka/sergeant",
-      expectedUsage: { inputTokens: 10, outputTokens: 20 },
-      at,
-    }))).resolves.toMatchObject({ seat: "codex" });
-  });
-
-  it("refunds an in-flight reservation when the owning fiber is cancelled", async () => {
-    const at = Date.UTC(2026, 0, 10);
-    const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
-    await Effect.runPromise(tracker.initialize());
-    await Effect.runPromise(Effect.gen(function*() {
-      const fiber = yield* Effect.forkChild(Effect.acquireUseRelease(
+    await expect(
+      Effect.runPromise(
         tracker.reserve({
           seat: "codex",
           tier: "stavka/sergeant",
           expectedUsage: { inputTokens: 10, outputTokens: 20 },
           at,
         }),
-        () => Effect.never,
-        (reservation) => tracker.refund(reservation),
-      ));
-      yield* Effect.yieldNow;
-      expect(tracker.headroom("codex", at)).toMatchObject({ remainingCalls: 0 });
-      yield* Fiber.interrupt(fiber);
-      expect(tracker.headroom("codex", at)).toMatchObject({
-        remainingCalls: 1,
-        remainingTokens: 100,
-      });
-    }));
+      ),
+    ).resolves.toMatchObject({ seat: "codex" });
+  });
+
+  it("refunds an in-flight reservation when the owning fiber is cancelled", async () => {
+    const at = Date.UTC(2026, 0, 10);
+    const tracker = new WindowTracker(limits, new MemoryWindowTrackerRepository());
+    await Effect.runPromise(tracker.initialize());
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(
+          Effect.acquireUseRelease(
+            tracker.reserve({
+              seat: "codex",
+              tier: "stavka/sergeant",
+              expectedUsage: { inputTokens: 10, outputTokens: 20 },
+              at,
+            }),
+            () => Effect.never,
+            (reservation) => tracker.refund(reservation),
+          ),
+        );
+        yield* Effect.yieldNow;
+        expect(tracker.headroom("codex", at)).toMatchObject({ remainingCalls: 0 });
+        yield* Fiber.interrupt(fiber);
+        expect(tracker.headroom("codex", at)).toMatchObject({
+          remainingCalls: 1,
+          remainingTokens: 100,
+        });
+      }),
+    );
   });
 });

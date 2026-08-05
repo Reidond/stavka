@@ -38,12 +38,8 @@ const SearchSchema = Schema.Struct({
   scenario: Schema.Literals(["movement", "engagement", "mechanized"]).pipe(
     Schema.withDecodingDefaultType(Effect.succeed("engagement")),
   ),
-  seed: SearchSeed.pipe(
-    Schema.withDecodingDefaultType(Effect.succeed(12)),
-  ),
-  time_scale: SearchTimeScale.pipe(
-    Schema.withDecodingDefaultType(Effect.succeed(10)),
-  ),
+  seed: SearchSeed.pipe(Schema.withDecodingDefaultType(Effect.succeed(12))),
+  time_scale: SearchTimeScale.pipe(Schema.withDecodingDefaultType(Effect.succeed(10))),
   camera: Schema.Literals(["ortho", "perspective"]).pipe(
     Schema.withDecodingDefaultType(Effect.succeed("ortho")),
   ),

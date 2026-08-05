@@ -86,11 +86,9 @@ const apiRatesPerMillion: Readonly<Record<TierAlias, { input: number; output: nu
   "stavka/heavy": { input: 2.5, output: 15 },
 };
 
-const nonNegative = (value: number): number =>
-  Number.isFinite(value) ? Math.max(0, value) : 0;
+const nonNegative = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
-const nonNegativeInteger = (value: number): number =>
-  Math.floor(nonNegative(value));
+const nonNegativeInteger = (value: number): number => Math.floor(nonNegative(value));
 
 const persistedFailureCodes = new Set([
   "API_SEAT_FAILURE",
@@ -139,25 +137,29 @@ export class WindowTracker {
   }
 
   initialize(): Effect.Effect<void, GatewayError> {
-    return this.persistence.withPermit(Effect.gen({ self: this }, function*() {
-      const persisted = yield* this.repository.load();
-      if (persisted === undefined) return;
-      this.restore(persisted);
-      const before = this.reservations.length;
-      this.prune(yield* Clock.currentTimeMillis);
-      if (this.reservations.length !== before) yield* this.repository.save(this.persisted());
-    }));
+    return this.persistence.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const persisted = yield* this.repository.load();
+        if (persisted === undefined) return;
+        this.restore(persisted);
+        const before = this.reservations.length;
+        this.prune(yield* Clock.currentTimeMillis);
+        if (this.reservations.length !== before) yield* this.repository.save(this.persisted());
+      }),
+    );
   }
 
   record(input: UsageAccountingInput): Effect.Effect<UsageAccountingResult, GatewayError> {
-    return this.persistence.withPermit(Effect.gen({ self: this }, function*() {
-      const previous = this.persisted();
-      const result = this.applyRecord(input, input.at ?? (yield* Clock.currentTimeMillis));
-      yield* this.repository.save(this.persisted()).pipe(
-        Effect.tapError(() => Effect.sync(() => this.restore(previous))),
-      );
-      return result;
-    }));
+    return this.persistence.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const previous = this.persisted();
+        const result = this.applyRecord(input, input.at ?? (yield* Clock.currentTimeMillis));
+        yield* this.repository
+          .save(this.persisted())
+          .pipe(Effect.tapError(() => Effect.sync(() => this.restore(previous))));
+        return result;
+      }),
+    );
   }
 
   reserve(input: {
@@ -168,126 +170,143 @@ export class WindowTracker {
     readonly at?: number;
     readonly ttlMs?: number;
   }): Effect.Effect<PlanReservation, GatewayError> {
-    return this.persistence.withPermit(Effect.gen({ self: this }, function*() {
-      const at = input.at ?? (yield* Clock.currentTimeMillis);
-      const previous = this.persisted();
-      this.prune(at);
-      const expectedTokens = Math.max(
-        1,
-        nonNegativeInteger(input.expectedUsage.inputTokens) +
-          nonNegativeInteger(input.expectedUsage.outputTokens),
-      );
-      const expectedPlanCreditUsd = nonNegative(
-        input.expectedPlanCreditUsd ?? estimateApiListCost(input.tier, input.expectedUsage),
-      );
-      if (!this.hasConfiguredPlanLimit(input.seat)) {
-        return yield* Effect.fail(new GatewayError(
-          503,
-          "SEAT_PLAN_LIMIT_REQUIRED",
-          input.seat === "claude"
-            ? "Claude admission requires a positive monthly plan-credit limit"
-            : "Codex admission requires a positive rolling call or token limit",
-        ));
-      }
-      if (input.seat === "claude" && this.limits.claudeMonthlyCreditUsd > 0) {
-        const reserved = this.reservations
-          .filter((reservation) =>
-            reservation.seat === "claude" && this.monthKey(reservation.at) === this.monthKey(at))
-          .reduce((total, reservation) => total + reservation.expectedPlanCreditUsd, 0);
-        const projected = this.monthlySeatUsage("claude", at) + reserved + expectedPlanCreditUsd;
-        if (projected > this.limits.claudeMonthlyCreditUsd) {
-          return yield* Effect.fail(this.exhaustedError("claude", this.headroom("claude", at)));
+    return this.persistence.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const at = input.at ?? (yield* Clock.currentTimeMillis);
+        const previous = this.persisted();
+        this.prune(at);
+        const expectedTokens = Math.max(
+          1,
+          nonNegativeInteger(input.expectedUsage.inputTokens) +
+            nonNegativeInteger(input.expectedUsage.outputTokens),
+        );
+        const expectedPlanCreditUsd = nonNegative(
+          input.expectedPlanCreditUsd ?? estimateApiListCost(input.tier, input.expectedUsage),
+        );
+        if (!this.hasConfiguredPlanLimit(input.seat)) {
+          return yield* Effect.fail(
+            new GatewayError(
+              503,
+              "SEAT_PLAN_LIMIT_REQUIRED",
+              input.seat === "claude"
+                ? "Claude admission requires a positive monthly plan-credit limit"
+                : "Codex admission requires a positive rolling call or token limit",
+            ),
+          );
         }
-      }
-      if (input.seat === "codex") {
-        const window = this.seatWindow("codex", at);
-        const reserved = this.reservations.filter((reservation) => reservation.seat === "codex");
-        const projectedCalls = window.calls + reserved.length + 1;
-        const projectedTokens = window.tokens +
-          reserved.reduce((total, reservation) => total + reservation.expectedTokens, 0) +
-          expectedTokens;
-        if (
-          (this.limits.codexWindowCalls > 0 && projectedCalls > this.limits.codexWindowCalls) ||
-          (this.limits.codexWindowTokens > 0 && projectedTokens > this.limits.codexWindowTokens)
-        ) {
-          return yield* Effect.fail(this.exhaustedError("codex", this.headroom("codex", at)));
+        if (input.seat === "claude" && this.limits.claudeMonthlyCreditUsd > 0) {
+          const reserved = this.reservations
+            .filter(
+              (reservation) =>
+                reservation.seat === "claude" &&
+                this.monthKey(reservation.at) === this.monthKey(at),
+            )
+            .reduce((total, reservation) => total + reservation.expectedPlanCreditUsd, 0);
+          const projected = this.monthlySeatUsage("claude", at) + reserved + expectedPlanCreditUsd;
+          if (projected > this.limits.claudeMonthlyCreditUsd) {
+            return yield* Effect.fail(this.exhaustedError("claude", this.headroom("claude", at)));
+          }
         }
-      }
-      const reservation: PlanReservation = {
-        id: `reservation_${crypto.randomUUID()}`,
-        seat: input.seat,
-        at,
-        expiresAt: at + Math.max(1_000, input.ttlMs ?? 10 * 60 * 1_000),
-        expectedTokens,
-        expectedPlanCreditUsd,
-      };
-      this.reservations.push(reservation);
-      yield* this.repository.save(this.persisted()).pipe(
-        Effect.tapError(() => Effect.sync(() => this.restore(previous))),
-      );
-      return reservation;
-    }));
+        if (input.seat === "codex") {
+          const window = this.seatWindow("codex", at);
+          const reserved = this.reservations.filter((reservation) => reservation.seat === "codex");
+          const projectedCalls = window.calls + reserved.length + 1;
+          const projectedTokens =
+            window.tokens +
+            reserved.reduce((total, reservation) => total + reservation.expectedTokens, 0) +
+            expectedTokens;
+          if (
+            (this.limits.codexWindowCalls > 0 && projectedCalls > this.limits.codexWindowCalls) ||
+            (this.limits.codexWindowTokens > 0 && projectedTokens > this.limits.codexWindowTokens)
+          ) {
+            return yield* Effect.fail(this.exhaustedError("codex", this.headroom("codex", at)));
+          }
+        }
+        const reservation: PlanReservation = {
+          id: `reservation_${crypto.randomUUID()}`,
+          seat: input.seat,
+          at,
+          expiresAt: at + Math.max(1_000, input.ttlMs ?? 10 * 60 * 1_000),
+          expectedTokens,
+          expectedPlanCreditUsd,
+        };
+        this.reservations.push(reservation);
+        yield* this.repository
+          .save(this.persisted())
+          .pipe(Effect.tapError(() => Effect.sync(() => this.restore(previous))));
+        return reservation;
+      }),
+    );
   }
 
   reconcile(
     reservation: PlanReservation,
     input: UsageAccountingInput,
   ): Effect.Effect<UsageAccountingResult, GatewayError> {
-    return this.persistence.withPermit(Effect.gen({ self: this }, function*() {
-      const previous = this.persisted();
-      const index = this.reservations.findIndex((candidate) => candidate.id === reservation.id);
-      if (index < 0) {
-        return yield* Effect.fail(new GatewayError(
-          500,
-          "PLAN_RESERVATION_MISSING",
-          `Usage reservation ${reservation.id} is no longer active`,
-        ));
-      }
-      if (input.seat !== reservation.seat) {
-        return yield* Effect.fail(new GatewayError(
-          500,
-          "PLAN_RESERVATION_SEAT_MISMATCH",
-          `Usage reservation ${reservation.id} belongs to ${reservation.seat}, not ${input.seat}`,
-        ));
-      }
-      this.reservations.splice(index, 1);
-      const result = this.applyRecord(input, input.at ?? (yield* Clock.currentTimeMillis));
-      yield* this.repository.save(this.persisted()).pipe(
-        Effect.tapError(() => Effect.sync(() => this.restore(previous))),
-      );
-      return result;
-    }));
+    return this.persistence.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const previous = this.persisted();
+        const index = this.reservations.findIndex((candidate) => candidate.id === reservation.id);
+        if (index < 0) {
+          return yield* Effect.fail(
+            new GatewayError(
+              500,
+              "PLAN_RESERVATION_MISSING",
+              `Usage reservation ${reservation.id} is no longer active`,
+            ),
+          );
+        }
+        if (input.seat !== reservation.seat) {
+          return yield* Effect.fail(
+            new GatewayError(
+              500,
+              "PLAN_RESERVATION_SEAT_MISMATCH",
+              `Usage reservation ${reservation.id} belongs to ${reservation.seat}, not ${input.seat}`,
+            ),
+          );
+        }
+        this.reservations.splice(index, 1);
+        const result = this.applyRecord(input, input.at ?? (yield* Clock.currentTimeMillis));
+        yield* this.repository
+          .save(this.persisted())
+          .pipe(Effect.tapError(() => Effect.sync(() => this.restore(previous))));
+        return result;
+      }),
+    );
   }
 
   refund(reservation: PlanReservation): Effect.Effect<void, GatewayError> {
-    return this.persistence.withPermit(Effect.gen({ self: this }, function*() {
-      const index = this.reservations.findIndex((candidate) => candidate.id === reservation.id);
-      if (index < 0) return;
-      const previous = this.persisted();
-      this.reservations.splice(index, 1);
-      yield* this.repository.save(this.persisted()).pipe(
-        Effect.tapError(() => Effect.sync(() => this.restore(previous))),
-      );
-    }));
+    return this.persistence.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const index = this.reservations.findIndex((candidate) => candidate.id === reservation.id);
+        if (index < 0) return;
+        const previous = this.persisted();
+        this.reservations.splice(index, 1);
+        yield* this.repository
+          .save(this.persisted())
+          .pipe(Effect.tapError(() => Effect.sync(() => this.restore(previous))));
+      }),
+    );
   }
 
   admit(seat: SeatKind, at = Date.now()): Effect.Effect<void, GatewayError> {
     return Effect.suspend(() => {
       if (seat !== "claude" && seat !== "codex") return Effect.void;
       if (!this.hasConfiguredPlanLimit(seat)) {
-        return Effect.fail(new GatewayError(
-          503,
-          "SEAT_PLAN_LIMIT_REQUIRED",
-          `${seat} admission requires an explicit positive plan limit`,
-        ));
+        return Effect.fail(
+          new GatewayError(
+            503,
+            "SEAT_PLAN_LIMIT_REQUIRED",
+            `${seat} admission requires an explicit positive plan limit`,
+          ),
+        );
       }
       const headroom = this.headroom(seat, at);
-      const exhausted = headroom.remainingCreditUsd === 0 ||
+      const exhausted =
+        headroom.remainingCreditUsd === 0 ||
         headroom.remainingCalls === 0 ||
         headroom.remainingTokens === 0;
-      return exhausted
-        ? Effect.fail(this.exhaustedError(seat, headroom))
-        : Effect.void;
+      return exhausted ? Effect.fail(this.exhaustedError(seat, headroom)) : Effect.void;
     });
   }
 
@@ -295,9 +314,11 @@ export class WindowTracker {
     if (seat !== "claude" && seat !== "codex") return false;
     if (!this.hasConfiguredPlanLimit(seat)) return true;
     const headroom = this.headroom(seat, at);
-    return headroom.remainingCreditUsd === 0 ||
+    return (
+      headroom.remainingCreditUsd === 0 ||
       headroom.remainingCalls === 0 ||
-      headroom.remainingTokens === 0;
+      headroom.remainingTokens === 0
+    );
   }
 
   monthlySeatUsage(seat: SeatKind, at = Date.now()): number {
@@ -313,7 +334,10 @@ export class WindowTracker {
     return true;
   }
 
-  seatWindow(seat: SeatKind, at = Date.now()): {
+  seatWindow(
+    seat: SeatKind,
+    at = Date.now(),
+  ): {
     readonly calls: number;
     readonly tokens: number;
     readonly resetsAt: string;
@@ -332,8 +356,10 @@ export class WindowTracker {
     this.prune(at);
     if (seat === "claude") {
       const used = this.monthlySeatUsage(seat, at);
-      const reservations = this.reservations.filter((reservation) =>
-        reservation.seat === seat && this.monthKey(reservation.at) === this.monthKey(at));
+      const reservations = this.reservations.filter(
+        (reservation) =>
+          reservation.seat === seat && this.monthKey(reservation.at) === this.monthKey(at),
+      );
       const reservedCreditUsd = reservations.reduce(
         (total, reservation) => total + reservation.expectedPlanCreditUsd,
         0,
@@ -510,5 +536,7 @@ export class WindowTrackerService extends Context.Service<WindowTrackerService, 
   "@stavka/maskirovka/WindowTracker",
 ) {}
 
-export const WindowTrackerLive: Layer.Layer<WindowTrackerService> =
-  Layer.succeed(WindowTrackerService, new WindowTracker());
+export const WindowTrackerLive: Layer.Layer<WindowTrackerService> = Layer.succeed(
+  WindowTrackerService,
+  new WindowTracker(),
+);

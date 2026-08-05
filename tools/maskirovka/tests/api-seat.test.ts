@@ -8,19 +8,22 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("metered API seat", () => {
   it("translates an OpenAI-shaped request to an Anthropic fallback model", async () => {
-    const fetchMock = vi.fn(async (
-      _input: string | URL | Request,
-      _init?: RequestInit,
-    ) => new Response(JSON.stringify({
-      id: "msg_metered",
-      type: "message",
-      role: "assistant",
-      model: "claude-sonnet-4-6",
-      content: [{ type: "text", text: "{\"summary\":\"hold\",\"commands\":[]}" }],
-      stop_reason: "end_turn",
-      stop_sequence: null,
-      usage: { input_tokens: 12, output_tokens: 5 },
-    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            id: "msg_metered",
+            type: "message",
+            role: "assistant",
+            model: "claude-sonnet-4-6",
+            content: [{ type: "text", text: '{"summary":"hold","commands":[]}' }],
+            stop_reason: "end_turn",
+            stop_sequence: null,
+            usage: { input_tokens: 12, output_tokens: 5 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const normalized = normalizeRequest("openai-responses", {
       model: "stavka/commander",
@@ -39,10 +42,12 @@ describe("metered API seat", () => {
         },
       },
     });
-    const result = await Effect.runPromise(new ApiSeat(undefined, "anthropic-key").invoke({
-      ...normalized,
-      model: "claude-sonnet-4-6",
-    }));
+    const result = await Effect.runPromise(
+      new ApiSeat(undefined, "anthropic-key").invoke({
+        ...normalized,
+        model: "claude-sonnet-4-6",
+      }),
+    );
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -61,17 +66,20 @@ describe("metered API seat", () => {
   });
 
   it("translates an Anthropic-shaped request to an OpenAI fallback model", async () => {
-    const fetchMock = vi.fn(async (
-      _input: string | URL | Request,
-      _init?: RequestInit,
-    ) => new Response(JSON.stringify({
-      id: "resp_metered",
-      object: "response",
-      status: "completed",
-      output_text: "{\"summary\":\"advance\",\"commands\":[]}",
-      output: [],
-      usage: { input_tokens: 9, output_tokens: 4 },
-    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            id: "resp_metered",
+            object: "response",
+            status: "completed",
+            output_text: '{"summary":"advance","commands":[]}',
+            output: [],
+            usage: { input_tokens: 9, output_tokens: 4 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const schema = {
       type: "object",
@@ -87,10 +95,12 @@ describe("metered API seat", () => {
       messages: [{ role: "user", content: "Advance" }],
       output_config: { format: { type: "json_schema", schema } },
     });
-    const result = await Effect.runPromise(new ApiSeat("openai-key").invoke({
-      ...normalized,
-      model: "gpt-5.6-sol",
-    }));
+    const result = await Effect.runPromise(
+      new ApiSeat("openai-key").invoke({
+        ...normalized,
+        model: "gpt-5.6-sol",
+      }),
+    );
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://api.openai.com/v1/responses");

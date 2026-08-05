@@ -38,11 +38,13 @@ const normalizeTeamDomain = (value: string): string => value.replace(/\/$/, "");
 
 const isLoopbackHttpRequest = (request: Request): boolean => {
   const url = new URL(request.url);
-  return url.protocol === "http:" &&
+  return (
+    url.protocol === "http:" &&
     (url.hostname === "localhost" ||
       url.hostname === "127.0.0.1" ||
       url.hostname === "[::1]" ||
-      url.hostname === "::1");
+      url.hostname === "::1")
+  );
 };
 
 const remoteKeyResolvers = new Map<string, AccessKeyResolver>();

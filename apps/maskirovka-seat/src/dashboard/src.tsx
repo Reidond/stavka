@@ -355,8 +355,8 @@ function Dashboard() {
               Kill switch
             </h2>
             <p className="mb-0">
-              Stops new model traffic on this seat and remains in force across container restarts. It
-              does not stop or reroute any other seat.
+              Stops new model traffic on this seat and remains in force across container restarts.
+              It does not stop or reroute any other seat.
             </p>
             <p className="font-data text-xs uppercase">
               Last changed {formatTimestamp(snapshot?.controls.updated_at)}
@@ -455,61 +455,63 @@ function Dashboard() {
         </section>
 
         <section className="mt-7" aria-labelledby="requests-heading">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-          <h2 id="requests-heading" className="m-0 font-display text-2xl uppercase">
-            Recent request metadata
-          </h2>
-          <p className="m-0 font-data text-xs uppercase">
-            {snapshot?.requests.retained ?? requestItems.length} retained · limit{" "}
-            {snapshot?.requests.limit ?? "—"} · metadata only
-          </p>
-        </div>
-        {requests.error ? (
-          <OrderCallout title="Request feed unavailable" priority="urgent">
-            {errorMessage(requests.error)}
-          </OrderCallout>
-        ) : requestItems.length === 0 ? (
-          <div
-            className="border border-contour bg-ink p-12 text-center font-data text-xs text-paper uppercase"
-            role="status"
-          >
-            {requests.isPending ? "Loading request metadata…" : "No request metadata retained yet"}
-          </div>
-        ) : (
-          <>
-            <p className="mb-2 font-data text-[0.65rem] tracking-wider text-ink/70 uppercase">
-              Timestamp · dialect · alias → concrete model · HTTP status · latency · queue depth
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+            <h2 id="requests-heading" className="m-0 font-display text-2xl uppercase">
+              Recent request metadata
+            </h2>
+            <p className="m-0 font-data text-xs uppercase">
+              {snapshot?.requests.retained ?? requestItems.length} retained · limit{" "}
+              {snapshot?.requests.limit ?? "—"} · metadata only
             </p>
-            <LogFeed
-              items={requestItems}
-              getKey={(item) => item.request_id}
-              height={420}
-              estimateSize={44}
-              renderItem={(item) => (
-                <span className="inline-flex min-w-max items-center gap-2 whitespace-nowrap">
-                  <strong>{formatTimestamp(item.timestamp)}</strong>
-                  <span>· {item.dialect}</span>
-                  <span>
-                    · {item.alias} → {item.model}
+          </div>
+          {requests.error ? (
+            <OrderCallout title="Request feed unavailable" priority="urgent">
+              {errorMessage(requests.error)}
+            </OrderCallout>
+          ) : requestItems.length === 0 ? (
+            <div
+              className="border border-contour bg-ink p-12 text-center font-data text-xs text-paper uppercase"
+              role="status"
+            >
+              {requests.isPending
+                ? "Loading request metadata…"
+                : "No request metadata retained yet"}
+            </div>
+          ) : (
+            <>
+              <p className="mb-2 font-data text-[0.65rem] tracking-wider text-ink/70 uppercase">
+                Timestamp · dialect · alias → concrete model · HTTP status · latency · queue depth
+              </p>
+              <LogFeed
+                items={requestItems}
+                getKey={(item) => item.request_id}
+                height={420}
+                estimateSize={44}
+                renderItem={(item) => (
+                  <span className="inline-flex min-w-max items-center gap-2 whitespace-nowrap">
+                    <strong>{formatTimestamp(item.timestamp)}</strong>
+                    <span>· {item.dialect}</span>
+                    <span>
+                      · {item.alias} → {item.model}
+                    </span>
+                    <StatusChip tone={item.status >= 200 && item.status < 400 ? "works" : "broken"}>
+                      HTTP {item.status}
+                    </StatusChip>
+                    <span>· {item.latency_ms} ms</span>
+                    <span>· queue {item.queue_depth}</span>
                   </span>
-                  <StatusChip tone={item.status >= 200 && item.status < 400 ? "works" : "broken"}>
-                    HTTP {item.status}
-                  </StatusChip>
-                  <span>· {item.latency_ms} ms</span>
-                  <span>· queue {item.queue_depth}</span>
-                </span>
-              )}
-            />
-          </>
-        )}
+                )}
+              />
+            </>
+          )}
         </section>
 
         <section className="mt-7" aria-labelledby="boundary-heading">
           <OrderCallout title="Orchestration boundary">
             <p id="boundary-heading" className="m-0">
-              Registry management, cross-seat fallback and routing, and shared budget controls belong
-              to the Maskirovka orchestration gateway. They are intentionally unavailable on this
-              single hosted leaf.
+              Registry management, cross-seat fallback and routing, and shared budget controls
+              belong to the Maskirovka orchestration gateway. They are intentionally unavailable on
+              this single hosted leaf.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <StatusChip>{snapshot?.capabilities.tier_remap ?? "model-only"}</StatusChip>

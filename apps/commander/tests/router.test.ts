@@ -111,10 +111,7 @@ describe("Commander HTTP routing", () => {
   beforeEach(() => mocks.agentRoute.mockReset().mockResolvedValue(null));
 
   it("serves the public health contract through HttpApi", async () => {
-    const response = await handleRequest(
-      new Request("https://commander.test/healthz"),
-      makeEnv(),
-    );
+    const response = await handleRequest(new Request("https://commander.test/healthz"), makeEnv());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -135,7 +132,7 @@ describe("Commander HTTP routing", () => {
     );
 
     expect(response.status).toBe(200);
-    const document = await response.json() as { readonly paths: Record<string, unknown> };
+    const document = (await response.json()) as { readonly paths: Record<string, unknown> };
     expect(document.paths).toHaveProperty("/api/connect");
     expect(document.paths).toHaveProperty("/admin/export");
     expect(document.paths).toHaveProperty("/admin/exports");
@@ -174,24 +171,28 @@ describe("Commander HTTP routing", () => {
         getByName: vi.fn(() => ({ handleTick })),
       } as unknown as Env["ORCHESTRATOR"],
     });
-    const request = (payload: unknown) => new Request("https://commander.test/api/tick", {
-      method: "POST",
-      headers: {
-        authorization: "Bearer machine-secret",
-        "content-type": "application/json",
-        "x-stavka-mission-epoch": "1",
-      },
-      body: JSON.stringify(payload),
-    });
+    const request = (payload: unknown) =>
+      new Request("https://commander.test/api/tick", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer machine-secret",
+          "content-type": "application/json",
+          "x-stavka-mission-epoch": "1",
+        },
+        body: JSON.stringify(payload),
+      });
 
     const accepted = await handleRequest(request(test12Fixture.request), env);
     expect(accepted.status).toBe(200);
     expect(handleTick).toHaveBeenCalledWith(test12Fixture.request);
 
-    const rejected = await handleRequest(request({
-      ...test12Fixture.request,
-      unexpected: true,
-    }), env);
+    const rejected = await handleRequest(
+      request({
+        ...test12Fixture.request,
+        unexpected: true,
+      }),
+      env,
+    );
     expect(rejected.status).toBe(400);
     expect(handleTick).toHaveBeenCalledTimes(1);
   });
@@ -205,12 +206,16 @@ describe("Commander HTTP routing", () => {
       get: vi.fn(async (key: string) => values.get(key) ?? null),
     };
     const setMapBriefing = vi.fn();
-    values.set("session:map-session", JSON.stringify({
-      missionId: "map-mission",
-      faction: "OPFOR",
-      epoch: 3,
-      mapName: "Everon",
-    }));
+    const sessionIndexKey = `session:${JSON.stringify(["map-session", 3, "OPFOR"])}`;
+    values.set(
+      sessionIndexKey,
+      JSON.stringify({
+        missionId: "map-mission",
+        faction: "OPFOR",
+        epoch: 3,
+        mapName: "Everon",
+      }),
+    );
     const env = makeEnv({
       TERRAIN_CACHE: terrainCache as unknown as Env["TERRAIN_CACHE"],
       ORCHESTRATOR: {
@@ -225,13 +230,15 @@ describe("Commander HTTP routing", () => {
       grid_resolution_meters: 10,
       source: "arma_extracted" as const,
       classification_version: 2,
-      terrain_grid: [{
-        grid: [0, 0] as const,
-        type: "field" as const,
-        cover: "light" as const,
-        elevation: 0,
-        traversable: true,
-      }],
+      terrain_grid: [
+        {
+          grid: [0, 0] as const,
+          type: "field" as const,
+          cover: "light" as const,
+          elevation: 0,
+          traversable: true,
+        },
+      ],
       key_features: [],
     };
     const briefing = {
@@ -239,23 +246,45 @@ describe("Commander HTTP routing", () => {
       content_hash: computeMapBriefingContentHash(briefingInput),
     };
     const terrainKey = `map:Everon:arma_extracted:v2:${briefing.content_hash}`;
-    const request = (payload: unknown) => new Request("https://commander.test/api/map", {
-      method: "POST",
-      headers: {
-        authorization: "Bearer machine-secret",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const request = (payload: unknown) =>
+      new Request("https://commander.test/api/map", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer machine-secret",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-    const accepted = await handleRequest(request({
-      protocol_version: 1,
-      session_id: "map-session",
-      mission_id: "map-mission",
-      mission_epoch: 3,
-      faction: "OPFOR",
-      briefing,
-    }), env);
+    const beforeConnect = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "unconnected-session",
+        mission_id: "map-mission",
+        mission_epoch: 3,
+        faction: "OPFOR",
+        briefing,
+      }),
+      env,
+    );
+    expect(beforeConnect.status).toBe(409);
+    await expect(beforeConnect.json()).resolves.toMatchObject({
+      error: { code: "MAP_SESSION_NOT_CONNECTED" },
+    });
+    expect(terrainCache.put).not.toHaveBeenCalled();
+    expect(setMapBriefing).not.toHaveBeenCalled();
+
+    const accepted = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "map-session",
+        mission_id: "map-mission",
+        mission_epoch: 3,
+        faction: "OPFOR",
+        briefing,
+      }),
+      env,
+    );
     expect(accepted.status).toBe(200);
     await expect(accepted.json()).resolves.toMatchObject({
       accepted: true,
@@ -273,32 +302,203 @@ describe("Commander HTTP routing", () => {
     });
     expect(setMapBriefing).toHaveBeenCalledWith(briefing);
 
-    const stale = await handleRequest(request({
-      protocol_version: 1,
-      session_id: "map-session",
-      mission_id: "map-mission",
-      mission_epoch: 2,
-      faction: "OPFOR",
-      briefing,
-    }), env);
+    const stale = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "map-session",
+        mission_id: "map-mission",
+        mission_epoch: 2,
+        faction: "OPFOR",
+        briefing,
+      }),
+      env,
+    );
     expect(stale.status).toBe(409);
     await expect(stale.json()).resolves.toMatchObject({
+      error: { code: "MAP_SESSION_NOT_CONNECTED" },
+    });
+    expect(terrainCache.put).toHaveBeenCalledTimes(2);
+    expect(setMapBriefing).toHaveBeenCalledTimes(1);
+
+    const mismatchedMission = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "map-session",
+        mission_id: "other-mission",
+        mission_epoch: 3,
+        faction: "OPFOR",
+        briefing,
+      }),
+      env,
+    );
+    expect(mismatchedMission.status).toBe(409);
+    await expect(mismatchedMission.json()).resolves.toMatchObject({
+      error: { code: "MAP_SESSION_MISMATCH" },
+    });
+
+    const maldenInput = { ...briefingInput, map_name: "Malden" as const };
+    const mismatchedMap = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "map-session",
+        mission_id: "map-mission",
+        mission_epoch: 3,
+        faction: "OPFOR",
+        briefing: {
+          ...maldenInput,
+          content_hash: computeMapBriefingContentHash(maldenInput),
+        },
+      }),
+      env,
+    );
+    expect(mismatchedMap.status).toBe(409);
+    await expect(mismatchedMap.json()).resolves.toMatchObject({
       error: { code: "MAP_SESSION_MISMATCH" },
     });
     expect(terrainCache.put).toHaveBeenCalledTimes(2);
     expect(setMapBriefing).toHaveBeenCalledTimes(1);
 
-    const rejected = await handleRequest(request({
-      protocol_version: 1,
-      session_id: "map-session",
-      mission_id: "map-mission",
-      mission_epoch: 3,
-      faction: "OPFOR",
-      briefing,
-      unexpected: true,
-    }), env);
+    const rejected = await handleRequest(
+      request({
+        protocol_version: 1,
+        session_id: "map-session",
+        mission_id: "map-mission",
+        mission_epoch: 3,
+        faction: "OPFOR",
+        briefing,
+        unexpected: true,
+      }),
+      env,
+    );
     expect(rejected.status).toBe(400);
     expect(terrainCache.put).toHaveBeenCalledTimes(2);
+  });
+
+  it("isolates OPFOR and BLUFOR Durable Objects and map indexes for the same session identity", async () => {
+    const values = new Map<string, string>();
+    const terrainCache = {
+      put: vi.fn(async (key: string, value: string) => {
+        values.set(key, value);
+      }),
+      get: vi.fn(async (key: string) => values.get(key) ?? null),
+    };
+    const stubs = new Map<
+      string,
+      {
+        connectSession: ReturnType<typeof vi.fn>;
+        setMapBriefing: ReturnType<typeof vi.fn>;
+      }
+    >();
+    const getByName = vi.fn((name: string) => {
+      const existing = stubs.get(name);
+      if (existing !== undefined) return existing;
+      const created = {
+        connectSession: vi.fn().mockResolvedValue({
+          protocol_version: 1,
+          accepted: true,
+          request_full_snapshot: true,
+          tick_rate_hint: 2_000,
+        }),
+        setMapBriefing: vi.fn(),
+      };
+      stubs.set(name, created);
+      return created;
+    });
+    const env = makeEnv({
+      TERRAIN_CACHE: terrainCache as unknown as Env["TERRAIN_CACHE"],
+      ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"],
+    });
+    const briefingInput = {
+      map_name: "Everon",
+      grid_size: 1,
+      grid_width: 1,
+      grid_height: 1,
+      grid_resolution_meters: 10,
+      source: "arma_extracted" as const,
+      classification_version: 1,
+      terrain_grid: [
+        {
+          grid: [0, 0] as const,
+          type: "field" as const,
+          cover: "light" as const,
+          elevation: 0,
+          traversable: true,
+        },
+      ],
+      key_features: [],
+    };
+    const briefing = {
+      ...briefingInput,
+      content_hash: computeMapBriefingContentHash(briefingInput),
+    };
+    const connect = (faction: "OPFOR" | "BLUFOR") =>
+      handleRequest(
+        new Request("https://commander.test/api/connect", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer machine-secret",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            protocol_version: 1,
+            session_id: "shared-session",
+            mission_id: `mission-${faction.toLowerCase()}`,
+            mission_epoch: 7,
+            faction,
+            map_name: "Everon",
+          }),
+        }),
+        env,
+      );
+    const upload = (faction: "OPFOR" | "BLUFOR") =>
+      handleRequest(
+        new Request("https://commander.test/api/map", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer machine-secret",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            protocol_version: 1,
+            session_id: "shared-session",
+            mission_id: `mission-${faction.toLowerCase()}`,
+            mission_epoch: 7,
+            faction,
+            briefing,
+          }),
+        }),
+        env,
+      );
+
+    expect((await connect("OPFOR")).status).toBe(200);
+    expect((await connect("BLUFOR")).status).toBe(200);
+
+    const opforName = JSON.stringify(["shared-session", 7, "OPFOR"]);
+    const bluforName = JSON.stringify(["shared-session", 7, "BLUFOR"]);
+    expect(getByName.mock.calls.map(([name]) => name)).toEqual([opforName, bluforName]);
+    expect(stubs.size).toBe(2);
+    expect(stubs.get(opforName)).not.toBe(stubs.get(bluforName));
+
+    const opforIndex = `session:${opforName}`;
+    const bluforIndex = `session:${bluforName}`;
+    expect(JSON.parse(values.get(opforIndex) ?? "{}")).toMatchObject({
+      missionId: "mission-opfor",
+      faction: "OPFOR",
+      epoch: 7,
+      mapName: "Everon",
+    });
+    expect(JSON.parse(values.get(bluforIndex) ?? "{}")).toMatchObject({
+      missionId: "mission-blufor",
+      faction: "BLUFOR",
+      epoch: 7,
+      mapName: "Everon",
+    });
+
+    expect((await upload("OPFOR")).status).toBe(200);
+    expect((await upload("BLUFOR")).status).toBe(200);
+    expect(stubs.get(opforName)?.setMapBriefing).toHaveBeenCalledTimes(1);
+    expect(stubs.get(bluforName)?.setMapBriefing).toHaveBeenCalledTimes(1);
+    expect(stubs.get(opforName)?.setMapBriefing).not.toBe(stubs.get(bluforName)?.setMapBriefing);
   });
 
   it("does not attach a cached briefing whose map differs from the connect mission", async () => {
@@ -317,13 +517,15 @@ describe("Commander HTTP routing", () => {
       grid_resolution_meters: 10,
       source: "arma_extracted" as const,
       classification_version: 1,
-      terrain_grid: [{
-        grid: [0, 0] as const,
-        type: "field" as const,
-        cover: "light" as const,
-        elevation: 0,
-        traversable: true,
-      }],
+      terrain_grid: [
+        {
+          grid: [0, 0] as const,
+          type: "field" as const,
+          cover: "light" as const,
+          elevation: 0,
+          traversable: true,
+        },
+      ],
       key_features: [],
     };
     const foreignBriefing = {
@@ -347,21 +549,24 @@ describe("Commander HTTP routing", () => {
       } as unknown as Env["ORCHESTRATOR"],
     });
 
-    const response = await handleRequest(new Request("https://commander.test/api/connect", {
-      method: "POST",
-      headers: {
-        authorization: "Bearer machine-secret",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        protocol_version: 1,
-        session_id: "map-connect-session",
-        mission_id: "map-connect-mission",
-        mission_epoch: 3,
-        faction: "OPFOR",
-        map_name: "Everon",
+    const response = await handleRequest(
+      new Request("https://commander.test/api/connect", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer machine-secret",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          protocol_version: 1,
+          session_id: "map-connect-session",
+          mission_id: "map-connect-mission",
+          mission_epoch: 3,
+          faction: "OPFOR",
+          map_name: "Everon",
+        }),
       }),
-    }), env);
+      env,
+    );
 
     expect(response.status).toBe(200);
     expect(connectSession).toHaveBeenCalledTimes(1);
@@ -370,10 +575,9 @@ describe("Commander HTTP routing", () => {
 
   it("fails closed when durable export routes have no R2 binding", async () => {
     const response = await handleRequest(
-      new Request(
-        "http://127.0.0.1/admin/exports?session_id=session&faction=OPFOR&epoch=1",
-        { method: "POST" },
-      ),
+      new Request("http://127.0.0.1/admin/exports?session_id=session&faction=OPFOR&epoch=1", {
+        method: "POST",
+      }),
       makeEnv(),
     );
 
@@ -425,9 +629,7 @@ describe("Commander HTTP routing", () => {
     });
 
     const downloaded = await handleRequest(
-      new Request(
-        `http://127.0.0.1/admin/exports/object?key=${encodeURIComponent(metadata.key)}`,
-      ),
+      new Request(`http://127.0.0.1/admin/exports/object?key=${encodeURIComponent(metadata.key)}`),
       env,
     );
     expect(downloaded.status).toBe(200);

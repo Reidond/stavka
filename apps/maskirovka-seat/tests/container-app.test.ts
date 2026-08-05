@@ -240,65 +240,71 @@ describe("container Effect HttpApi gateway", () => {
     ["rate_limit", 429, true],
     ["timeout", 504, true],
     ["auth", 503, false],
-  ] as const)("maps %s provider failures to truthful HTTP status", async (reason, status, retryable) => {
-    const failingRunner: SeatRunner = {
-      ...runner,
-      runMessages: () => Effect.fail(new ProviderInvocationError({
-        provider: "claude",
-        reason,
-        status,
-        retryable,
-        message: "provider detail must not leak",
-        ...(reason === "rate_limit"
-          ? {
-              resolvedModel: "claude-fable-5",
-              usage: {
-                inputTokens: 12,
-                outputTokens: 3,
-                estimatedCostUsd: 0.01,
-              },
-            }
-          : {}),
-      })),
-    };
-    const response = await request(
-      {
-        config: {
-          seatId: "claude",
-          provider: "claude",
-          aliases: { "stavka/commander": "claude-fable-5" },
+  ] as const)(
+    "maps %s provider failures to truthful HTTP status",
+    async (reason, status, retryable) => {
+      const failingRunner: SeatRunner = {
+        ...runner,
+        runMessages: () =>
+          Effect.fail(
+            new ProviderInvocationError({
+              provider: "claude",
+              reason,
+              status,
+              retryable,
+              message: "provider detail must not leak",
+              ...(reason === "rate_limit"
+                ? {
+                    resolvedModel: "claude-fable-5",
+                    usage: {
+                      inputTokens: 12,
+                      outputTokens: 3,
+                      estimatedCostUsd: 0.01,
+                    },
+                  }
+                : {}),
+            }),
+          ),
+      };
+      const response = await request(
+        {
+          config: {
+            seatId: "claude",
+            provider: "claude",
+            aliases: { "stavka/commander": "claude-fable-5" },
+          },
+          runner: failingRunner,
+          authConfigured: Effect.succeed(true),
+          authCheckpoint: () => Effect.succeed(undefined),
         },
-        runner: failingRunner,
-        authConfigured: Effect.succeed(true),
-        authCheckpoint: () => Effect.succeed(undefined),
-      },
-      "/v1/messages",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-fable-5",
-          max_tokens: 64,
-          messages: [{ role: "user", content: "Orders" }],
-        }),
-      },
-    );
+        "/v1/messages",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-fable-5",
+            max_tokens: 64,
+            messages: [{ role: "user", content: "Orders" }],
+          }),
+        },
+      );
 
-    expect(response.status).toBe(status);
-    await expect(response.json()).resolves.toMatchObject({
-      error: {
-        retryable,
-        ...(reason === "rate_limit"
-          ? {
-              resolved_model: "claude-fable-5",
-              usage: {
-                input_tokens: 12,
-                output_tokens: 3,
-                estimated_cost_usd: 0.01,
-              },
-            }
-          : {}),
-      },
-    });
-  });
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({
+        error: {
+          retryable,
+          ...(reason === "rate_limit"
+            ? {
+                resolved_model: "claude-fable-5",
+                usage: {
+                  input_tokens: 12,
+                  output_tokens: 3,
+                  estimated_cost_usd: 0.01,
+                },
+              }
+            : {}),
+        },
+      });
+    },
+  );
 });

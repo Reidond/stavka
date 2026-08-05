@@ -64,6 +64,20 @@ describe("offline simulation host", () => {
     expect(yieldControl).toHaveBeenCalledTimes(Math.ceil(1_000 / OFFLINE_STEP_CHUNK_SIZE) - 1);
   });
 
+  it("treats one offline Step as a cooperative resume quantum at the selected time scale", async () => {
+    for (const timeScale of [1, 10, 100] as const) {
+      const initial = createOfflineSimState({ ...identity, timeScale });
+      const yieldControl = vi.fn(async () => {});
+      const quantum = 10 * timeScale;
+      const next = await stepOfflineSimStateCooperatively(initial, quantum, yieldControl);
+      expect(next.world.tick - initial.world.tick).toBe(quantum);
+      expect(yieldControl).toHaveBeenCalledTimes(
+        Math.max(0, Math.ceil(quantum / OFFLINE_STEP_CHUNK_SIZE) - 1),
+      );
+      yieldControl.mockClear();
+    }
+  });
+
   it("rejects an invalid cooperative chunk size before advancing", async () => {
     const initial = createOfflineSimState(identity);
     await expect(stepOfflineSimStateCooperatively(initial, 10, async () => {}, 0)).rejects.toThrow(

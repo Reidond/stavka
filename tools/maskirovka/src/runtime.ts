@@ -2,10 +2,7 @@ import { join } from "node:path";
 import { Effect, Layer } from "effect";
 
 import type { MaskirovkaConfig } from "./config";
-import {
-  FileCacheRepository,
-  type CacheRepositoryService,
-} from "./repositories/cache-repository";
+import { FileCacheRepository, type CacheRepositoryService } from "./repositories/cache-repository";
 import {
   FileGatewayConfigRepository,
   type GatewayConfigRepositoryService,
@@ -40,26 +37,29 @@ export interface RuntimeOverrides {
 const withCheckedSeatHealth = (
   config: MaskirovkaConfig,
   probes: CliProbeRepositoryService,
-): Effect.Effect<MaskirovkaConfig, import("./domain/types").GatewayError> => Effect.gen(function*() {
-  const [claude, codex] = yield* Effect.all([
-    probes.run("claude", ["auth", "status"]),
-    probes.run("codex", ["login", "status"]),
-  ], { concurrency: "unbounded" });
-  return {
-    ...config,
-    seats: config.seats.map((seat) => seat.id === "claude"
-      ? { ...seat, status: claude.ok ? "healthy" as const : "unavailable" as const }
-      : seat.id === "codex"
-        ? { ...seat, status: codex.ok ? "healthy" as const : "unavailable" as const }
-        : seat),
-  };
-});
+): Effect.Effect<MaskirovkaConfig, import("./domain/types").GatewayError> =>
+  Effect.gen(function* () {
+    const [claude, codex] = yield* Effect.all(
+      [probes.run("claude", ["auth", "status"]), probes.run("codex", ["login", "status"])],
+      { concurrency: "unbounded" },
+    );
+    return {
+      ...config,
+      seats: config.seats.map((seat) =>
+        seat.id === "claude"
+          ? { ...seat, status: claude.ok ? ("healthy" as const) : ("unavailable" as const) }
+          : seat.id === "codex"
+            ? { ...seat, status: codex.ok ? ("healthy" as const) : ("unavailable" as const) }
+            : seat,
+      ),
+    };
+  });
 
 export const createGatewayService = (
   config: MaskirovkaConfig,
   overrides: RuntimeOverrides = {},
 ): Effect.Effect<GatewayService, import("./domain/types").GatewayError> =>
-  Effect.gen(function*() {
+  Effect.gen(function* () {
     const checkedConfig = yield* withCheckedSeatHealth(
       config,
       overrides.probes ?? new ProcessCliProbeRepository(),
@@ -70,9 +70,9 @@ export const createGatewayService = (
       config.stateDirectory,
       codexWorkspace,
     ]);
-    const repository = overrides.gatewayConfig ?? new FileGatewayConfigRepository(
-      join(config.stateDirectory, "gateway.json"),
-    );
+    const repository =
+      overrides.gatewayConfig ??
+      new FileGatewayConfigRepository(join(config.stateDirectory, "gateway.json"));
     const registry = new SeatRegistry(
       checkedConfig.aliases,
       checkedConfig.seats,
@@ -83,21 +83,23 @@ export const createGatewayService = (
       checkedConfig,
       registry,
       overrides.cache ?? new FileCacheRepository(config.cacheDirectory),
-      overrides.logs ?? new FileRequestLogRepository(
-        join(config.stateDirectory, "requests.ndjson"),
-      ),
+      overrides.logs ??
+        new FileRequestLogRepository(join(config.stateDirectory, "requests.ndjson")),
       overrides.adapters ?? [
         new MockSeat(),
         new ClaudeSeat(),
         new CodexSeat(codexWorkspace),
         new ApiSeat(config.openAiApiKey, config.anthropicApiKey),
       ],
-      new WindowTracker({
-        claudeMonthlyCreditUsd: config.claudeMonthlyCreditUsd,
-        codexWindowCalls: config.codexWindowCallLimit,
-        codexWindowTokens: config.codexWindowTokenLimit,
-        codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
-      }, new FileWindowTrackerRepository(join(config.stateDirectory, "usage-tracker.json"))),
+      new WindowTracker(
+        {
+          claudeMonthlyCreditUsd: config.claudeMonthlyCreditUsd,
+          codexWindowCalls: config.codexWindowCallLimit,
+          codexWindowTokens: config.codexWindowTokenLimit,
+          codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
+        },
+        new FileWindowTrackerRepository(join(config.stateDirectory, "usage-tracker.json")),
+      ),
     );
     yield* service.initialize();
     return service;

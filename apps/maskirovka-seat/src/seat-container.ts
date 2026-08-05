@@ -21,10 +21,7 @@ import type {
   HostedSeatRequestLog,
   HostedSeatStatus,
 } from "./hosted-seat-runtime";
-import {
-  providerLifecycleIsHealthy,
-  providerLifecycleTransition,
-} from "./provider-health";
+import { providerLifecycleIsHealthy, providerLifecycleTransition } from "./provider-health";
 import { SeatInvocationGovernor, SeatQueueFullError } from "./seat-invocation-governor";
 import {
   HOSTED_REQUEST_LOG_LIMIT,
