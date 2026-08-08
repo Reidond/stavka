@@ -28,15 +28,32 @@ work and real Cloudflare / live-provider acceptance remain external.
 5. Final PRODUCT gap audit found no remaining feasible-local P0/P1 product
    gaps (only external Arma / Cloudflare / live-provider gates).
 6. Documentation refreshed with exact results and explicit external gates.
+7. A single CI workflow now gates automatic production deployment on successful
+   `main` verification; its Effect task prebuilds all four services and deploys
+   gateway → hosted seat → Commander → Poligon sequentially. No live deploy was
+   run for this change.
 
 ## Still external-only
 
-Unchanged from the pause handoff:
-
 - production Enforce Script addon, Workbench, dedicated server, Conflict/JIP,
   BattlEye, Workshop, and in-game 30/40/50-group profiling;
-- real Cloudflare account deploy, Access, DO/KV/R2/Container lifecycle;
-- live Claude / Codex / metered API entitlements and invoice reconciliation.
+- **repair account workers.dev** (`andrii-shafar` returns `error code: 1042` for
+  all Workers; uploads succeeded; `wrangler dev --remote` works);
+- harden the GitHub `production` environment (secrets
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are present; add required
+  reviewers / deployment branch policy if desired);
+- Cloudflare Access apps + `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` (dashboard;
+  Wrangler OAuth lacks Access scopes);
+- live Claude / Codex tokens via gateway `/_/` after Access + HTTP routing work;
+- full deployed lifecycle drills (sleep/restart, R2 export, Access WS).
+
+An automatic deploy success proves upload and Wrangler configuration only while
+workers.dev returns 1042; it does not prove HTTP availability. Worker secrets
+and provider credentials remain out of band. Rollback is `wrangler rollback`
+per service in reverse dependency order (Poligon, Commander, hosted seat,
+gateway), or an equivalent documented version rollback.
+
+Posture B / home-Mac dial-in remains permanently unsupported.
 
 The Test-12 corpus remains intentionally derived and must not be presented as
 a missing raw Workbench capture.

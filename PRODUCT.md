@@ -20,7 +20,7 @@
 | **Revision** | **B — 2026-08-02** · REST-only · Vite+ · TS 7 native · Effect · Agents SDK · 5-series models |
 | **Revision** | **C — 2026-08-02** · **Poligon** — the THREE.js proving-ground sim; macOS-first dev without the game |
 | **Revision** | **D — 2026-08-02** · **Maskirovka** — subscription-seat LLM proxy for dev/test; \$0 deterministic CI |
-| **Revision** | **E — 2026-08-02** · seats in **production** (BYO subscription) · Responses-API-only OpenAI · `@stavka/ui` design system |
+| **Revision** | **E — 2026-08-02** · seats in **production** (BYO subscription) · Responses-API-only OpenAI · direct Kumo web surfaces |
 | **Revision** | **F — 2026-08-02** · everything **TanStack** on the frontend — Start · Router · Query · Table · Form · Virtual |
 | **Revision** | **G — 2026-08-02** · **all-Cloudflare hosting** — the only box left is the game; seats move into Cloudflare Containers |
 | **Revision** | **H — 2026-08-02** · **Cloudflare Access** in front of every human surface — dashboards, viewer, admin |
@@ -33,7 +33,7 @@ hands-on validation of Stavka:
 
 - **Part I — Product Specification.** Vision, architecture, transport strategy,
   auth, monorepo layout, LLM decision engine, sergeant sub-agents, REST protocol,
-  command types, state schema, difficulty, mod bridge design, the Poligon proving-ground sim, the Maskirovka seat proxy, the `@stavka/ui` design system, persistence,
+  command types, state schema, difficulty, mod bridge design, the Poligon proving-ground sim, the Maskirovka seat proxy, direct Kumo web surfaces, persistence,
   six-phase implementation plan, resolved decisions, open questions.
 - **Part II — Engine Research.** Everything learned about Enfusion / Enforce
   Script: communication options, AI system surface, Conflict mode internals,
@@ -140,10 +140,10 @@ so:
    (`gpt-5.6-sol` underperforms on legacy chat completions; `@effect/ai-openai`
    is Responses-backed); Anthropic access is the latest Messages API. The
    chat-completions dialect is removed from Maskirovka's surface.
-3. **One design system** — `@stavka/ui` on **Tailwind CSS v4 + Base UI**: the
-   operations-document "map-sheet" identity codified as tokens and wrapped
-   primitives, applied to every web surface — the Poligon viewer, the
-   Maskirovka dashboard, and every future panel.
+3. **One visual language** — direct granular **Cloudflare Kumo 2.9.2** imports
+   on **Tailwind CSS v4**: Kumo semantic tokens and styled components are used
+   on every web surface, while feature-specific compositions remain local to
+   the Poligon viewer, Maskirovka dashboards, and future panels.
 
 ---
 
@@ -163,12 +163,12 @@ Frontend stack unified on TanStack, end to end:
 3. **TanStack Query** owns request/response data (admin, health, logs, scenario
    CRUD). Boundary stated plainly: real-time sim/agent state stays on the
    Agents SDK WebSocket sync — Query never wraps the socket.
-4. **Table · Virtual · Form** run headless inside `@stavka/ui` (`DataTable`,
-   `LogFeed`, every form — Form validates with Effect Schema via Standard
-   Schema). Base UI supplies interaction primitives; TanStack supplies data and
-   navigation machinery; apps import neither directly.
-5. The Maskirovka dashboard becomes a static **Router + Query SPA** built from
-   `@stavka/ui` — no SSR inside a CLI tool.
+4. **Table · Virtual · Form** run headless in the applications that need them
+   (`@tanstack/react-table`, `@tanstack/react-virtual`, and
+   `@tanstack/react-form`; forms validate with Effect Schema via Standard
+   Schema). Kumo supplies styled controls and accessible interaction surfaces.
+5. The Maskirovka dashboard remains a static **Router + Query SPA** with direct
+   Kumo imports and no SSR inside a CLI tool.
 
 ---
 
@@ -485,7 +485,7 @@ between the dedicated server and its paired Worker.
 **Setup flow:**
 
 ```
-1. Admin deploys Worker         →  pnpm run deploy
+1. Admin deploys the production services →  pnpm run deploy:production (after main CI verification)
 2. Admin generates API key      →  pnpm run generate-key  (outputs sk-stavka-...)
 3. Admin sets key on Worker     →  cd apps/commander && npx wrangler secret put API_KEY
 4. Admin sets key on AR server  →  paste into mod server config (see below)
@@ -553,8 +553,7 @@ stavka/
 ├── oxlint.json                     # Optional Oxlint overrides (vp check)
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                  # Lint + test + typecheck
-│       └── deploy.yml              # Wrangler deploy on push to main
+│       └── ci.yml                  # Verification plus gated ordered production deploy
 ├── README.md
 ├── SPEC.md
 ├── RESEARCH.md
@@ -762,7 +761,7 @@ export default defineConfig({
     "build": "vp run build",
     "test": "vp test",
     "check": "vp check",
-    "deploy": "vp run deploy --filter=@stavka/commander"
+    "deploy:production": "pnpm --filter @stavka/tasks deploy:production"
   },
   "devDependencies": {
     "vite-plus": "latest",
@@ -1670,7 +1669,7 @@ registration is revocable per seat.
 
 **For the human** — `vp run ai:up` (start + first-run doctor), `ai:doctor`,
 `ai:smoke`, `ai:models`, `ai:serve` (production gateway / seat registration); a live dashboard at `/_/` — a static TanStack Router + Query SPA built from
-`@stavka/ui`, behind Cloudflare Access in hosted postures (request feed, seat
+direct Kumo imports, behind Cloudflare Access in hosted postures (request feed, seat
 status, tier remap, kill switch); readable per-request log lines
 (tier · seat · tokens · ms · queue depth · cache hit).
 
@@ -1773,68 +1772,57 @@ Access-protected admin, not instead of it.
 
 ---
 
-## One Design System — `@stavka/ui` (Tailwind 4 + Base UI)
+## Direct Kumo Frontend Composition (Tailwind 4 + app-local features)
 
 Every web surface in this project — the Poligon viewer, the Maskirovka
-dashboard, the future replay and decision-log panels — wears one uniform. The
-identity already exists: the operations-document **map-sheet** language of this
-very spec (aged topographic paper, grease-pencil red and ultramarine, ParaType
-faces, stamps and chips). `@stavka/ui` codifies it.
+dashboards, and future replay or decision-log panels — uses the same Kumo
+semantic vocabulary without introducing another shared UI package. Each app
+imports only the Kumo component or primitive it renders, then keeps its
+feature-specific compositions beside the feature that owns them.
 
 ### Stack
 
-- **Tailwind CSS v4** — CSS-first configuration; the entire identity lives as
-  `@theme` design tokens in one stylesheet. No `tailwind.config.js`, no raw hex
-  anywhere in app code.
-- **Base UI** (`@base-ui-components/react`) — unstyled, accessible primitives
-  (dialogs, menus, tooltips, sliders, tabs) wrapped once into Stavka
-  components. Apps import from `@stavka/ui`, never from Base UI directly.
-- **TanStack headless machinery inside the components** — Table under
-  `DataTable`, Virtual under `LogFeed`, Form (validated by Effect Schema
-  through Standard Schema) under every form surface. Base UI supplies
-  interaction primitives; TanStack supplies data and navigation machinery;
-  apps import neither directly — only `@stavka/ui`.
-- Built and shipped through the Vite+ workspace like any other package.
+- **Cloudflare Kumo 2.9.2** — direct granular imports from
+  `@cloudflare/kumo/components/*` and `@cloudflare/kumo/primitives/*`. Prefer
+  Kumo styled components; use a primitive only when the surface needs behavior
+  not covered by a styled component.
+- **Tailwind CSS v4** — CSS-first entrypoints use Kumo's stylesheet and semantic
+  tokens. App-local CSS is limited to layout, viewport fallbacks, and feature
+  composition; it does not recreate a generic design-system facade.
+- **TanStack headless libraries** — Table, Virtual, and Form are direct app
+  dependencies only where a surface needs those capabilities. Forms validate
+  at the boundary with Effect Schema through Standard Schema.
+- Built and shipped through the Vite+ workspace like any other application.
 
-### Tokens (map-sheet)
+### Semantic token vocabulary
 
-| Token | Value | Role |
-|---|---|---|
-| `--color-paper` | `#E9E4D0` | map-sheet ground |
-| `--color-ink` | `#26231B` | typewriter ink |
-| `--color-carmine` | `#B0342B` | orders · OPFOR · primary accent |
-| `--color-ultramarine` | `#2E4E7E` | intelligence · BLUFOR · links |
-| `--color-olive` | `#6B6B3A` | terrain · OK states |
-| `--color-contour` | `#C7BA92` | hairlines · grid |
-| type | Oswald / PT Serif / PT Mono | display / body / data |
+Kumo semantic classes such as `bg-kumo-base`, `bg-kumo-contrast`,
+`text-kumo-strong`, `text-kumo-subtle`, `border-kumo-line`,
+`border-kumo-hairline`, and `bg-kumo-success`/`bg-kumo-danger`/`bg-kumo-info`
+carry the visual identity. The apps do not define private color-name classes;
+Kumo remains the source of truth for color, contrast, and state.
 
-### Component Inventory (initial)
+### Feature compositions
 
-`Stamp` (validation marks) · `StatusChip` (WORKS / BROKEN / PENDING) ·
-`DataTable` · `OrderCallout` · `FigureFrame` (bordered figure + mono caption) ·
-`SeatCard` (Maskirovka seat health/budget) · `TimeScrubber` (Poligon
-pause · step · ×1–×100) · `LogFeed` (decision-log stream) · `MapLegend`.
+Poligon owns `PoligonFigure`, `PoligonLegend`, `PoligonDataTable`,
+`PoligonLogFeed`, and `PoligonTimeScrubber`. Maskirovka owns its hosted-seat,
+gateway, and local operations forms, badges, feeds, and cards. These names are
+feature-specific and may evolve with their owning surface; they are not a
+replacement shared package.
 
 ### THREE.js Integration
 
-The canvas is content, the chrome is `@stavka/ui`: the Poligon viewport sits
-inside a `FigureFrame`, and every HUD overlay (unit tags, engagement readouts,
-scenario picker) is DOM styled by the same tokens — no styles defined inside
-the scene layer.
+The canvas is content and the chrome is Kumo: the Poligon viewport sits inside
+an app-local figure composition, and every HUD overlay (unit tags, engagement
+readouts, scenario picker) is DOM-styled with Kumo semantic tokens. No styles
+are defined inside the scene layer.
 
 ### Rules
 
-One tokens file owns every color and face; apps compose `@stavka/ui`
-components and Tailwind utilities only. Accessibility rides on Base UI's
-primitives — focus management and keyboard behavior come standard, and the
-map-sheet palette is contrast-checked once, centrally.
-
-### Monorepo Addition
-
-```
-packages/
-├── ui/                  # @stavka/ui — Tailwind 4 @theme tokens + wrapped Base UI primitives
-```
+Import Kumo components and primitives directly, keep feature compositions local,
+and use semantic token classes in both JSX and app CSS. Accessibility and
+keyboard behavior come from the Kumo component or the explicitly selected
+primitive. Every human surface keeps its Cloudflare Access gate.
 
 ---
 
@@ -1863,7 +1851,7 @@ packages/
 - [ ] **Poligon**: `apps/poligon` — `SimWorld` agent + **TanStack Start** viewer (R3F canvas, Effect-Schema'd scenario URLs, time-scale controls), one Worker via custom entrypoint
 - [ ] Conformance fixtures: the Test 12 wire captures as the golden corpus, validated against sim-link output
 - [ ] **Maskirovka**: `tools/maskirovka` skeleton — latest dialects only (`/v1/messages` + `/v1/responses`), tier aliases, `mock` seat, record/replay cache (CI never touches a paid seat)
-- [ ] **`@stavka/ui`**: Tailwind 4 `@theme` map-sheet tokens + wrapped Base UI primitives + TanStack Table/Virtual/Form inside `DataTable`/`LogFeed`/forms; Poligon viewer and the Maskirovka dashboard consume it from day one
+- [x] **Direct Kumo frontend composition**: Kumo 2.9.2 styled components and primitives, semantic tokens, and app-local TanStack Table/Virtual/Form compositions across Poligon and Maskirovka surfaces
 - [ ] Deploy: `wrangler deploy` to CF Workers; test against Poligon first, the Hetzner AR server when available
 - **Goal**: Mod connects via HTTP through `CommanderLink`, reports state, commander spawns
   units via AR's native systems. Same tick, two fronts — Poligon goes green before
@@ -1963,9 +1951,9 @@ packages/
 | **LLM seats** | Maskirovka — seat gateway for dev *and* production: BYO subscription seats (Claude Agent SDK credit · Codex ChatGPT sign-in) registered per deployment and hosted as Cloudflare Containers (or dialing in from home), `mock` seat + record/replay cache for $0 deterministic CI, metered API as automatic fallback |
 | **Coding-agent DX** | Root `AGENTS.md` + `CLAUDE.md` contract — one start command, tier aliases, `/healthz` machine-readable seats, auto-generated `.dev.vars`; agents never plumb keys |
 | **API dialects** | Latest only — OpenAI **Responses API** exclusively (legacy chat completions degrades `gpt-5.6-sol`); Anthropic Messages, latest version |
-| **Design system** | `@stavka/ui` — Tailwind CSS v4 `@theme` map-sheet tokens + Base UI primitives; one identity across Poligon, Maskirovka, and all future panels |
+| **Frontend composition** | Direct granular `@cloudflare/kumo` 2.9.2 imports, Kumo semantic tokens, and app-local feature components across Poligon, Maskirovka, and future panels |
 | **Human-surface auth** | Cloudflare Access in front of every dashboard/viewer/admin route (email OTP / GitHub, allowlist, free ≤ 50 users) + in-Worker JWT verification on HTTP and WS; service tokens for headless clients; machine wire keys unchanged. Clerk / Better Auth reserved for a hypothetical public multi-tenant future |
-| **Frontend stack** | Everything TanStack — Start for all deployed apps (on Workers, sharing the Worker with the agents via custom entrypoint), Router with Effect-Schema'd search params (URLs are repro cases), Query for request/response data (real-time stays on Agents SDK sync), Table/Virtual/Form headless inside `@stavka/ui` |
+| **Frontend stack** | Everything TanStack — Start for all deployed apps (on Workers, sharing the Worker with the agents via custom entrypoint), Router with Effect-Schema'd search params (URLs are repro cases), Query for request/response data (real-time stays on Agents SDK sync), direct Table/Virtual/Form dependencies only where a surface needs them, and Kumo for styled controls |
 
 ## Open Questions
 

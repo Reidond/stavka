@@ -9,13 +9,13 @@ Everything feasible without Arma Reforger Tools or operator-owned cloud/model
 accounts is implemented in this workspace: strict protocol and replay
 contracts, Commander orchestration, deterministic simulation and link behavior,
 Poligon's hosted and browser-local modes, local and hosted Maskirovka code, the
-shared frontend system, and deterministic verification/evaluation tooling.
+Kumo-based frontend surfaces, and deterministic verification/evaluation tooling.
 
 > **External boundary:** no production Arma addon or dedicated-server layer is
-> claimed. Real Cloudflare deployment and bindings, Access policies, Container
-> lifecycle behavior, and live Claude/Codex/API accounts also require
-> operator-owned infrastructure and credentials and have not been validated by
-> the repository-only implementation pass.
+> claimed. The CI-gated production workflow is implemented but no live deploy is
+> run by repository verification. Real Cloudflare bindings, Access policies,
+> Container lifecycle behavior, and live Claude/Codex/API accounts require
+> operator-owned infrastructure and credentials.
 
 ## Quick start
 
@@ -61,7 +61,9 @@ pnpm ai:smoke
 ```
 
 `ai:up` binds Maskirovka to `127.0.0.1:4141`; `ai:smoke` uses only the mock
-seat. Live provider and deployment actions are always explicit operator steps.
+seat. Live provider actions and local/manual deployment actions are always
+explicit operator steps. A successful `main` CI verification is the authorized
+automatic production path.
 
 ## Engineering contract
 
@@ -74,11 +76,13 @@ seat. Live provider and deployment actions are always explicit operator steps.
   agents, and handlers call Effect repository operations.
 - Wire, persisted, URL, map, and replay data is decoded with Effect Schema at
   the boundary.
-- Frontend variants use `tailwind-variants@3.3.0` `tv`; Tailwind-aware class
-  composition uses the shared `cn` helper from `@stavka/ui`.
+- Frontend surfaces import granular `@cloudflare/kumo` components and primitives,
+  use Kumo semantic tokens, and keep feature-specific compositions app-local.
+  TanStack Table/Form/Virtual are direct dependencies only where a surface needs
+  their headless behavior.
 - `pnpm lint:tailwind` runs per-entrypoint, warning-as-error Oxc/Tailwind rules
   against each app's real CSS source. Tracked VS Code settings and extensions
-  give Cursor the same Tailwind v4, `tv(...)`, and `cn(...)` awareness.
+  give Cursor the same Tailwind v4 entrypoints and Kumo semantic utilities.
 
 The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 [engineering guide](docs/EFFECT_V4.md) contain the project-specific patterns.
@@ -92,7 +96,6 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 | `packages/doctrine`    | Typed Commander doctrine presets                                                                                       |
 | `packages/sim-core`    | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
 | `packages/sim-link`    | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
-| `packages/ui`          | Shared Tailwind variants, tokens, interaction primitives, tables, forms, and virtual feeds                             |
 | `tools/tasks`          | Effect-first repository task orchestration behind short package-script aliases                                         |
 | `apps/commander`       | Effect HttpApi Worker, durable Commander/Sergeants, seat routing/accounting, logs, inline/R2 replay exports            |
 | `apps/poligon`         | TanStack/THREE proving ground with Agent, offline, versus, replay, and cost views                                      |
@@ -123,10 +126,13 @@ the local browser acceptance evidence are recorded in
 
 These checks use mocks, fakes, and replay data. They do not prove a real
 Cloudflare deployment, Access policy, subscription seat, production addon, or
-dedicated server.
+dedicated server. The production job uploads and configures all four services
+in order; while workers.dev returns error 1042, that success is not HTTP health.
 
 ## Documentation
 
+- [Service URLs](docs/URLS.md) — local and production origins, path maps, and
+  probe commands
 - [Operator guide](docs/OPERATOR_GUIDE.md) — local stacks, modes, routes,
   exports, secrets, and deployment preparation
 - [Implementation and acceptance status](docs/IMPLEMENTATION_STATUS.md) —

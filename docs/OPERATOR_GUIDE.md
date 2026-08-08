@@ -1,9 +1,14 @@
 # Stavka operator guide
 
-This guide covers every layer that can be run or prepared from this repository
-without Arma Reforger. Cloudflare deployment, Access policy creation, live
-provider accounts, the production addon, and a dedicated server are explicit
-external gates; no result for those gates is claimed here.
+Primary day-to-day path is four Cloudflare services — the Maskirovka gateway
+Container, hosted Maskirovka seat, Commander, and Poligon — via `wrangler dev`
+locally or the CI-gated production workflow. Arma Reforger remains out of scope
+here. Live subscription tokens and Cloudflare Access policies are operator-owned
+gates.
+
+**Permanently unsupported:** PRODUCT Posture B / home-Mac dial-in (outbound
+contributor seats from a personal machine). Seat execution for hosted Stavka is
+Cloudflare Container only. Do not wire or document dial-in to a personal Mac.
 
 ## System shape
 
@@ -18,26 +23,206 @@ flowchart LR
   A["Future Arma addon/server<br/>not implemented by scope"] -.-> C
   PA -->|"protocol v1 + machine bearer"| C["Commander<br/>Effect HttpApi + durable agents"]
   C --> D["Commander and Sergeant state<br/>SQLite logs/archive + R2 export layer"]
-  C --> ML["Local Maskirovka<br/>mock / replay / subscription / API"]
-  ML <-->|"outbound contributor WebSocket"| RC["Remote contributor seat"]
-  C --> MH["Hosted Maskirovka leaf<br/>Worker + Container"]
+  C -->|"Bearer GATEWAY_KEY"| MG["Maskirovka gateway<br/>Worker + Container"]
+  MG --> CL["Claude + Codex CLIs<br/>in-process seats"]
+  C -.->|"optional experiment"| MH["Hosted leaf<br/>apps/maskirovka-seat"]
   H["Human operator"] -->|"Cloudflare Access"| PA
   H -->|"Cloudflare Access"| C
-  H -->|"Cloudflare Access"| ML
-  H -->|"Cloudflare Access"| MH
+  H -->|"Cloudflare Access"| MG
 ```
 
 The boundaries are deliberately separate:
 
 - simulator/game traffic uses an opaque machine bearer on Commander `/api/*`;
-- local/hosted Maskirovka model traffic uses its own seat bearer;
-- contributor processes connect outbound to Commander `/seats` with a
-  registration bearer;
+- Maskirovka model traffic uses `MASKIROVKA_GATEWAY_KEY` (gateway) or
+  `MASKIROVKA_SEAT_KEY` (optional leaf);
 - human pages, admin APIs, and Agent WebSocket upgrades use Cloudflare Access;
 - exact local mode may synthesize a development identity only when both
   `ENVIRONMENT=local` and `DEV_ACCESS_EMAIL` are configured.
 
 An Access identity never substitutes for a model/game machine credential.
+
+## Primary path: four Cloudflare services
+
+| Service                | Workspace                    | Local                        | Production order |
+| ---------------------- | ---------------------------- | ---------------------------- | ---------------- |
+| Maskirovka gateway     | `@stavka/maskirovka-gateway` | `build:dashboard` then `dev` | 1                |
+| Hosted Maskirovka seat | `@stavka/maskirovka-seat`    | `build:dashboard` then `dev` | 2                |
+| Commander              | `@stavka/commander`          | `dev`                        | 3                |
+| Poligon                | `@stavka/poligon`            | `dev` (Vite)                 | 4                |
+
+Deploy and local origins, path maps, Access issuer pattern, and probe commands
+are catalogued in [URLS.md](./URLS.md). Production workers.dev subdomain on
+this account is `andrii-shafar`:
+
+- Gateway: `https://stavka-maskirovka-gateway.andrii-shafar.workers.dev`
+- Hosted seat: `https://stavka-maskirovka-seat.andrii-shafar.workers.dev`
+- Commander: `https://stavka-commander.andrii-shafar.workers.dev`
+- Poligon: `https://stavka-poligon.andrii-shafar.workers.dev`
+
+The production workflow runs `pnpm run deploy:production` after all verification
+gates. Its Effect task builds gateway and seat dashboards plus Poligon before
+any mutation, then deploys the four services in the order in the table above.
+For an explicit local/manual action, use the service's `pnpm --filter <pkg> run
+deploy` script (never bare `pnpm deploy`, which is pnpm's own publish command).
+Poligon deploy reads `dist/server/wrangler.json` from the preceding build.
+
+### Production CI/CD policy
+
+The single `.github/workflows/ci.yml` workflow verifies pull requests, pushes to
+`main`, and manual dispatches. Its `deploy` job needs a successful `verify` job
+and runs only for a `main` push or manual dispatch from `main`. It uses the
+GitHub `production` environment, the non-cancellable `cloudflare-production`
+concurrency group, and requires `CLOUDFLARE_API_TOKEN` plus
+`CLOUDFLARE_ACCOUNT_ID`.
+
+The account-scoped token should have Workers Scripts Edit and Containers Edit.
+Add KV, R2, or route permissions only if a future CI task provisions or manages
+those resources. Worker secrets and Claude/Codex provider credentials remain
+out of band; CI never writes them.
+
+A green deployment proves upload and Wrangler configuration only. While this
+account's workers.dev origin returns Cloudflare `error code: 1042`, it does not
+prove worker HTTP availability and the pipeline does not run a post-deploy
+health check.
+
+If a live rollback is required, run these package-filtered Wrangler commands in
+reverse-dependency order (Poligon, Commander, hosted seat, then gateway):
+
+```bash
+pnpm --filter @stavka/poligon exec wrangler rollback -c wrangler.jsonc
+pnpm --filter @stavka/commander exec wrangler rollback
+pnpm --filter @stavka/maskirovka-seat exec wrangler rollback
+pnpm --filter @stavka/maskirovka-gateway exec wrangler rollback
+```
+
+Each command accepts an optional positional `<VERSION_ID>` after `rollback` to
+target a specific Worker Version. Rollback is an explicit operator live action,
+never a repository verification step.
+
+### Local wrangler-dev stack
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+
+cp apps/maskirovka-gateway/.dev.vars.example apps/maskirovka-gateway/.dev.vars
+cp apps/commander/.dev.vars.example apps/commander/.dev.vars
+cp apps/poligon/.dev.vars.example apps/poligon/.dev.vars
+```
+
+Edit ignored `.dev.vars` so Commander `STAVKA_AI_BASE_URL` / `STAVKA_AI_KEY`
+point at the gateway origin and key, and Poligon `COMMANDER_*` match Commander.
+For local Access synthesis, keep `ENVIRONMENT=local` and `DEV_ACCESS_EMAIL`.
+
+```bash
+pnpm --filter @stavka/maskirovka-gateway build:dashboard
+pnpm --filter @stavka/maskirovka-gateway dev
+```
+
+```bash
+pnpm --filter @stavka/commander dev
+```
+
+```bash
+pnpm --filter @stavka/poligon dev
+```
+
+Gateway dashboard credentials: open `/_/` (Access-gated), use Provider auth to
+paste Claude (`claude setup-token`) and Codex subscription tokens. Tokens stay
+in Durable Object auth state and are never echoed. Optional Wrangler secrets
+`CLAUDE_CODE_OAUTH_TOKEN` / `CODEX_ACCESS_TOKEN` are recovery-only.
+
+### Account bindings already created
+
+On account `Andrii Shafar` (`3f5946e8e68fa04a86d36a5f83617f4b`):
+
+| Resource      | Binding / name                                         | Id / note                                             |
+| ------------- | ------------------------------------------------------ | ----------------------------------------------------- |
+| KV            | Commander `TERRAIN_CACHE`                              | `7b6659541b754b71bf36f7eaf2997065`                    |
+| R2            | Commander `SESSION_EXPORTS` → `stavka-session-exports` | created                                               |
+| R2            | Gateway `REPLAY_CACHE` → `stavka-maskirovka-replay`    | created                                               |
+| Container app | `stavka-maskirovka-gateway-maskirovkagateway`          | Application ID `a03535c4-54fd-4fd4-bbe1-f2d556d428ea` |
+
+Machine secrets were uploaded with `wrangler secret put` (never commit):
+
+| Worker                      | Secrets                                                 |
+| --------------------------- | ------------------------------------------------------- |
+| `stavka-maskirovka-gateway` | `MASKIROVKA_GATEWAY_KEY`                                |
+| `stavka-commander`          | `API_KEY`, `STAVKA_AI_KEY` (same value as gateway key)  |
+| `stavka-poligon`            | `COMMANDER_API_KEY` (same value as Commander `API_KEY`) |
+
+Rotate with `pnpm generate-key` and another interactive `secret put`.
+
+### Cloudflare Access (operator dashboard — API token lacks Access scopes)
+
+Wrangler OAuth on this machine can manage Workers/KV/R2/Containers but **cannot**
+create Access apps (`Authentication error` on `/access/*`). Create four
+self-hosted Access applications in Zero Trust:
+
+1. **Zero Trust → Access → Applications → Add application → Self-hosted**
+2. Applications (workers.dev first):
+   - `Stavka Poligon` → `stavka-poligon.andrii-shafar.workers.dev`
+   - `Stavka Commander` → `stavka-commander.andrii-shafar.workers.dev`
+   - `Stavka Maskirovka gateway` → `stavka-maskirovka-gateway.andrii-shafar.workers.dev`
+     (protect `/_/` and `/admin/*`; machine `/healthz`, `/v1/*` stay bearer-only
+     at the Worker — Access still wraps the hostname unless you path-split)
+   - `Stavka Maskirovka seat` → the hosted seat workers.dev hostname when that
+     optional service is enabled
+3. Policy: Allow your operator email (or IdP group). Keep service tokens
+   least-privileged if used.
+4. Copy each app’s **Application Audience (AUD)** and the team domain.
+   `ACCESS_TEAM_DOMAIN` must include the scheme:
+   `https://<team>.cloudflareaccess.com` (not bare hostname — JWT issuer/JWKS
+   verification fails without `https://`).
+5. Set on every Worker (vars or secrets; not committed):
+
+```bash
+pnpm --filter @stavka/maskirovka-gateway exec wrangler secret put ACCESS_TEAM_DOMAIN
+pnpm --filter @stavka/maskirovka-gateway exec wrangler secret put ACCESS_AUD
+pnpm --filter @stavka/commander exec wrangler secret put ACCESS_TEAM_DOMAIN
+pnpm --filter @stavka/commander exec wrangler secret put ACCESS_AUD
+pnpm --filter @stavka/poligon exec wrangler secret put ACCESS_TEAM_DOMAIN
+pnpm --filter @stavka/poligon exec wrangler secret put ACCESS_AUD
+```
+
+Use the matching AUD per app when audiences differ.
+
+### Deploy smoke checklist
+
+After workers.dev serves traffic (see blocker below):
+
+```bash
+GW=https://stavka-maskirovka-gateway.andrii-shafar.workers.dev
+CMD=https://stavka-commander.andrii-shafar.workers.dev
+POL=https://stavka-poligon.andrii-shafar.workers.dev
+
+curl --fail -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" "$GW/healthz"
+curl --fail -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" "$GW/v1/models"
+curl --fail "$CMD/healthz"
+curl --silent --output /dev/null --write-out '%{http_code}\n' \
+  --request POST "$CMD/api/tick"   # expect 401
+curl --fail "$POL/healthz"
+```
+
+Then: Access login to gateway `/_/`, store Claude + Codex tokens, confirm
+`/healthz` seat headroom; Poligon Agent → Commander → gateway; unauthenticated
+human routes fail closed; Container sleep/restart keeps DO auth checkpoints.
+
+### Known blocker: account workers.dev returns error 1042
+
+Workers are uploaded and secrets/bindings exist. Public
+`https://*.andrii-shafar.workers.dev` currently returns Cloudflare
+`error code: 1042` (HTTP 404) for every Worker on this account, including a
+minimal probe, and `wrangler tail` shows no invocation. Remote execution via
+`wrangler dev --remote` succeeds (Worker code runs). Custom domains on other
+zones still work for non-Stavka apps.
+
+Until Cloudflare repairs the `andrii-shafar` workers.dev zone (or the
+subdomain is reprovisioned via support/dashboard), public smokes and Access
+hostname binding against workers.dev cannot complete. A CI deploy can still
+finish its upload/configuration steps; do not treat that success alone as HTTP
+acceptance.
 
 ## Prerequisites and bootstrap
 
@@ -46,7 +231,7 @@ Use the pinned workspace versions:
 - Node.js 22 from `.node-version`
 - pnpm 11.18.0 from `package.json`
 - Vite+ 0.2.7 from the root development dependencies
-- Docker only for the hosted-seat Linux image build
+- Docker for gateway/leaf Container image builds
 
 ```bash
 corepack enable
@@ -57,7 +242,7 @@ pnpm exec vp --version
 CI installs with a frozen lockfile. Do not switch package managers or modify the
 lock merely because `vp` is not installed globally.
 
-## Deterministic local Commander and Poligon
+## Deterministic local Commander and Poligon (legacy Node-oriented)
 
 Create ignored local files from the tracked templates:
 
@@ -212,10 +397,17 @@ canonical `SessionExport` behind the repository boundary. The binding is
 that the target-account bucket, retention/garbage collection, or deployed
 read/write behavior is correct.
 
-## Local Maskirovka gateway
+## Maskirovka gateway (hosted Container is primary)
 
-Maskirovka keeps ordinary development deterministic and makes seat use an
-explicit operator action.
+The supported hosted Maskirovka is `apps/maskirovka-gateway`: one Worker +
+Container running Claude and Codex seats in-process (PRODUCT Posture A). Prefer
+`wrangler dev` / deploy for that app. Leaf `apps/maskirovka-seat` remains an
+optional single-provider Cloudflare experiment only.
+
+### Legacy Node `:4141` helpers (CI / offline only)
+
+`pnpm ai:up` and the Node server on `127.0.0.1:4141` are **not** the operator
+primary path. Keep them for offline CI helpers, replay doctor, and corpus work:
 
 ```bash
 pnpm ai:doctor
@@ -269,31 +461,23 @@ production posture.
 Do not infer entitlement, model availability, quota, or billing from a doctor,
 mock, or replay pass.
 
-### Outbound contributor seat
+### Outbound contributor seat — unsupported for hosted Stavka
 
-A machine behind NAT can contribute an authenticated Claude or Codex seat by
-opening an outbound WebSocket to Commander:
+PRODUCT Posture B (home-Mac / NAT dial-in via `maskirovka serve --register`) is
+**unsupported** for Stavka’s hosted posture. Do not document or operate seats
+on a personal machine as a production path. Repository contributor-client code
+may remain for protocol experiments; it is not an approved deployment option.
 
-```bash
-MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD=20 \
-  pnpm --filter @stavka/maskirovka serve -- \
-  --register wss://commander.example/seats \
-  --token '<registration-token>' \
-  --provider claude \
-  --seat-id home-claude
-```
+Hosted seat execution is the Maskirovka gateway Container (or, optionally, a
+Cloudflare leaf Container — never a home Mac).
 
-Contributor mode owns bearer registration, heartbeat/reconnect, typed decision
-frames, deadlines, cancellation, official SDK execution, and durable per-seat
-usage reservations. It is a leaf process: it does not start the local HTTP
-gateway, dashboard, request feed, cache, or alias controls. Commander owns
-cross-seat aggregation and failover.
+## Hosted Maskirovka leaf (optional Cloudflare experiment)
 
-## Hosted Maskirovka leaf
-
-`apps/maskirovka-seat` is a single operator-owned seat, not a replacement for
-the local orchestration gateway. Its Worker and Container both use Effect v4
-`HttpApi`; the Container runs one official Codex or Claude SDK.
+`apps/maskirovka-seat` is a **single-provider Cloudflare Container leaf**, not
+the PRODUCT gateway and never a personal-machine dial-in. Prefer
+`apps/maskirovka-gateway` for Claude + Codex together. The leaf Worker and
+Container both use Effect v4 `HttpApi`; the Container runs one official Codex
+or Claude SDK.
 
 Repository-only checks:
 
@@ -348,28 +532,31 @@ still needs live external observation.
 
 Run these from the repository root:
 
-| Command                 | Scope                                                          |
-| ----------------------- | -------------------------------------------------------------- |
-| `pnpm check`            | Vite+ lint/format gate                                         |
-| `pnpm lint:tailwind`    | Oxc + `better-tailwindcss`, warnings denied                    |
-| `pnpm test`             | Deterministic Vitest suite                                     |
-| `pnpm test:watch`       | Interactive watch mode                                         |
-| `pnpm typecheck`        | TypeScript checks across workspaces                            |
-| `pnpm build`            | Package builds and Worker dry-run bundles, concurrency limited |
-| `pnpm verify`           | Workspace-declared verification tasks, concurrency limited     |
-| `pnpm eval -- --replay` | Semantic replay/simulation/Maskirovka corpus gate              |
-| `pnpm ai:smoke`         | Zero-provider local gateway contract smoke                     |
-| `pnpm generate-key`     | Print a new 256-bit `sk-stavka-…` machine key                  |
+| Command                      | Scope                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm check`                 | Vite+ lint/format gate                                                        |
+| `pnpm lint:tailwind`         | Oxc + `better-tailwindcss`, warnings denied                                   |
+| `pnpm test`                  | Deterministic Vitest suite                                                    |
+| `pnpm test:watch`            | Interactive watch mode                                                        |
+| `pnpm typecheck`             | TypeScript checks across workspaces                                           |
+| `pnpm build`                 | Package builds and Worker dry-run bundles, concurrency limited                |
+| `pnpm verify`                | Workspace-declared verification tasks, concurrency limited                    |
+| `pnpm eval -- --replay`      | Semantic replay/simulation/Maskirovka corpus gate                             |
+| `pnpm ai:smoke`              | Zero-provider local gateway contract smoke                                    |
+| `pnpm run deploy:production` | CI-only ordered production deployment; do not run locally during verification |
+| `pnpm generate-key`          | Print a new 256-bit `sk-stavka-…` machine key                                 |
 
-Tailwind warnings seen by Cursor are intentional project diagnostics. Four Oxc
-invocations select the correct CSS entrypoint for shared UI, Poligon, local
-Maskirovka, and the hosted seat; together they cover the first-party JS/TS
-surfaces with warnings denied. The tracked workspace settings teach Tailwind
-IntelliSense about `tv(...)`, `cn(...)`, and those v4 style sources. Do not
-silence a warning with hand-built conditional class strings.
+Tailwind warnings seen by Cursor are intentional project diagnostics. Five Oxc
+invocations cover Commander/architecture plus the correct CSS entrypoints for
+Poligon, local Maskirovka, the hosted seat, and the gateway dashboard, with
+warnings denied. The tracked workspace settings map Tailwind IntelliSense to
+those v4/Kumo style sources. Do not silence a warning with hand-built
+conditional class strings.
 
-There is no root deploy command. Deploy an app only after external setup, using
-its workspace `deploy` script. Never publish merely because a dry run passed.
+Do not run `pnpm run deploy:production` locally during repository verification.
+The automatic production path is the successful `main` CI verify followed by
+the gated deploy job; explicit local/manual service deploys remain operator
+actions. Never publish merely because a dry run passed.
 
 ## Secrets and deployment preparation
 
@@ -387,26 +574,23 @@ Local rules:
 - never place real credentials in examples, fixtures, replay corpora, command
   arguments, screenshots, or chat.
 
-Once an operator supplies a Cloudflare account/domain, the safe preparation
-sequence is:
+Cloudflare preparation sequence (workers.dev first; custom domains later):
 
-1. Complete all deterministic and local HTTP/browser gates.
-2. Confirm the intended account with `wrangler whoami` in each app directory.
-3. Create/bind Commander DO/KV/R2, Poligon Agent assets, and hosted-seat
-   DO/Container/assets; replace placeholder origins.
-4. Add secrets interactively with `wrangler secret put`.
-5. Create Access applications and policies; configure exact team domains,
-   audiences, user roles, and least-privilege service tokens.
-6. Deploy deliberately, then verify unauthorized and authorized HTTP,
-   WebSocket, state eviction/redeploy, R2 export, Container lifecycle,
-   cancellation/backpressure, and secret rotation.
-7. Validate each live seat separately before enabling Commander routing; keep
-   rule/replay fallback available.
-8. Record observability, failure/degraded-mode, retention, rollback, and cost
-   evidence.
-
-Those steps are instructions for a future authorized deployment, not evidence
-that one occurred.
+1. Complete deterministic gates and local `wrangler dev` smokes.
+2. Confirm account with `wrangler whoami`.
+3. Bind Commander KV/R2 and gateway R2/Container (see “Account bindings” above).
+4. `wrangler secret put` for machine keys; never commit secrets.
+5. Create Access apps/policies in the Zero Trust dashboard; set
+   `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` on each Worker.
+6. Put the required `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the
+   GitHub `production` environment; keep worker and provider secrets out of CI.
+7. Let successful `main` CI verify trigger the ordered gateway → hosted seat →
+   Commander → Poligon deployment, or use an explicitly approved service deploy.
+8. Smoke machine bearers, Access gates, Container sleep/restart auth, R2
+   export, and Poligon Agent → Commander → gateway.
+9. If public `*.workers.dev` returns `error code: 1042`, stop and repair the
+   account workers.dev zone before claiming HTTP acceptance (uploads alone are
+   insufficient).
 
 ## Arma and dedicated-server handoff — excluded by scope
 
