@@ -77,7 +77,7 @@ describe("ReplayDashboard", () => {
     ]);
   });
 
-  it("renders replay metadata, timeline stages, and cost table with shared UI", () => {
+  it("renders replay metadata, timeline stages, and cost table with Kumo components", () => {
     const markup = renderToStaticMarkup(<ReplayDashboard replay={replayFixture} />);
 
     expect(markup).toContain("Cause to outcome replay timeline");

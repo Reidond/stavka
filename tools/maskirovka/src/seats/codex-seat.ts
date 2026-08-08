@@ -4,7 +4,11 @@ import { Effect } from "effect";
 import { GatewayError, type SeatInvocation, type SeatResult } from "../domain/types";
 import { estimateTokens, type SeatAdapter } from "./seat-adapter";
 
-const codexSubscriptionCredentialKeys = new Set(["CODEX_API_KEY", "OPENAI_API_KEY"]);
+const codexSubscriptionCredentialKeys = new Set([
+  "ANTHROPIC_API_KEY",
+  "CODEX_API_KEY",
+  "OPENAI_API_KEY",
+]);
 
 export const sanitizeCodexSubscriptionEnvironment = (
   environment: Readonly<Record<string, string | undefined>>,

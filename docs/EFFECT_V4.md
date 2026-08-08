@@ -98,5 +98,5 @@ rg -n "location\.pathname|url\.pathname|new URL\(" apps packages tools
 
 Every result must be either a justified external boundary or a migration defect.
 The repository architecture tests additionally reject Hono, manual pathname
-dispatch, Effect version drift, SQL outside repositories, and UI variants that
-bypass `tailwind-variants`.
+dispatch, Effect version drift, SQL outside repositories, and frontend code that
+drifts from the direct Kumo and app-local composition contract.

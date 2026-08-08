@@ -1,5 +1,5 @@
 ARG MASKIROVKA_PLATFORM=linux/amd64
-FROM --platform=${MASKIROVKA_PLATFORM} node:22-bookworm-slim AS build
+FROM --platform=${MASKIROVKA_PLATFORM} node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS build
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=/pnpm:$PATH
@@ -9,8 +9,9 @@ RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
 
 COPY container-package.json ./package.json
 COPY container-pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY container-pnpm-lock.yaml ./pnpm-lock.yaml
 RUN --mount=type=cache,id=maskirovka-seat-pnpm,target=/pnpm/store \
-  pnpm install --no-frozen-lockfile
+  pnpm install --frozen-lockfile
 
 COPY container-tsconfig.json ./tsconfig.json
 COPY src ./src
@@ -23,7 +24,7 @@ RUN pnpm exec esbuild src/container/main.ts \
   --outfile=dist/container.js
 RUN pnpm prune --prod
 
-FROM --platform=${MASKIROVKA_PLATFORM} node:22-bookworm-slim AS runtime
+FROM --platform=${MASKIROVKA_PLATFORM} node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=4141

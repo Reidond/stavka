@@ -3,10 +3,18 @@ import { Effect } from "effect";
 import { GatewayError, type SeatInvocation, type SeatResult } from "../domain/types";
 import type { SeatAdapter } from "./seat-adapter";
 
-const oauthEnvironment = (): NodeJS.ProcessEnv => ({
-  ...process.env,
-  ANTHROPIC_API_KEY: undefined,
-});
+export const sanitizeClaudeSubscriptionEnvironment = (
+  environment: Readonly<Record<string, string | undefined>>,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(environment).filter(
+      ([key, value]) =>
+        key !== "ANTHROPIC_API_KEY" &&
+        key !== "OPENAI_API_KEY" &&
+        key !== "CODEX_API_KEY" &&
+        value !== undefined,
+    ),
+  ) as Record<string, string>;
 
 export class ClaudeSeat implements SeatAdapter {
   readonly id = "claude" as const;
@@ -24,7 +32,7 @@ export class ClaudeSeat implements SeatAdapter {
             prompt: request.prompt,
             options: {
               abortController,
-              env: oauthEnvironment(),
+              env: sanitizeClaudeSubscriptionEnvironment(process.env),
               model: request.model,
               maxTurns: 1,
               tools: [],

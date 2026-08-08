@@ -3,8 +3,8 @@
   "extends": ["./.oxlintrc.json"],
   "settings": {
     "better-tailwindcss": {
-      "cwd": "packages/ui",
-      "entryPoint": "../../tools/maskirovka/src/dashboard/styles.css",
+      "cwd": "tools/maskirovka",
+      "entryPoint": "src/dashboard/styles.css",
       "detectComponentClasses": true
     }
   },

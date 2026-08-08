@@ -3,12 +3,12 @@
     "*.css": "tailwindcss"
   },
   "tailwindCSS.experimental.configFile": {
-    "packages/ui/src/tokens.css": "packages/ui/src/**",
     "apps/poligon/src/styles.css": "apps/poligon/src/**",
     "apps/maskirovka-seat/src/dashboard/styles.css": "apps/maskirovka-seat/src/dashboard/**",
-    "tools/maskirovka/src/dashboard/styles.css": "tools/maskirovka/src/dashboard/**"
+    "tools/maskirovka/src/dashboard/styles.css": "tools/maskirovka/src/dashboard/**",
+    "apps/maskirovka-gateway/src/dashboard/styles.css": "apps/maskirovka-gateway/src/dashboard/**"
   },
-  "tailwindCSS.classFunctions": ["cn", "tv"],
+  "tailwindCSS.classFunctions": [],
   "editor.quickSuggestions": {
     "strings": "on"
   },

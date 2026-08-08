@@ -41,7 +41,7 @@ describe("CommanderCostDashboard", () => {
     });
   });
 
-  it("renders compact calls, token, and cost totals using shared UI components", () => {
+  it("renders compact calls, token, and cost totals using Kumo components", () => {
     const markup = renderToStaticMarkup(
       <CommanderCostDashboard
         sources={[

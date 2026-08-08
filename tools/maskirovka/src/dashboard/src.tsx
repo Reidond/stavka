@@ -6,10 +6,19 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { Banner } from "@cloudflare/kumo/components/banner";
+import { Button } from "@cloudflare/kumo/components/button";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Schema } from "effect";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Button, LogFeed, OrderCallout, SchemaForm, SeatCard, Stamp, StatusChip } from "@stavka/ui";
+
+import {
+  MaskirovkaBadge,
+  MaskirovkaLogFeed,
+  MaskirovkaSeatOverview,
+  MaskirovkaSettingsForm,
+} from "./components";
 
 import "./styles.css";
 
@@ -161,18 +170,22 @@ function Dashboard() {
     <main className="maskirovka-shell">
       <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="stavka-grid-label m-0">Stavka / seat gateway / operations</p>
-          <h1 className="m-0 font-display text-5xl tracking-tight uppercase">Maskirovka</h1>
+          <p className="m-0 text-xs tracking-wider text-kumo-subtle uppercase">
+            Stavka / seat gateway / operations
+          </p>
+          <h1 className="m-0 text-5xl font-semibold tracking-tight text-kumo-strong uppercase">
+            Maskirovka
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusChip tone={snapshot?.ok ? "works" : "broken"}>
+          <MaskirovkaBadge status={snapshot?.ok ? "success" : "error"}>
             {snapshot?.mode ?? "loading"}
-          </StatusChip>
-          <Stamp tone={snapshot?.killed ? "broken" : "works"}>
+          </MaskirovkaBadge>
+          <MaskirovkaBadge status={snapshot?.killed ? "error" : "success"}>
             {snapshot?.killed ? "Traffic stopped" : "Traffic enabled"}
-          </Stamp>
+          </MaskirovkaBadge>
           <Button
-            tone={snapshot?.killed ? "primary" : "danger"}
+            variant={snapshot?.killed ? "primary" : "destructive"}
             disabled={!snapshot || killSwitch.isPending}
             onClick={() => killSwitch.mutate(!snapshot?.killed)}
           >
@@ -183,21 +196,19 @@ function Dashboard() {
 
       <div className="maskirovka-content">
         {health.error ? (
-          <OrderCallout title="Gateway unavailable" priority="urgent">
-            {health.error.message}
-          </OrderCallout>
+          <Banner variant="error" title="Gateway unavailable" description={health.error.message} />
         ) : null}
 
         <section>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-display text-2xl uppercase">Seats</h2>
-            <p className="font-data text-xs uppercase">
+            <h2 className="text-2xl font-semibold text-kumo-strong uppercase">Seats</h2>
+            <p className="text-xs text-kumo-subtle uppercase">
               {snapshot?.accounting.note ?? "Loading quota estimate scope"}
             </p>
           </div>
           <div className="maskirovka-grid">
             {(snapshot?.seats ?? []).map((seat) => (
-              <SeatCard
+              <MaskirovkaSeatOverview
                 key={seat.id}
                 name={seat.name}
                 provider={seat.id}
@@ -215,8 +226,8 @@ function Dashboard() {
 
         <section className="mt-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-display text-2xl uppercase">Tier map</h2>
-            <p className="font-data text-xs uppercase">
+            <h2 className="text-2xl font-semibold text-kumo-strong uppercase">Tier map</h2>
+            <p className="text-xs text-kumo-subtle uppercase">
               {snapshot?.savings.requests ?? 0} requests · cash ~$
               {(snapshot?.savings.actualCostUsd ?? 0).toFixed(4)} · plan credit ~$
               {(snapshot?.savings.planCreditUsd ?? 0).toFixed(4)} · saved ~$
@@ -225,9 +236,11 @@ function Dashboard() {
           </div>
           <div className="maskirovka-grid">
             {(snapshot?.aliases ?? []).map((alias) => (
-              <section key={alias.tier} className="stavka-panel p-4">
-                <h3 className="mt-0 font-display text-lg uppercase">{alias.tier}</h3>
-                <SchemaForm
+              <LayerCard key={alias.tier} className="p-4">
+                <h3 className="mt-0 text-lg font-semibold text-kumo-strong uppercase">
+                  {alias.tier}
+                </h3>
+                <MaskirovkaSettingsForm
                   schema={RemapSchema}
                   defaultValues={{ seat: alias.seat, model: alias.model }}
                   fields={[
@@ -253,14 +266,14 @@ function Dashboard() {
                     });
                   }}
                 />
-              </section>
+              </LayerCard>
             ))}
           </div>
         </section>
 
         <section className="mt-6">
-          <h2 className="font-display text-2xl uppercase">Request feed</h2>
-          <LogFeed
+          <h2 className="text-2xl font-semibold text-kumo-strong uppercase">Request feed</h2>
+          <MaskirovkaLogFeed
             items={requests.data?.requests ?? []}
             getKey={(item) => item.requestId}
             renderItem={(item) => (

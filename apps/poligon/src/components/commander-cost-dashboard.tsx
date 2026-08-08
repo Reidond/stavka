@@ -1,5 +1,9 @@
 import type { CommanderCostAggregate } from "@stavka/protocol";
-import { DataTable, FigureFrame, StatusChip, type ColumnDef } from "@stavka/ui";
+import { Badge } from "@cloudflare/kumo/components/badge";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
+import type { ColumnDef } from "@tanstack/react-table";
+
+import { PoligonDataTable } from "./poligon-ui";
 
 export interface CommanderCostSource {
   readonly faction: string;
@@ -49,30 +53,30 @@ const columns: ColumnDef<CommanderCostRow, unknown>[] = [
   {
     accessorKey: "faction",
     header: "Faction",
-    cell: ({ row }) => <StatusChip>{row.original.faction}</StatusChip>,
+    cell: ({ row }) => <Badge variant="secondary">{row.original.faction}</Badge>,
   },
   {
     id: "agent",
     header: "Agent / model",
     cell: ({ row }) => (
       <div className="min-w-36">
-        <StatusChip>{row.original.agent_tier}</StatusChip>
-        <span className="mt-1 block font-data text-xs">{row.original.model}</span>
+        <Badge variant="secondary">{row.original.agent_tier}</Badge>
+        <span className="mt-1 block text-xs text-kumo-subtle">{row.original.model}</span>
       </div>
     ),
   },
   {
     accessorKey: "calls",
     header: "Calls",
-    cell: ({ row }) => <span className="font-data">{formatInteger(row.original.calls)}</span>,
+    cell: ({ row }) => <span>{formatInteger(row.original.calls)}</span>,
   },
   {
     id: "tokens",
     header: "Tokens",
     cell: ({ row }) => (
-      <span className="font-data">
+      <span>
         {formatInteger(row.original.input_tokens + row.original.output_tokens)}
-        <span className="block text-[0.65rem] text-ink/60">
+        <span className="block text-[0.65rem] text-kumo-subtle">
           {formatInteger(row.original.input_tokens)} in ·{" "}
           {formatInteger(row.original.output_tokens)} out
         </span>
@@ -82,7 +86,7 @@ const columns: ColumnDef<CommanderCostRow, unknown>[] = [
   {
     accessorKey: "cost_usd",
     header: "Cost",
-    cell: ({ row }) => <span className="font-data">{formatCost(row.original.cost_usd)}</span>,
+    cell: ({ row }) => <span>{formatCost(row.original.cost_usd)}</span>,
   },
 ];
 
@@ -102,23 +106,26 @@ export const CommanderCostDashboard = ({
   );
 
   return (
-    <FigureFrame caption="Current commander session usage">
+    <LayerCard className="overflow-hidden p-0">
+      <p className="border-b border-kumo-hairline px-3 py-2 text-xs tracking-wider text-kumo-subtle uppercase">
+        Current commander session usage
+      </p>
       <section aria-label="Commander session cost dashboard" className="space-y-3 p-3">
         <header className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="m-0 font-display text-2xl uppercase">Session cost</h2>
+          <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">Session cost</h2>
           <div className="flex flex-wrap gap-1.5">
-            <StatusChip>{formatInteger(totals.calls)} calls</StatusChip>
-            <StatusChip>{formatInteger(totals.tokens)} tokens</StatusChip>
-            <StatusChip>{formatCost(totals.cost)}</StatusChip>
+            <Badge variant="secondary">{formatInteger(totals.calls)} calls</Badge>
+            <Badge variant="secondary">{formatInteger(totals.tokens)} tokens</Badge>
+            <Badge variant="secondary">{formatCost(totals.cost)}</Badge>
           </div>
         </header>
-        <DataTable
+        <PoligonDataTable
           data={rows}
           columns={columns}
           emptyLabel="No model usage reported for this session"
           getRowId={(row) => row.key}
         />
       </section>
-    </FigureFrame>
+    </LayerCard>
   );
 };

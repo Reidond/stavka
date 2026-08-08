@@ -1,9 +1,10 @@
 import { Canvas, useThree } from "@react-three/fiber";
 import type { SimWorldState } from "@stavka/sim-core";
-import { mapSheetColors } from "@stavka/ui";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { OrbitControls as ThreeOrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+import { poligonVisualizationPalette } from "./poligon-ui";
 
 const MAX_POLAR_ANGLE = Math.PI / 2.1;
 
@@ -60,7 +61,12 @@ const Terrain = ({ world }: { readonly world: SimWorldState }) => {
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
     <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <meshStandardMaterial color={mapSheetColors.olive} wireframe opacity={0.86} transparent />
+      <meshStandardMaterial
+        color={poligonVisualizationPalette.terrain}
+        wireframe
+        opacity={0.86}
+        transparent
+      />
     </mesh>
   );
 };
@@ -82,13 +88,21 @@ const Units = ({ world, faction }: { readonly world: SimWorldState; readonly fac
             <mesh castShadow>
               <cylinderGeometry args={[4, 4, 8, 10]} />
               <meshStandardMaterial
-                color={friendly ? mapSheetColors.ultramarine : mapSheetColors.carmine}
+                color={
+                  friendly
+                    ? poligonVisualizationPalette.friendly
+                    : poligonVisualizationPalette.hostile
+                }
               />
             </mesh>
             {group.status === "engaged" ? (
               <mesh rotation={[-Math.PI / 2, 0, 0]}>
                 <ringGeometry args={[8, 11, 24]} />
-                <meshBasicMaterial color={mapSheetColors.carmine} transparent opacity={0.7} />
+                <meshBasicMaterial
+                  color={poligonVisualizationPalette.hostile}
+                  transparent
+                  opacity={0.7}
+                />
               </mesh>
             ) : null}
             {group.order ? (
@@ -100,7 +114,7 @@ const Units = ({ world, faction }: { readonly world: SimWorldState; readonly fac
                 ]}
               >
                 <coneGeometry args={[3, 8, 8]} />
-                <meshStandardMaterial color={mapSheetColors.contour} />
+                <meshStandardMaterial color={poligonVisualizationPalette.objective} />
               </mesh>
             ) : null}
           </group>
@@ -130,14 +144,14 @@ export const Battlefield = ({
     shadows="percentage"
     frameloop="demand"
     dpr={[1, 1.5]}
-    className="min-h-136 bg-ink"
+    className="min-h-136 bg-kumo-contrast"
   >
     <ambientLight intensity={1.5} />
     <directionalLight position={[200, 400, 100]} intensity={2.5} castShadow />
     <Terrain world={world} />
     <Units world={world} faction={faction} />
     <gridHelper
-      args={[640, 32, mapSheetColors.contour, mapSheetColors.contour]}
+      args={[640, 32, poligonVisualizationPalette.grid, poligonVisualizationPalette.grid]}
       position={[0, 1, 0]}
     />
     <EventDrivenOrbitControls />

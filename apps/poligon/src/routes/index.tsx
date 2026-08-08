@@ -1,25 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate, type UseNavigateResult } from "@tanstack/react-router";
+import { Banner } from "@cloudflare/kumo/components/banner";
+import { Button } from "@cloudflare/kumo/components/button";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Effect, Schema } from "effect";
 import { useEffect, useMemo, useState } from "react";
 import { useAgent } from "agents/react";
-import {
-  DataTable,
-  Button,
-  FigureFrame,
-  LogFeed,
-  MapLegend,
-  OrderCallout,
-  SchemaForm,
-  Stamp,
-  StatusChip,
-  TimeScrubber,
-  type ColumnDef,
-} from "@stavka/ui";
+import type { ColumnDef } from "@tanstack/react-table";
 import type { SimGroup } from "@stavka/sim-core";
 
 import { Battlefield } from "../components/battlefield";
 import { CommanderCostDashboard } from "../components/commander-cost-dashboard";
+import {
+  PoligonBadge,
+  PoligonDataTable,
+  PoligonFigure,
+  PoligonLegend,
+  PoligonLogFeed,
+  PoligonSettingsForm,
+  PoligonTimeScrubber,
+} from "../components/poligon-ui";
 import { useOfflineSimHost } from "../offline-sim-host";
 import { simWorldAgentName } from "../scenario-identity";
 import type { PoligonState, SimWorld } from "../sim-world";
@@ -215,7 +215,7 @@ const AgentPoligonPage = ({
   if (!state) {
     return (
       <main className="poligon-shell">
-        <Stamp tone="pending">Connecting to SimWorld</Stamp>
+        <PoligonBadge status="warning">Connecting to SimWorld</PoligonBadge>
       </main>
     );
   }
@@ -225,26 +225,32 @@ const AgentPoligonPage = ({
     <main className="poligon-shell">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="stavka-grid-label m-0">Stavka / proving ground / {name}</p>
-          <h1 className="m-0 font-display text-5xl tracking-tight uppercase">Poligon</h1>
+          <p className="m-0 text-xs tracking-wider text-kumo-subtle uppercase">
+            Stavka / proving ground / {name}
+          </p>
+          <h1 className="m-0 text-5xl font-semibold tracking-tight text-kumo-strong uppercase">
+            Poligon
+          </h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button size="sm" onClick={() => void navigate({ to: "/replay" })}>
             Replay import
           </Button>
-          <StatusChip tone={accessMode === "operator" ? "works" : "pending"}>
+          <PoligonBadge status={accessMode === "operator" ? "success" : "warning"}>
             {accessMode === "loading" ? "checking access" : accessMode}
-          </StatusChip>
-          <StatusChip tone={health.data?.ok ? "works" : "pending"}>100 ms fixed step</StatusChip>
+          </PoligonBadge>
+          <PoligonBadge status={health.data?.ok ? "success" : "warning"}>
+            100 ms fixed step
+          </PoligonBadge>
           {commanderFactions.map((faction) => {
             const commander = state.commanders[faction];
             return (
-              <StatusChip key={faction} tone={commander?.connected ? "works" : "broken"}>
+              <PoligonBadge key={faction} status={commander?.connected ? "success" : "error"}>
                 {faction}{" "}
                 {commander?.connected
                   ? `${commander.mode}${commander.doctrine ? ` / ${commander.doctrine}` : ""}`
                   : "offline"}
-              </StatusChip>
+              </PoligonBadge>
             );
           })}
         </div>
@@ -252,28 +258,28 @@ const AgentPoligonPage = ({
 
       <div className="poligon-layout">
         <section className="min-w-0 space-y-4">
-          <FigureFrame
+          <PoligonFigure
             caption={`${state.scenario} · seed ${state.seed} · ${state.world.tick} fixed steps`}
           >
             <div className="relative min-h-136">
               <Battlefield world={state.world} faction={state.faction} camera={search.camera} />
               <div className="pointer-events-none absolute top-3 left-3 space-y-1">
-                <Stamp tone={state.paused ? "pending" : "works"}>
+                <PoligonBadge status={state.paused ? "warning" : "success"}>
                   {state.paused ? "Paused" : `Running ×${state.timeScale}`}
-                </Stamp>
+                </PoligonBadge>
               </div>
             </div>
-          </FigureFrame>
-          <MapLegend
+          </PoligonFigure>
+          <PoligonLegend
             items={[
               { label: state.faction, tone: "friendly" },
-              { label: "opposition", tone: "enemy" },
+              { label: "opposition", tone: "hostile" },
               { label: "terrain", tone: "terrain" },
               { label: "waypoint", tone: "objective" },
             ]}
           />
           <fieldset disabled={!canOperate} className="m-0 border-0 p-0">
-            <TimeScrubber
+            <PoligonTimeScrubber
               paused={state.paused}
               speed={state.timeScale}
               time={state.world.timeMs / 1_000}
@@ -283,14 +289,16 @@ const AgentPoligonPage = ({
               onSpeedChange={updateTimeScale}
             />
           </fieldset>
-          <DataTable data={groups} columns={groupColumns} getRowId={(group) => group.id} />
+          <PoligonDataTable data={groups} columns={groupColumns} getRowId={(group) => group.id} />
         </section>
 
         <aside className="space-y-4">
-          <section className="stavka-panel p-4">
-            <h2 className="mt-0 font-display text-2xl uppercase">Reproduction case</h2>
+          <LayerCard className="p-4">
+            <h2 className="mt-0 text-2xl font-semibold text-kumo-strong uppercase">
+              Reproduction case
+            </h2>
             <fieldset disabled={!canOperate} className="m-0 border-0 p-0">
-              <SchemaForm
+              <PoligonSettingsForm
                 schema={FormSchema}
                 defaultValues={{
                   scenario: search.scenario,
@@ -377,26 +385,32 @@ const AgentPoligonPage = ({
                 }}
               />
             </fieldset>
-          </section>
+          </LayerCard>
 
           {controlError ? (
-            <OrderCallout title="Simulation controls" priority="urgent">
-              {controlError}
-            </OrderCallout>
+            <Banner variant="error" title="Simulation controls" description={controlError} />
           ) : null}
 
           {commanderFactions.map((faction) => {
             const commander = state.commanders[faction];
             return commander?.lastError ? (
-              <OrderCallout key={faction} title={`${faction} commander`} priority="urgent">
-                {commander.lastError}
-              </OrderCallout>
+              <Banner
+                key={faction}
+                variant="error"
+                title={`${faction} commander`}
+                description={commander.lastError}
+              />
             ) : (
-              <OrderCallout key={faction} title={`${faction} commander`}>
-                {commander?.connected
-                  ? `Tick ${commander.lastTickId}; next-hint ${commander.tickRateHint} ms.`
-                  : "Set COMMANDER_URL and COMMANDER_API_KEY to close the full loop."}
-              </OrderCallout>
+              <Banner
+                key={faction}
+                variant="secondary"
+                title={`${faction} commander`}
+                description={
+                  commander?.connected
+                    ? `Tick ${commander.lastTickId}; next-hint ${commander.tickRateHint} ms.`
+                    : "Set COMMANDER_URL and COMMANDER_API_KEY to close the full loop."
+                }
+              />
             );
           })}
 
@@ -411,8 +425,8 @@ const AgentPoligonPage = ({
           />
 
           <section>
-            <h2 className="font-display text-2xl uppercase">Decision feed</h2>
-            <LogFeed
+            <h2 className="text-2xl font-semibold text-kumo-strong uppercase">Decision feed</h2>
+            <PoligonLogFeed
               items={state.decisions}
               getKey={(item) => item.key}
               renderItem={(item) => (
@@ -420,7 +434,7 @@ const AgentPoligonPage = ({
                   <strong className="block">
                     {item.faction} · {item.summary}
                   </strong>
-                  <span className="block font-data text-xs">
+                  <span className="block text-xs text-kumo-subtle">
                     {item.timestamp} · {item.model} · {item.latency_ms.toFixed(0)} ms · $
                     {item.cost_usd.toFixed(4)}
                   </span>
@@ -431,8 +445,8 @@ const AgentPoligonPage = ({
           </section>
 
           <section>
-            <h2 className="font-display text-2xl uppercase">Local link log</h2>
-            <LogFeed
+            <h2 className="text-2xl font-semibold text-kumo-strong uppercase">Local link log</h2>
+            <PoligonLogFeed
               items={state.logs}
               getKey={(item) => item.id}
               renderItem={(item) => (
@@ -491,42 +505,46 @@ const OfflinePoligonPage = ({
     <main className="poligon-shell">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="stavka-grid-label m-0">Stavka / proving ground / {name}</p>
-          <h1 className="m-0 font-display text-5xl tracking-tight uppercase">Poligon</h1>
+          <p className="m-0 text-xs tracking-wider text-kumo-subtle uppercase">
+            Stavka / proving ground / {name}
+          </p>
+          <h1 className="m-0 text-5xl font-semibold tracking-tight text-kumo-strong uppercase">
+            Poligon
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => void navigate({ to: "/replay" })}>
             Replay import
           </Button>
-          <StatusChip tone="works">browser offline</StatusChip>
-          <StatusChip tone="works">100 ms local fixed step</StatusChip>
-          <StatusChip tone="pending">no commander / no network</StatusChip>
+          <PoligonBadge status="success">browser offline</PoligonBadge>
+          <PoligonBadge status="success">100 ms local fixed step</PoligonBadge>
+          <PoligonBadge status="warning">no commander / no network</PoligonBadge>
         </div>
       </header>
 
       <div className="poligon-layout">
         <section className="min-w-0 space-y-4">
-          <FigureFrame
+          <PoligonFigure
             caption={`${state.scenario} · seed ${state.seed} · ${state.world.tick} fixed steps · browser host`}
           >
             <div className="relative min-h-136">
               <Battlefield world={state.world} faction={state.faction} camera={search.camera} />
               <div className="pointer-events-none absolute top-3 left-3 space-y-1">
-                <Stamp tone={state.paused ? "pending" : "works"}>
+                <PoligonBadge status={state.paused ? "warning" : "success"}>
                   {state.paused ? "Paused offline" : `Running offline ×${state.timeScale}`}
-                </Stamp>
+                </PoligonBadge>
               </div>
             </div>
-          </FigureFrame>
-          <MapLegend
+          </PoligonFigure>
+          <PoligonLegend
             items={[
               { label: state.faction, tone: "friendly" },
-              { label: "opposition", tone: "enemy" },
+              { label: "opposition", tone: "hostile" },
               { label: "terrain", tone: "terrain" },
               { label: "waypoint", tone: "objective" },
             ]}
           />
-          <TimeScrubber
+          <PoligonTimeScrubber
             paused={state.paused}
             speed={state.timeScale}
             time={state.world.timeMs / 1_000}
@@ -538,24 +556,25 @@ const OfflinePoligonPage = ({
           <div className="flex justify-end">
             <Button onClick={reset}>Reset exact seed</Button>
           </div>
-          <DataTable data={groups} columns={groupColumns} getRowId={(group) => group.id} />
+          <PoligonDataTable data={groups} columns={groupColumns} getRowId={(group) => group.id} />
         </section>
 
         <aside className="space-y-4">
-          <OrderCallout title="Browser-local simulation">
-            Deterministic sim-core runs in this tab. Agent WebSocket and Commander networking are
-            disabled.
-          </OrderCallout>
+          <Banner
+            variant="secondary"
+            title="Browser-local simulation"
+            description="Deterministic sim-core runs in this tab. Agent WebSocket and Commander networking are disabled."
+          />
 
           {controlError ? (
-            <OrderCallout title="Offline controls" priority="urgent">
-              {controlError}
-            </OrderCallout>
+            <Banner variant="error" title="Offline controls" description={controlError} />
           ) : null}
 
-          <section className="stavka-panel p-4">
-            <h2 className="mt-0 font-display text-2xl uppercase">Reproduction case</h2>
-            <SchemaForm
+          <LayerCard className="p-4">
+            <h2 className="mt-0 text-2xl font-semibold text-kumo-strong uppercase">
+              Reproduction case
+            </h2>
+            <PoligonSettingsForm
               schema={FormSchema}
               defaultValues={{
                 scenario: search.scenario,
@@ -641,11 +660,13 @@ const OfflinePoligonPage = ({
                 });
               }}
             />
-          </section>
+          </LayerCard>
 
           <section>
-            <h2 className="font-display text-2xl uppercase">Local simulation log</h2>
-            <LogFeed
+            <h2 className="text-2xl font-semibold text-kumo-strong uppercase">
+              Local simulation log
+            </h2>
+            <PoligonLogFeed
               items={state.logs}
               getKey={(item) => item.id}
               renderItem={(item) => (

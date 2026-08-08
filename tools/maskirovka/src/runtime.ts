@@ -16,7 +16,10 @@ import {
   type RequestLogRepositoryService,
 } from "./repositories/request-log-repository";
 import { FileRuntimeDirectoryRepository } from "./repositories/runtime-directory-repository";
-import { FileWindowTrackerRepository } from "./repositories/window-tracker-repository";
+import {
+  FileWindowTrackerRepository,
+  type WindowTrackerRepositoryService,
+} from "./repositories/window-tracker-repository";
 import { ApiSeat } from "./seats/api-seat";
 import { ClaudeSeat } from "./seats/claude-seat";
 import { CodexSeat } from "./seats/codex-seat";
@@ -30,6 +33,7 @@ export interface RuntimeOverrides {
   readonly cache?: CacheRepositoryService;
   readonly logs?: RequestLogRepositoryService;
   readonly gatewayConfig?: GatewayConfigRepositoryService;
+  readonly windowTracker?: WindowTrackerRepositoryService;
   readonly adapters?: readonly SeatAdapter[];
   readonly probes?: CliProbeRepositoryService;
 }
@@ -98,7 +102,8 @@ export const createGatewayService = (
           codexWindowTokens: config.codexWindowTokenLimit,
           codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
         },
-        new FileWindowTrackerRepository(join(config.stateDirectory, "usage-tracker.json")),
+        overrides.windowTracker ??
+          new FileWindowTrackerRepository(join(config.stateDirectory, "usage-tracker.json")),
       ),
     );
     yield* service.initialize();

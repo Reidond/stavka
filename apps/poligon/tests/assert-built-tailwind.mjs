@@ -14,18 +14,19 @@ const css = (
   await Promise.all(cssFiles.map((name) => readFile(join(assetsDirectory, name), "utf8")))
 ).join("\n");
 
-const sharedUtilities = [
-  ["inline-flex", ".inline-flex{display:inline-flex}"],
-  ["max-w-xl", ".max-w-xl{max-width:var(--container-xl)}"],
-  ["data-active:bg-ink", ".data-active\\:bg-ink[data-active]{background-color:var(--color-ink)}"],
+const kumoUtilities = [
+  ["kumo base token", "--color-kumo-base"],
+  ["kumo canvas token", "--color-kumo-canvas"],
+  ["kumo default text", "--text-color-kumo-default"],
+  ["kumo table utility", ".bg-kumo-base"],
+  ["kumo semantic status utility", ".text-kumo-success"],
+  ["kumo component-internal utility", ".bg-linear-to-b"],
 ];
 
-const missing = sharedUtilities
+const missing = kumoUtilities
   .filter(([, generatedCss]) => !css.includes(generatedCss))
   .map(([utility]) => utility);
 
 if (missing.length > 0) {
-  throw new Error(
-    `Generated Poligon CSS is missing shared @stavka/ui utilities: ${missing.join(", ")}`,
-  );
+  throw new Error(`Generated Poligon CSS is missing Kumo tokens/utilities: ${missing.join(", ")}`);
 }

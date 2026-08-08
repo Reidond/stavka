@@ -1,0 +1,45 @@
+@source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
+@import "@cloudflare/kumo/styles/tailwind";
+@import "tailwindcss";
+
+@source "./**/*.{ts,tsx}";
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0;
+  }
+
+  body {
+    background: var(--color-kumo-canvas);
+    color: var(--text-color-kumo-default);
+    overflow: hidden;
+  }
+
+  * {
+    border-color: var(--color-kumo-hairline);
+  }
+}
+
+@layer components {
+  .maskirovka-gateway-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    padding: 2rem;
+  }
+
+  .maskirovka-gateway-content {
+    height: calc(100vh - 8rem);
+    height: calc(100dvh - 8rem);
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+}

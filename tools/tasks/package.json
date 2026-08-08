@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "eval": "tsx src/cli.ts eval",
-    "lint:tailwind": "tsx src/cli.ts lint-tailwind",
+    "eval": "node --import tsx src/cli.ts eval",
+    "lint:tailwind": "node --import tsx src/cli.ts lint-tailwind",
+    "build:maskirovka-gateway": "node --import tsx src/cli.ts build-maskirovka-gateway",
+    "deploy:production": "node --import tsx src/cli.ts deploy-production",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

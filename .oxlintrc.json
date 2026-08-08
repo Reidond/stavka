@@ -3,8 +3,8 @@
   "jsPlugins": ["eslint-plugin-better-tailwindcss"],
   "settings": {
     "better-tailwindcss": {
-      "cwd": "packages/ui",
-      "entryPoint": "src/tokens.css",
+      "cwd": "apps/poligon",
+      "entryPoint": "src/styles.css",
       "detectComponentClasses": true
     }
   },

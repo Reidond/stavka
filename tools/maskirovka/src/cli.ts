@@ -428,13 +428,13 @@ const runDeploySeat = (): Effect.Effect<void, GatewayError> =>
     const action = apply ? "deploy" : "build";
     const result = yield* new ProcessCliProbeRepository().run(
       "pnpm",
-      ["--filter", "@stavka/maskirovka-seat", action],
+      ["--filter", "@stavka/maskirovka-gateway", action],
       10 * 60 * 1_000,
     );
     if (result.output) yield* Console.log(result.output);
     if (!result.ok) {
       return yield* Effect.fail(
-        new GatewayError(500, "SEAT_DEPLOY_FAILED", `maskirovka-seat ${action} failed`),
+        new GatewayError(500, "GATEWAY_DEPLOY_FAILED", `maskirovka-gateway ${action} failed`),
       );
     }
     if (!apply) {

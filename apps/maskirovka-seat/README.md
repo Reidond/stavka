@@ -1,11 +1,15 @@
-# Maskirovka hosted seat
+# Maskirovka hosted seat (optional Cloudflare leaf)
 
-One deployment represents one operator-owned subscription seat. An Effect v4
-`HttpApi` Worker authenticates the machine wire, resolves Stavka tier aliases,
-and forwards the latest OpenAI Responses or Anthropic Messages dialect to a
-singleton Cloudflare Container. The Container exposes the same contract-first
-Effect HTTP surface on Node and runs the official Codex or Claude Agent SDK; it
-does not contain a metered API fallback.
+One deployment represents one operator-owned **Cloudflare Container**
+subscription seat. This is an optional single-provider experiment — not the
+PRODUCT production gateway (`apps/maskirovka-gateway`) and **never** a
+home-Mac / Posture B dial-in path.
+
+An Effect v4 `HttpApi` Worker authenticates the machine wire, resolves Stavka
+tier aliases, and forwards the latest OpenAI Responses or Anthropic Messages
+dialect to a singleton Cloudflare Container. The Container exposes the same
+contract-first Effect HTTP surface on Node and runs the official Codex or
+Claude Agent SDK; it does not contain a metered API fallback.
 
 The Container-backed Durable Object persists an opaque credential checkpoint in
 its own SQLite storage only when the runtime credential changes. Checkpoints are
@@ -60,9 +64,10 @@ is capped at 200 metadata-only rows (generated request ID, time, dialect, alias,
 resolved model, status, latency, and queue depth); prompts, bodies, credentials,
 and error text are never stored.
 
-This deployment is one hosted leaf, not the orchestration gateway. Seat
-registration, cross-seat fallback/routing, and budget policy are intentionally
-not exposed here.
+This deployment is one hosted Cloudflare leaf, not the orchestration gateway.
+For Claude + Codex together with dashboard credential store, deploy
+`apps/maskirovka-gateway` instead. Seat registration, cross-seat
+fallback/routing, and budget policy are intentionally not exposed on the leaf.
 
 The Durable Object also enforces leaf-level subscription-seat backpressure:
 one provider invocation runs at a time, up to eight requests wait in FIFO

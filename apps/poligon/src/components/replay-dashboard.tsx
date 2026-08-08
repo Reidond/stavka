@@ -5,17 +5,18 @@ import type {
   GameSnapshot,
   SessionExport,
 } from "@stavka/protocol";
-import {
-  Button,
-  DataTable,
-  FigureFrame,
-  LogFeed,
-  mapSheetColors,
-  StatusChip,
-  type ColumnDef,
-} from "@stavka/ui";
+import { Button } from "@cloudflare/kumo/components/button";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
+import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 
+import {
+  PoligonBadge,
+  PoligonDataTable,
+  PoligonFigure,
+  PoligonLogFeed,
+  poligonVisualizationPalette,
+} from "./poligon-ui";
 import { reconstructReplayFrames, type ReplayFrame } from "../replay-state";
 
 export interface ReplayTimelineEntry {
@@ -73,10 +74,10 @@ export const projectReplayTacticalMarkers = (
 
 const markerColor = (kind: ReplayTacticalMarker["kind"]): string =>
   kind === "friendly"
-    ? mapSheetColors.ultramarine
+    ? poligonVisualizationPalette.friendly
     : kind === "known_enemy"
-      ? mapSheetColors.carmine
-      : mapSheetColors.olive;
+      ? poligonVisualizationPalette.hostile
+      : poligonVisualizationPalette.objective;
 
 const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
   const markers = projectReplayTacticalMarkers(frame.snapshot);
@@ -97,10 +98,10 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
         viewBox="0 0 100 100"
         role="img"
         aria-label={`Reconstructed tactical state at tick ${frame.tickId}`}
-        className="min-h-72 w-full border border-contour bg-paper"
+        className="min-h-72 w-full border border-kumo-hairline bg-kumo-base"
       >
         <title>{`Tick ${frame.tickId} reconstructed friendly, objective, and known-enemy positions`}</title>
-        <path d="M 8 92 H 92 M 8 92 V 8" fill="none" stroke={mapSheetColors.contour} />
+        <path d="M 8 92 H 92 M 8 92 V 8" fill="none" stroke={poligonVisualizationPalette.grid} />
         {markers.map((marker) => {
           const x = projectX(marker.x);
           const y = projectZ(marker.z);
@@ -123,7 +124,7 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
         })}
       </svg>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 font-data text-xs">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <span>Mission time</span>
           <strong>{frame.snapshot.mission.time_elapsed_seconds.toFixed(1)}s</strong>
           <span>Friendly groups</span>
@@ -137,7 +138,7 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
         </div>
         <ul aria-label="Selected replay state entities" className="m-0 space-y-1 p-0 text-xs">
           {markers.map((marker) => (
-            <li key={marker.key} className="list-none border-t border-contour pt-1">
+            <li key={marker.key} className="list-none border-t border-kumo-hairline pt-1">
               <strong>{marker.label}</strong> · X {marker.x.toFixed(0)} · Z {marker.z.toFixed(0)} ·{" "}
               {marker.detail}
             </li>
@@ -153,23 +154,23 @@ const ReplayStateProgression = ({ frames }: { readonly frames: readonly ReplayFr
   const frame = frames[selectedIndex] ?? frames.at(-1);
   if (!frame) {
     return (
-      <FigureFrame caption="No canonical full snapshot was archived">
+      <PoligonFigure caption="No canonical full snapshot was archived">
         <p className="m-0 p-4 text-sm">No replay state frames are available.</p>
-      </FigureFrame>
+      </PoligonFigure>
     );
   }
 
   return (
-    <FigureFrame
+    <PoligonFigure
       caption={`Tick ${frame.tickId} · ${frame.kind} · ${frame.source} state · ${selectedIndex + 1}/${frames.length}`}
     >
       <section className="space-y-3 p-3" aria-label="Reconstructed replay world progression">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            <StatusChip>{frame.kind}</StatusChip>
-            <StatusChip>{frame.source}</StatusChip>
-            <StatusChip>{frame.events.length} events</StatusChip>
-            <StatusChip>{frame.commandResults.length} results</StatusChip>
+            <PoligonBadge>{frame.kind}</PoligonBadge>
+            <PoligonBadge>{frame.source}</PoligonBadge>
+            <PoligonBadge>{frame.events.length} events</PoligonBadge>
+            <PoligonBadge>{frame.commandResults.length} results</PoligonBadge>
           </div>
           <div className="flex gap-2">
             <Button
@@ -192,7 +193,7 @@ const ReplayStateProgression = ({ frames }: { readonly frames: readonly ReplayFr
         </div>
         <ReplayTacticalState frame={frame} />
       </section>
-    </FigureFrame>
+    </PoligonFigure>
   );
 };
 
@@ -265,30 +266,30 @@ const costColumns: ColumnDef<ReplayCostRow, unknown>[] = [
   {
     accessorKey: "faction",
     header: "Faction",
-    cell: ({ row }) => <StatusChip>{row.original.faction}</StatusChip>,
+    cell: ({ row }) => <PoligonBadge>{row.original.faction}</PoligonBadge>,
   },
   {
     id: "agent",
     header: "Agent / model",
     cell: ({ row }) => (
       <div className="min-w-36">
-        <StatusChip>{row.original.agent_tier}</StatusChip>
-        <span className="mt-1 block font-data text-xs">{row.original.model}</span>
+        <PoligonBadge>{row.original.agent_tier}</PoligonBadge>
+        <span className="mt-1 block text-xs text-kumo-subtle">{row.original.model}</span>
       </div>
     ),
   },
   {
     accessorKey: "calls",
     header: "Calls",
-    cell: ({ row }) => <span className="font-data">{formatInteger(row.original.calls)}</span>,
+    cell: ({ row }) => <span>{formatInteger(row.original.calls)}</span>,
   },
   {
     id: "tokens",
     header: "Tokens",
     cell: ({ row }) => (
-      <span className="font-data">
+      <span>
         {formatInteger(row.original.input_tokens + row.original.output_tokens)}
-        <span className="block text-[0.65rem] text-ink/60">
+        <span className="block text-[0.65rem] text-kumo-subtle">
           {formatInteger(row.original.input_tokens)} in ·{" "}
           {formatInteger(row.original.output_tokens)} out
         </span>
@@ -298,7 +299,7 @@ const costColumns: ColumnDef<ReplayCostRow, unknown>[] = [
   {
     accessorKey: "cost_usd",
     header: "Cost",
-    cell: ({ row }) => <span className="font-data">{formatCost(row.original.cost_usd)}</span>,
+    cell: ({ row }) => <span>{formatCost(row.original.cost_usd)}</span>,
   },
 ];
 
@@ -309,41 +310,43 @@ export const ReplayDashboard = ({ replay }: { readonly replay: SessionExport }) 
 
   return (
     <div className="space-y-4">
-      <section className="stavka-panel flex flex-wrap items-center gap-2 p-3">
-        <StatusChip>{replay.session.session_id}</StatusChip>
-        <StatusChip>{replay.session.faction}</StatusChip>
-        <StatusChip>{replay.session.doctrine}</StatusChip>
-        <StatusChip>{replay.session.mode}</StatusChip>
-        <span className="font-data text-xs">Exported {replay.session.exported_at}</span>
-      </section>
+      <LayerCard className="flex flex-wrap items-center gap-2 p-3">
+        <PoligonBadge>{replay.session.session_id}</PoligonBadge>
+        <PoligonBadge>{replay.session.faction}</PoligonBadge>
+        <PoligonBadge>{replay.session.doctrine}</PoligonBadge>
+        <PoligonBadge>{replay.session.mode}</PoligonBadge>
+        <span className="text-xs text-kumo-subtle">Exported {replay.session.exported_at}</span>
+      </LayerCard>
 
       <ReplayStateProgression
         key={`${replay.session.session_id}:${replay.session.exported_at}`}
         frames={frames}
       />
 
-      <FigureFrame
+      <PoligonFigure
         caption={`${timeline.length} decisions · ${replay.archive.ticks.length} ticks · ${replay.archive.events.length} archived events`}
       >
         <section className="space-y-3 p-3" aria-label="Cause to outcome replay timeline">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="m-0 font-display text-2xl uppercase">Decision timeline</h2>
-            <div className="flex items-center gap-1 font-data text-xs" aria-label="Timeline stages">
-              <StatusChip>Cause</StatusChip>
+            <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">
+              Decision timeline
+            </h2>
+            <div className="flex items-center gap-1 text-xs" aria-label="Timeline stages">
+              <PoligonBadge>Cause</PoligonBadge>
               <span aria-hidden="true">→</span>
-              <StatusChip>Decision</StatusChip>
+              <PoligonBadge>Decision</PoligonBadge>
               <span aria-hidden="true">→</span>
-              <StatusChip>Commands</StatusChip>
+              <PoligonBadge>Commands</PoligonBadge>
               <span aria-hidden="true">→</span>
-              <StatusChip>Outcomes</StatusChip>
+              <PoligonBadge>Outcomes</PoligonBadge>
             </div>
           </div>
-          <LogFeed
+          <PoligonLogFeed
             items={timeline}
             getKey={(item) => item.id}
             renderItem={(item) => (
               <article className="space-y-2">
-                <p className="m-0 font-data text-xs">{item.timestamp}</p>
+                <p className="m-0 text-xs text-kumo-subtle">{item.timestamp}</p>
                 <p className="m-0">
                   <strong>Cause</strong> · {item.cause}
                 </p>
@@ -361,19 +364,21 @@ export const ReplayDashboard = ({ replay }: { readonly replay: SessionExport }) 
             height={420}
           />
         </section>
-      </FigureFrame>
+      </PoligonFigure>
 
-      <FigureFrame caption="Grouped by session, faction, agent tier, and model">
+      <PoligonFigure caption="Grouped by session, faction, agent tier, and model">
         <section className="space-y-3 p-3" aria-label="Replay cost breakdown">
-          <h2 className="m-0 font-display text-2xl uppercase">Calls, tokens, and cost</h2>
-          <DataTable
+          <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">
+            Calls, tokens, and cost
+          </h2>
+          <PoligonDataTable
             data={costs}
             columns={costColumns}
             emptyLabel="No model usage recorded in this export"
             getRowId={(row) => row.key}
           />
         </section>
-      </FigureFrame>
+      </PoligonFigure>
     </div>
   );
 };

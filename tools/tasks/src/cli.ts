@@ -5,9 +5,21 @@ import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Console, Data, Effect, Schema } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 
-import { evaluationTask, tailwindLintTask, type TaskCommand } from "./task-plan";
+import {
+  evaluationTask,
+  maskirovkaGatewayBuildTask,
+  productionDeployTask,
+  tailwindLintTask,
+  type TaskCommand,
+} from "./task-plan";
 
-const TaskName = Schema.Literals(["eval", "lint-tailwind"]);
+const TaskName = Schema.Literals([
+  "eval",
+  "lint-tailwind",
+  "build-maskirovka-gateway",
+  "deploy-production",
+]);
+type TaskName = Schema.Schema.Type<typeof TaskName>;
 
 class TaskCommandFailed extends Data.TaggedError("TaskCommandFailed")<{
   readonly label: string;
@@ -45,10 +57,28 @@ const runCommand = (command: TaskCommand) =>
     ),
   );
 
+const commandsForTask = (
+  task: TaskName,
+  forwardedArguments: ReadonlyArray<string>,
+): ReadonlyArray<TaskCommand> => {
+  switch (task) {
+    case "eval":
+      return evaluationTask(forwardedArguments);
+    case "lint-tailwind":
+      return tailwindLintTask;
+    case "build-maskirovka-gateway":
+      return maskirovkaGatewayBuildTask;
+    case "deploy-production":
+      return productionDeployTask;
+  }
+
+  return task satisfies never;
+};
+
 const program = Effect.gen(function* () {
   const task = yield* Schema.decodeUnknownEffect(TaskName)(process.argv[2]);
   const forwardedArguments = process.argv.slice(3).filter((argument) => argument !== "--");
-  const commands = task === "eval" ? evaluationTask(forwardedArguments) : tailwindLintTask;
+  const commands = commandsForTask(task, forwardedArguments);
   for (const command of commands) yield* runCommand(command);
 }).pipe(Effect.provide(NodeServices.layer));
 

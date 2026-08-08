@@ -1,0 +1,41 @@
+{
+  "name": "@stavka/maskirovka-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build:dashboard": "vp build --config vite.dashboard.config.ts",
+    "build": "pnpm --filter @stavka/tasks build:maskirovka-gateway",
+    "build:container": "docker build -f Dockerfile -t stavka-maskirovka-gateway:local ../..",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "types": "wrangler types worker-configuration.d.ts",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@cloudflare/kumo": "2.9.2",
+    "@phosphor-icons/react": "2.1.10",
+    "@stavka/access-auth": "workspace:*",
+    "@stavka/maskirovka": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-router": "1.170.18",
+    "effect": "4.0.0-beta.102",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260801.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "24.3.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.5",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.7",
+    "vitest": "4.1.10",
+    "wrangler": "4.118.0"
+  }
+}

@@ -3,6 +3,9 @@ packages:
   - "apps/*"
   - "tools/*"
 
+minimumReleaseAgeExclude:
+  - "@cloudflare/kumo@2.9.2"
+
 allowBuilds:
   "@parcel/watcher": true
   core-js-pure: true

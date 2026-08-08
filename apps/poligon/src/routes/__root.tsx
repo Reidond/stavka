@@ -19,7 +19,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 const Document = ({ children }: { readonly children: ReactNode }) => (
-  <html lang="en">
+  <html lang="en" data-mode="light">
     <head>
       <HeadContent />
     </head>

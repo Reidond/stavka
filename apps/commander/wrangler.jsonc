@@ -4,11 +4,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-02",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
   "durable_objects": {
     "bindings": [{ "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrchestratorAgent"] }],
-  "kv_namespaces": [{ "binding": "TERRAIN_CACHE" }],
+  "kv_namespaces": [{ "binding": "TERRAIN_CACHE", "id": "7b6659541b754b71bf36f7eaf2997065" }],
   "r2_buckets": [{ "binding": "SESSION_EXPORTS", "bucket_name": "stavka-session-exports" }],
   "vars": {
     "ENVIRONMENT": "production",
@@ -24,7 +26,8 @@
     "TICK_INTERVAL_ACTIVE_MS": "750",
     "TICK_INTERVAL_BURST_MS": "300",
     "STAVKA_AI_PROVIDER": "openai",
-    "STAVKA_AI_BASE_URL": "https://maskirovka.example.invalid",
+    // Replaced after gateway deploy with the live workers.dev origin.
+    "STAVKA_AI_BASE_URL": "https://stavka-maskirovka-gateway.andrii-shafar.workers.dev",
   },
   "observability": { "enabled": true },
 }

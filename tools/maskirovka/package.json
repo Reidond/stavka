@@ -6,6 +6,12 @@
     "maskirovka": "./dist/cli.js"
   },
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
   "scripts": {
     "dev": "pnpm build:dashboard && tsx src/cli.ts up",
     "serve": "pnpm build:dashboard && tsx src/cli.ts serve",
@@ -14,6 +20,7 @@
     "smoke": "tsx src/cli.ts smoke",
     "deploy-seat": "tsx src/cli.ts deploy-seat",
     "eval": "tsx src/cli.ts eval --replay",
+    "test": "vitest run --config vitest.config.ts",
     "build:dashboard": "vp build --config vite.dashboard.config.ts",
     "build:cli": "tsc -p tsconfig.build.json",
     "build": "pnpm build:dashboard && pnpm build:cli",
@@ -22,14 +29,18 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.220",
+    "@cloudflare/kumo": "2.9.2",
     "@effect/platform-node": "4.0.0-beta.102",
     "@openai/codex-sdk": "0.146.0",
+    "@phosphor-icons/react": "2.1.10",
+    "@standard-schema/spec": "1.1.0",
     "@stavka/access-auth": "workspace:*",
     "@stavka/protocol": "workspace:*",
-    "@stavka/ui": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
+    "@tanstack/react-form": "1.33.3",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.18",
+    "@tanstack/react-virtual": "3.14.9",
     "effect": "4.0.0-beta.102",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -43,6 +54,7 @@
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.0.5",
     "tailwindcss": "4.3.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.7"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.7",
+    "vitest": "4.1.10"
   }
 }

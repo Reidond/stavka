@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -64,6 +64,7 @@ describe("project architecture conventions", () => {
       "apps/commander/src",
       "apps/maskirovka-seat/src",
       "apps/poligon/src",
+      "apps/maskirovka-gateway/src",
       "tools/maskirovka/src",
     ];
     const missingEffectContracts = httpApplications.filter((directory) => {
@@ -88,13 +89,37 @@ describe("project architecture conventions", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("keeps shared component variants on tailwind-variants", () => {
-    const manifest = readFileSync(join(repositoryRoot, "packages/ui/package.json"), "utf8");
-    const variants = readFileSync(join(repositoryRoot, "packages/ui/src/variants.ts"), "utf8");
+  it("uses direct Kumo dependencies and rejects the retired private UI package", () => {
+    const consumers = [
+      "apps/poligon/package.json",
+      "tools/maskirovka/package.json",
+      "apps/maskirovka-seat/package.json",
+      "apps/maskirovka-gateway/package.json",
+    ];
+    const retiredPackageNames = [
+      ["@stavka", "ui"].join("/"),
+      ["tailwind", "variants"].join("-"),
+      ["@base-ui-components", "react"].join("/"),
+    ];
+    const legacyReferences = sourceFiles
+      .filter((path) => /(?:package\.json|\.(?:ts|tsx|css|md))$/u.test(path))
+      .filter((path) =>
+        retiredPackageNames.some((name) => readFileSync(path, "utf8").includes(name)),
+      );
 
-    expect(manifest).toContain('"tailwind-variants"');
-    expect(variants).toMatch(/from\s+["']tailwind-variants["']/u);
-    expect(variants).toMatch(/\btv\s*\(/u);
+    expect(legacyReferences).toEqual([]);
+    for (const relative of consumers) {
+      const manifest = JSON.parse(readFileSync(join(repositoryRoot, relative), "utf8")) as {
+        dependencies?: Record<string, string>;
+      };
+      expect(manifest.dependencies?.["@cloudflare/kumo"], relative).toBe("2.9.2");
+      expect(manifest.dependencies?.["@phosphor-icons/react"], relative).toBe("2.1.10");
+      const source = walk(join(repositoryRoot, relative.split("/").slice(0, -1).join("/")))
+        .filter((path) => /\.(?:ts|tsx)$/u.test(path))
+        .map((path) => readFileSync(path, "utf8"))
+        .join("\n");
+      expect(source).toMatch(/@cloudflare\/kumo\/(?:components|primitives)\//u);
+    }
   });
 
   it("keeps package scripts as short task aliases", () => {
@@ -108,6 +133,17 @@ describe("project architecture conventions", () => {
     expect(offenders).toEqual([]);
     expect(manifest.scripts.eval).toBe("pnpm --filter @stavka/tasks eval");
     expect(manifest.scripts["lint:tailwind"]).toBe("pnpm --filter @stavka/tasks lint:tailwind");
+    expect(manifest.scripts["deploy:production"]).toBe(
+      "pnpm --filter @stavka/tasks deploy:production",
+    );
+    expect(manifest.scripts.deploy).toBeUndefined();
+
+    const gatewayManifest = JSON.parse(
+      readFileSync(join(repositoryRoot, "apps/maskirovka-gateway/package.json"), "utf8"),
+    ) as { readonly scripts: Readonly<Record<string, string>> };
+    expect(gatewayManifest.scripts.build).toBe(
+      "pnpm --filter @stavka/tasks build:maskirovka-gateway",
+    );
   });
 
   it("keeps Tailwind diagnostics aligned across scripts, CI, and Cursor", () => {
@@ -118,11 +154,18 @@ describe("project architecture conventions", () => {
       ".oxlintrc.poligon.json",
       ".oxlintrc.maskirovka-seat.json",
       ".oxlintrc.maskirovka.json",
+      ".oxlintrc.maskirovka-gateway.json",
     ].map((path) => readFileSync(join(repositoryRoot, path), "utf8"));
     const settings = readFileSync(join(repositoryRoot, ".vscode/settings.json"), "utf8");
     const extensions = readFileSync(join(repositoryRoot, ".vscode/extensions.json"), "utf8");
     const ci = readFileSync(join(repositoryRoot, ".github/workflows/ci.yml"), "utf8");
-    const poligonStyles = readFileSync(join(repositoryRoot, "apps/poligon/src/styles.css"), "utf8");
+    const stylePaths = [
+      "apps/poligon/src/styles.css",
+      "tools/maskirovka/src/dashboard/styles.css",
+      "apps/maskirovka-seat/src/dashboard/styles.css",
+      "apps/maskirovka-gateway/src/dashboard/styles.css",
+    ];
+    const styles = stylePaths.map((path) => readFileSync(join(repositoryRoot, path), "utf8"));
 
     expect(manifest).toContain('"lint:tailwind"');
     expect(oxlint).toContain('"eslint-plugin-better-tailwindcss"');
@@ -138,15 +181,28 @@ describe("project architecture conventions", () => {
     expect(taskPlan).toContain(".oxlintrc.poligon.json");
     expect(taskPlan).toContain(".oxlintrc.maskirovka-seat.json");
     expect(taskPlan).toContain(".oxlintrc.maskirovka.json");
-    expect(settings).toContain('"tailwindCSS.classFunctions": ["cn", "tv"]');
+    expect(taskPlan).toContain(".oxlintrc.maskirovka-gateway.json");
+    expect(settings).toContain('"tailwindCSS.classFunctions": []');
     expect(settings).toContain(
       '"apps/maskirovka-seat/src/dashboard/styles.css": "apps/maskirovka-seat/src/dashboard/**"',
+    );
+    expect(settings).toContain(
+      '"apps/maskirovka-gateway/src/dashboard/styles.css": "apps/maskirovka-gateway/src/dashboard/**"',
     );
     expect(extensions).toContain('"bradlc.vscode-tailwindcss"');
     expect(extensions).toContain('"oxc.oxc-vscode"');
     expect(ci).toContain("pnpm lint:tailwind");
-    expect(poligonStyles).toContain('@source "../../../packages/ui/src"');
-    expect(poligonStyles).toContain("@layer components");
+    for (const [index, stylesheet] of styles.entries()) {
+      const source = stylesheet.match(/@source "([^"]+\/@cloudflare\/kumo\/dist)\/\*\*\//u);
+      expect(source, stylePaths[index]).not.toBeNull();
+      expect(
+        existsSync(resolve(dirname(join(repositoryRoot, stylePaths[index]!)), source![1]!)),
+        stylePaths[index],
+      ).toBe(true);
+      expect(stylesheet).toMatch(
+        /@source "[^"]+";\s*@import "@cloudflare\/kumo\/styles\/tailwind";\s*@import "tailwindcss";/u,
+      );
+    }
   });
 
   it("ships the project-local Effect v4 engineering skill", () => {

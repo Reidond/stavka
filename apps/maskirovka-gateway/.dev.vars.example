@@ -1,0 +1,10 @@
+# Local-only values. Never commit real provider credentials or gateway keys.
+ENVIRONMENT=local
+GATEWAY_ID=local-gateway
+MASKIROVKA_GATEWAY_KEY=local-machine-key
+DEV_ACCESS_EMAIL=operator@example.test
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=
+# Optional bootstrap credentials; normal administration uses /admin/auth/:provider.
+CLAUDE_CODE_OAUTH_TOKEN=
+CODEX_ACCESS_TOKEN=
