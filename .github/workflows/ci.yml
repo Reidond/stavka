@@ -19,7 +19,7 @@ jobs:
           node-version: "22.19.0"
           cache: true
           run-install: false
-      - run: vp install --approve-builds
+      - run: vp install
       - run: vp check
       - run: vp test --run
       - run: vp build
@@ -40,7 +40,7 @@ jobs:
           node-version: "22.19.0"
           cache: true
           run-install: false
-      - run: vp install --approve-builds
+      - run: vp install
       - run: vp exec wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
