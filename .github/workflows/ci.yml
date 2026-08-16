@@ -21,9 +21,9 @@ jobs:
           run-install: false
       - run: vp install
       - run: vp check
+      - run: vp exec tsc --noEmit
       - run: vp test --run
-      - run: vp build
-      - run: vp exec wrangler deploy --dry-run --outdir dist/worker
+      - run: vp run build
 
   deploy:
     needs: verify
