@@ -1,3 +1,2 @@
-WAR_BENCH_ADMIN_KEY=replace-with-a-random-operator-key
 WAR_BENCH_ENCRYPTION_KEY=replace-with-base64-encoded-32-byte-key
 # WAR_BENCH_CODEX_MODEL=optional-model-id-from-pi-catalog

@@ -2,23 +2,21 @@
 
 ## GitHub production secrets
 
-The `production` environment in `Reidond/warbench` must contain four stable secrets:
+The `production` environment in `Reidond/warbench` must contain three stable secrets:
 
 - `CLOUDFLARE_API_TOKEN` — token with permission to deploy Workers and manage Worker secrets for the target account.
 - `CLOUDFLARE_ACCOUNT_ID` — target Cloudflare account id.
-- `WAR_BENCH_ADMIN_KEY` — private operator key accepted by the hosted dashboard API.
 - `WAR_BENCH_ENCRYPTION_KEY` — base64 encoding of exactly 32 random bytes. This must remain stable because it encrypts the stored Codex OAuth credentials.
 
-Generate the two Warbench values locally without committing them:
+Generate the Warbench encryption key locally without committing it:
 
 ```bash
-openssl rand -base64 24
 openssl rand -base64 32
 ```
 
-Use the first output as `WAR_BENCH_ADMIN_KEY` and the second as `WAR_BENCH_ENCRYPTION_KEY`.
+Use the output as `WAR_BENCH_ENCRYPTION_KEY`.
 
-A successful `main` verification deploys the Worker, creates/migrates the two Durable Object classes, then installs both stable Worker secrets with Wrangler.
+A successful `main` verification deploys the Worker to `warbench.sands.red`, creates or migrates the two Durable Object classes, then installs the stable encryption secret with Wrangler. The deployment disables `workers.dev` and preview URLs so they cannot bypass Cloudflare Access.
 
 ## Local development
 
@@ -36,15 +34,14 @@ For local credential encryption, replace `WAR_BENCH_ENCRYPTION_KEY` with a real 
 
 ## Connect the ChatGPT/Codex subscription
 
-1. Open the Warbench Worker URL.
-2. Enter `WAR_BENCH_ADMIN_KEY` into the operator field.
-3. Choose **Connect ChatGPT**.
-4. Warbench starts OpenAI's Codex device authorization and shows the verification URL and user code.
-5. Complete authorization in the OpenAI page.
-6. Warbench polls the device flow, exchanges the authorization code, extracts the ChatGPT account id, encrypts the access/refresh credentials with AES-GCM, and stores them in the `AuthVault` Durable Object.
-7. Expired access credentials are refreshed server-side before an experiment run.
+1. Open `https://warbench.sands.red` and sign in through Cloudflare Access.
+2. Choose **Connect ChatGPT**.
+3. Warbench starts OpenAI's Codex device authorization and shows the verification URL and user code.
+4. Complete authorization in the OpenAI page.
+5. Warbench polls the device flow, exchanges the authorization code, extracts the ChatGPT account id, encrypts the access/refresh credentials with AES-GCM, and stores them in the `AuthVault` Durable Object.
+6. Expired access credentials are refreshed server-side before an experiment run.
 
-The dashboard never stores the Codex OAuth credential in browser storage. Only the operator key is kept in `sessionStorage` for the current browser tab.
+The dashboard never stores the Codex OAuth credential in browser storage. Cloudflare Access is the sole operator gate in front of the entire application.
 
 ## Study procedure
 

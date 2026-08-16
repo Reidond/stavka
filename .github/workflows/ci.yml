@@ -49,10 +49,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WAR_BENCH_ADMIN_KEY: ${{ secrets.WAR_BENCH_ADMIN_KEY }}
           WAR_BENCH_ENCRYPTION_KEY: ${{ secrets.WAR_BENCH_ENCRYPTION_KEY }}
         run: |
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID WAR_BENCH_ADMIN_KEY WAR_BENCH_ENCRYPTION_KEY; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID WAR_BENCH_ENCRYPTION_KEY; do
             if [ -z "${!name:-}" ]; then
               echo "Missing production secret $name" >&2
               exit 1
@@ -63,12 +62,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: vp exec wrangler deploy
-      - name: Install stable Worker secrets
+      - name: Install stable Worker secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WAR_BENCH_ADMIN_KEY: ${{ secrets.WAR_BENCH_ADMIN_KEY }}
           WAR_BENCH_ENCRYPTION_KEY: ${{ secrets.WAR_BENCH_ENCRYPTION_KEY }}
         run: |
-          printf '%s' "$WAR_BENCH_ADMIN_KEY" | vp exec wrangler secret put WAR_BENCH_ADMIN_KEY
           printf '%s' "$WAR_BENCH_ENCRYPTION_KEY" | vp exec wrangler secret put WAR_BENCH_ENCRYPTION_KEY

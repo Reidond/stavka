@@ -4,8 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-16",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
-  "preview_urls": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "warbench.sands.red", "custom_domain": true }],
   "durable_objects": {
     "bindings": [
       { "name": "AUTH_VAULT", "class_name": "AuthVault" },

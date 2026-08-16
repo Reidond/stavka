@@ -22,7 +22,6 @@ export { AuthVault, BenchmarkStore };
 
 interface AppEnv extends Env {
   readonly BENCHMARK_STORE: DurableObjectNamespace<BenchmarkStore>;
-  readonly WAR_BENCH_ADMIN_KEY?: string;
   readonly WAR_BENCH_CODEX_MODEL?: string;
 }
 
@@ -31,24 +30,6 @@ const json = (body: unknown, init: ResponseInit = {}) =>
     ...init,
     headers: { "cache-control": "no-store", ...init.headers },
   });
-
-const safeEqual = (left: string, right: string): boolean => {
-  const a = new TextEncoder().encode(left);
-  const b = new TextEncoder().encode(right);
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) diff |= a[index]! ^ b[index]!;
-  return diff === 0;
-};
-
-const requireAdmin = (request: Request, env: AppEnv): Response | undefined => {
-  if (!env.WAR_BENCH_ADMIN_KEY)
-    return json({ error: "WAR_BENCH_ADMIN_KEY is not configured" }, { status: 503 });
-  const supplied = request.headers.get("x-warbench-admin-key") ?? "";
-  return safeEqual(supplied, env.WAR_BENCH_ADMIN_KEY)
-    ? undefined
-    : json({ error: "unauthorized" }, { status: 401 });
-};
 
 const vault = (env: AppEnv) => env.AUTH_VAULT.getByName("owner");
 const resultsStore = (env: AppEnv) => env.BENCHMARK_STORE.getByName("primary");
@@ -103,15 +84,12 @@ const html = `<!doctype html>
 </head>
 <body><main>
 <h1>Warbench</h1><p class="muted">Independent LLM commander hypothesis benchmark.</p>
-<div class="card"><h2>Operator access</h2><div class="row"><input id="key" type="password" placeholder="WAR_BENCH_ADMIN_KEY"><button onclick="saveKey()">Use key</button></div></div>
 <div class="card"><h2>Codex subscription</h2><p id="status">Checking…</p><div class="row"><button onclick="connect()">Connect ChatGPT</button><button onclick="disconnect()">Disconnect</button><select id="model"></select></div><div id="device"></div></div>
 <div class="card"><h2>Study</h2><p>Final conclusion requires at least 10 held-out seeds in each of 3 scenario families for both controllers.</p><div class="row"><label>Seeds/family <input id="seeds" type="number" min="1" max="20" value="1" style="width:70px"></label><button onclick="runBaseline()">Run rule baseline</button><button onclick="runCodex()">Run Codex candidate</button><button onclick="downloadReport()">PDF report</button><button onclick="clearResults()">Clear</button></div><p id="progress" class="muted"></p><pre id="result">No results yet.</pre></div>
 <div class="card"><h2>Acceptance gates</h2><p>Mean score +5%; win rate +5 percentage points; invalid decisions ≤2%; p95 decision latency ≤5s; no scenario-family score regression worse than 10%.</p></div>
 <script>
-let adminKey=sessionStorage.getItem('warbench-admin-key')||'';document.getElementById('key').value=adminKey;
 const families=['balanced','north-pressure','south-pressure'];
-function saveKey(){adminKey=document.getElementById('key').value;sessionStorage.setItem('warbench-admin-key',adminKey);refreshAll()}
-async function api(path,init={}){const headers=new Headers(init.headers||{});headers.set('x-warbench-admin-key',adminKey);if(init.body)headers.set('content-type','application/json');const r=await fetch(path,{...init,headers});const b=await r.json();if(!r.ok)throw new Error(b.error||JSON.stringify(b));return b}
+async function api(path,init={}){const headers=new Headers(init.headers||{});if(init.body)headers.set('content-type','application/json');const r=await fetch(path,{...init,headers});const b=await r.json();if(!r.ok)throw new Error(b.error||JSON.stringify(b));return b}
 async function status(){try{const s=await api('/api/auth/codex/status');document.getElementById('status').innerHTML=s.connected?'<span class="ok">Connected</span> '+(s.accountId||''):(s.pending?'<span class="warn">Waiting for authorization…</span>':'Not connected');if(s.pending)setTimeout(status,Math.max(2000,(s.intervalSeconds||5)*1000));if(s.connected)await models()}catch(e){document.getElementById('status').textContent=e.message}}
 async function models(){const data=await api('/api/models/codex');const select=document.getElementById('model');select.innerHTML=data.models.map(m=>'<option value="'+m.id+'"'+(m.default?' selected':'')+'>'+m.id+'</option>').join('')}
 async function connect(){try{const a=await api('/api/auth/codex/start',{method:'POST'});document.getElementById('device').innerHTML='<p>Open <a target="_blank" href="'+a.verificationUri+'">'+a.verificationUri+'</a> and enter:</p><h2><code>'+a.userCode+'</code></h2>';status()}catch(e){alert(e.message)}}
@@ -121,10 +99,10 @@ async function runArm(controller){const count=studyCount();const model=document.
 async function runBaseline(){try{await runArm('baseline')}catch(e){document.getElementById('progress').textContent=e.message}}
 async function runCodex(){try{await runArm('codex')}catch(e){document.getElementById('progress').textContent=e.message}}
 async function results(){try{const r=await api('/api/benchmark/results');const statusClass=r.hypothesis.status==='PASS'?'ok':r.hypothesis.status==='FAIL'?'bad':'warn';document.getElementById('result').innerHTML='<span class="'+statusClass+'">'+r.hypothesis.status+'</span>\n'+JSON.stringify(r,null,2)}catch(e){document.getElementById('result').textContent=e.message}}
-async function downloadReport(){const r=await fetch('/api/benchmark/report.pdf',{headers:{'x-warbench-admin-key':adminKey}});if(!r.ok){alert(await r.text());return}const blob=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='warbench-test-report.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function downloadReport(){const r=await fetch('/api/benchmark/report.pdf');if(!r.ok){alert(await r.text());return}const blob=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='warbench-test-report.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 async function clearResults(){await api('/api/benchmark/results',{method:'DELETE'});results()}
 async function refreshAll(){await Promise.all([status(),results()])}
-if(adminKey)refreshAll();else document.getElementById('status').textContent='Enter operator key first.';
+refreshAll();
 </script>
 </main></body></html>`;
 
@@ -135,11 +113,6 @@ export default {
       if (url.pathname === "/healthz") return json({ ok: true, service: "warbench" });
       if (url.pathname === "/")
         return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
-
-      if (url.pathname.startsWith("/api/")) {
-        const denied = requireAdmin(request, env);
-        if (denied) return denied;
-      }
 
       const authVault = vault(env);
 

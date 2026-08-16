@@ -28,7 +28,7 @@ Before the minimum sample is complete, the result is always **INCONCLUSIVE**.
 
 ## Product flow
 
-1. Open the hosted Warbench dashboard and enter the private operator key.
+1. Sign in to the hosted Warbench dashboard through Cloudflare Access.
 2. Choose **Connect ChatGPT**.
 3. Warbench starts OpenAI's Codex device authorization and displays the verification URL/code.
 4. Complete ChatGPT authorization in the browser. Warbench encrypts the refreshable credentials at rest in its `AuthVault` Durable Object.
@@ -56,8 +56,9 @@ GitHub Actions verifies every pull request and `main` push. Production deploymen
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
-- `WAR_BENCH_ADMIN_KEY`
 - `WAR_BENCH_ENCRYPTION_KEY`
+
+The Worker is available only at `warbench.sands.red`; `workers.dev` and preview URLs are disabled, and Cloudflare Access protects the entire application.
 
 See [`docs/DEPLOY.md`](docs/DEPLOY.md) for generation, deployment, Codex connection, study execution, and report instructions.
 
