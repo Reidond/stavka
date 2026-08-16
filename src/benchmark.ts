@@ -30,7 +30,9 @@ export interface BenchmarkSummary {
   readonly winRate: number;
   readonly invalidDecisionRate: number;
   readonly p95DecisionLatencyMs: number;
-  readonly families: Readonly<Record<ScenarioFamily, { meanScore: number; winRate: number; runs: number }>>;
+  readonly families: Readonly<
+    Record<ScenarioFamily, { meanScore: number; winRate: number; runs: number }>
+  >;
 }
 
 export interface HypothesisResult {
@@ -106,7 +108,8 @@ export const summarize = (
     controller,
     runs: results.length,
     meanScore: mean(results.map((result) => result.score)),
-    winRate: results.length === 0 ? 0 : results.filter((result) => result.won).length / results.length,
+    winRate:
+      results.length === 0 ? 0 : results.filter((result) => result.won).length / results.length,
     invalidDecisionRate: decisions === 0 ? 0 : invalid / decisions,
     p95DecisionLatencyMs: percentile95(latencies),
     families,
@@ -141,7 +144,8 @@ export const evaluateHypothesis = (
   }
 
   const scoreDenominator = Math.max(1, Math.abs(baseline.meanScore));
-  const meanScoreImprovement = (candidate.meanScore - baseline.meanScore) / scoreDenominator >= 0.05;
+  const meanScoreImprovement =
+    (candidate.meanScore - baseline.meanScore) / scoreDenominator >= 0.05;
   const winRateImprovement = candidate.winRate - baseline.winRate >= 0.05;
   const invalidDecisionRate = candidate.invalidDecisionRate <= 0.02;
   const latency = candidate.p95DecisionLatencyMs <= 5_000;

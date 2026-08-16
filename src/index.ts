@@ -28,7 +28,7 @@ interface AppEnv extends Env {
 const json = (body: unknown, init: ResponseInit = {}) =>
   Response.json(body, {
     ...init,
-    headers: { "cache-control": "no-store", ...(init.headers ?? {}) },
+    headers: { "cache-control": "no-store", ...init.headers },
   });
 
 const safeEqual = (left: string, right: string): boolean => {
@@ -156,7 +156,11 @@ export default {
           pollDeviceAuthorization(pending.deviceAuthId, pending.userCode),
         );
         if (polled.pending)
-          return json({ connected: false, pending: true, intervalSeconds: pending.intervalSeconds });
+          return json({
+            connected: false,
+            pending: true,
+            intervalSeconds: pending.intervalSeconds,
+          });
         await authVault.putCredentials(polled.credentials);
         return json({
           connected: true,
@@ -174,7 +178,8 @@ export default {
       if (url.pathname === "/api/models/codex" && request.method === "GET") {
         const models = openaiCodexProvider().getModels();
         const defaultModel =
-          env.WAR_BENCH_CODEX_MODEL && models.some((model) => model.id === env.WAR_BENCH_CODEX_MODEL)
+          env.WAR_BENCH_CODEX_MODEL &&
+          models.some((model) => model.id === env.WAR_BENCH_CODEX_MODEL)
             ? env.WAR_BENCH_CODEX_MODEL
             : models[0]?.id;
         return json({

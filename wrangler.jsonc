@@ -9,15 +9,15 @@
   "durable_objects": {
     "bindings": [
       { "name": "AUTH_VAULT", "class_name": "AuthVault" },
-      { "name": "BENCHMARK_STORE", "class_name": "BenchmarkStore" }
-    ]
+      { "name": "BENCHMARK_STORE", "class_name": "BenchmarkStore" },
+    ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["AuthVault"] },
-    { "tag": "v2", "new_sqlite_classes": ["BenchmarkStore"] }
+    { "tag": "v2", "new_sqlite_classes": ["BenchmarkStore"] },
   ],
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true }
-  }
+    "logs": { "enabled": true },
+  },
 }

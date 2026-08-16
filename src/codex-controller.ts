@@ -41,7 +41,8 @@ const validateSemantics = (
   const ordered = new Set<string>();
 
   for (const order of decision.orders) {
-    if (!own.has(order.unitId)) throw new Error(`order references non-commandable unit ${order.unitId}`);
+    if (!own.has(order.unitId))
+      throw new Error(`order references non-commandable unit ${order.unitId}`);
     if (ordered.has(order.unitId)) throw new Error(`duplicate order for ${order.unitId}`);
     ordered.add(order.unitId);
     if (order.type === "attack" && !enemies.has(order.targetId)) {
@@ -144,11 +145,8 @@ export const decideWithCodex = (
           }),
   });
 
-export const codexController = (
-  side: Side,
-  credentials: CodexCredentials,
-  requestedModel?: string,
-): Controller =>
+export const codexController =
+  (side: Side, credentials: CodexCredentials, requestedModel?: string): Controller =>
   (observation) =>
     decideWithCodex(observation, side, credentials, requestedModel).pipe(
       Effect.map((result) => result.decision),

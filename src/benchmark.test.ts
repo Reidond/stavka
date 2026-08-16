@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { evaluateHypothesis, minimumRunsPerFamily, scenarioFamilies, summarize, type SeedResult } from "./benchmark";
+import {
+  evaluateHypothesis,
+  minimumRunsPerFamily,
+  scenarioFamilies,
+  summarize,
+  type SeedResult,
+} from "./benchmark";
 
 const rows = (
   controller: "rule" | "codex",
