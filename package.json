@@ -20,6 +20,7 @@
     "@types/node": "24.3.0",
     "typescript": "7.0.2",
     "vite-plus": "0.2.7",
+    "vitest": "4.1.10",
     "wrangler": "4.31.0"
   },
   "engines": {
