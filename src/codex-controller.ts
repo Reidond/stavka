@@ -20,7 +20,15 @@ const systemPrompt = (side: Side) => `You are a battlefield commander in a deter
 You command only ${side} units.
 Return exactly one JSON object and no markdown or commentary.
 Schema: {"orders":[{"unitId":"...","type":"move","target":{"x":0,"y":0}}|{"unitId":"...","type":"attack","targetId":"..."}|{"unitId":"...","type":"hold"}]}
-Rules:
+Public simulator rules:
+- The battlefield is a 100 x 100 plane.
+- A move order advances a unit at most 7 distance units per simulation tick toward its target.
+- An attack succeeds only when the target is within distance 22. A successful attack removes the attacker's attack value from target HP.
+- An objective is controlled by the side with more living units within distance 12 of its center; ties preserve the previous owner.
+- Each match lasts 40 simulation ticks.
+- Strategic orders are refreshed every 5 simulation ticks and persist between decisions.
+- Final score is friendly remaining HP minus enemy remaining HP plus 150 points per controlled objective.
+Command rules:
 - Issue at most one order per living ${side} unit.
 - Never issue orders for the opposing side.
 - Coordinates must remain between 0 and 100.
