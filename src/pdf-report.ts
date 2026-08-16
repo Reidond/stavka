@@ -4,7 +4,7 @@ const escapePdf = (value: string): string =>
   value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 
 const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
-const number = (value: number): string => Number.isFinite(value) ? value.toFixed(2) : "n/a";
+const number = (value: number): string => (Number.isFinite(value) ? value.toFixed(2) : "n/a");
 
 const reportLines = (result: HypothesisResult): string[] => {
   const lines = [
@@ -69,7 +69,8 @@ const pageContent = (lines: readonly string[]): string => {
 export const renderHypothesisPdf = (result: HypothesisResult): Uint8Array => {
   const lines = reportLines(result);
   const chunks: string[][] = [];
-  for (let index = 0; index < lines.length; index += 48) chunks.push(lines.slice(index, index + 48));
+  for (let index = 0; index < lines.length; index += 48)
+    chunks.push(lines.slice(index, index + 48));
 
   const objects: string[] = [];
   const add = (body: string): number => {
@@ -84,7 +85,9 @@ export const renderHypothesisPdf = (result: HypothesisResult): Uint8Array => {
 
   for (const chunk of chunks) {
     const content = pageContent(chunk);
-    const contentId = add(`<< /Length ${new TextEncoder().encode(content).byteLength} >>\nstream\n${content}\nendstream`);
+    const contentId = add(
+      `<< /Length ${new TextEncoder().encode(content).byteLength} >>\nstream\n${content}\nendstream`,
+    );
     const pageId = add(
       `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`,
     );
@@ -92,7 +95,8 @@ export const renderHypothesisPdf = (result: HypothesisResult): Uint8Array => {
   }
 
   objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
-  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  objects[pagesId - 1] =
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
 
   let output = "%PDF-1.4\n";
   const offsets = [0];
