@@ -20,15 +20,15 @@ jobs:
           cache: true
           run-install: false
       - run: vp install
-      - name: Canonicalize benchmark formatting
+      - name: Canonicalize repository
         if: github.event_name == 'push'
         run: |
           vp check --fix
-          if ! git diff --quiet; then
+          if ! git diff --quiet || [ -n "$(git status --porcelain --untracked-files=all pnpm-lock.yaml)" ]; then
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add src/benchmark.ts src/codex-controller.ts
-            git commit -m "style: apply vite-plus formatting"
+            git add src/benchmark.ts src/codex-controller.ts pnpm-lock.yaml
+            git commit -m "chore: canonicalize benchmark workspace"
             git push
             exit 1
           fi
