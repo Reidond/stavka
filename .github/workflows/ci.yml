@@ -7,21 +7,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
       - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
         with:
           node-version: "22.19.0"
           cache: true
           run-install: false
       - run: vp install
+      - name: Canonicalize benchmark formatting
+        if: github.event_name == 'push'
+        run: |
+          vp check --fix
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add src/benchmark.ts src/codex-controller.ts
+            git commit -m "style: apply vite-plus formatting"
+            git push
+            exit 1
+          fi
       - run: vp check
       - run: vp exec tsc --noEmit
       - run: vp test --run
@@ -37,8 +47,6 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
       - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
         with:
           node-version: "22.19.0"
