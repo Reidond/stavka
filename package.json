@@ -23,6 +23,13 @@
     "vitest": "4.1.10",
     "wrangler": "4.31.0"
   },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.22.0",
+      "onFail": "download"
+    }
+  },
   "engines": {
     "node": ">=22.19.0"
   }

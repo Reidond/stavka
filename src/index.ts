@@ -1,13 +1,17 @@
 import { Effect } from "effect";
 import { AuthVault, type Env } from "./auth-vault";
-import { pollDeviceAuthorization, refreshCodexCredentials, startDeviceAuthorization } from "./codex-auth";
+import {
+  pollDeviceAuthorization,
+  refreshCodexCredentials,
+  startDeviceAuthorization,
+} from "./codex-auth";
 
 export { AuthVault };
 
 const json = (body: unknown, init: ResponseInit = {}) =>
   Response.json(body, {
     ...init,
-    headers: { "cache-control": "no-store", ...(init.headers ?? {}) },
+    headers: { "cache-control": "no-store", ...init.headers },
   });
 
 const safeEqual = (left: string, right: string): boolean => {
@@ -19,10 +23,16 @@ const safeEqual = (left: string, right: string): boolean => {
   return diff === 0;
 };
 
-const requireAdmin = (request: Request, env: Env & { readonly WAR_BENCH_ADMIN_KEY?: string }): Response | undefined => {
-  if (!env.WAR_BENCH_ADMIN_KEY) return json({ error: "WAR_BENCH_ADMIN_KEY is not configured" }, { status: 503 });
+const requireAdmin = (
+  request: Request,
+  env: Env & { readonly WAR_BENCH_ADMIN_KEY?: string },
+): Response | undefined => {
+  if (!env.WAR_BENCH_ADMIN_KEY)
+    return json({ error: "WAR_BENCH_ADMIN_KEY is not configured" }, { status: 503 });
   const supplied = request.headers.get("x-warbench-admin-key") ?? "";
-  return safeEqual(supplied, env.WAR_BENCH_ADMIN_KEY) ? undefined : json({ error: "unauthorized" }, { status: 401 });
+  return safeEqual(supplied, env.WAR_BENCH_ADMIN_KEY)
+    ? undefined
+    : json({ error: "unauthorized" }, { status: 401 });
 };
 
 const vault = (env: Env) => env.AUTH_VAULT.getByName("owner");
@@ -52,10 +62,14 @@ if(adminKey)status();else document.getElementById('status').textContent='Enter o
 </main></body></html>`;
 
 export default {
-  async fetch(request: Request, env: Env & { readonly WAR_BENCH_ADMIN_KEY?: string }): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env & { readonly WAR_BENCH_ADMIN_KEY?: string },
+  ): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/healthz") return json({ ok: true, service: "warbench" });
-    if (url.pathname === "/") return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    if (url.pathname === "/")
+      return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 
     if (url.pathname.startsWith("/api/")) {
       const denied = requireAdmin(request, env);
@@ -76,14 +90,26 @@ export default {
         credentials = await Effect.runPromise(refreshCodexCredentials(credentials.refresh));
         await authVault.putCredentials(credentials);
       }
-      if (credentials) return json({ connected: true, accountId: credentials.accountId, expires: credentials.expires });
+      if (credentials)
+        return json({
+          connected: true,
+          accountId: credentials.accountId,
+          expires: credentials.expires,
+        });
 
       const pending = await authVault.getPending();
       if (!pending) return json({ connected: false, pending: false });
-      const polled = await Effect.runPromise(pollDeviceAuthorization(pending.deviceAuthId, pending.userCode));
-      if (polled.pending) return json({ connected: false, pending: true, intervalSeconds: pending.intervalSeconds });
+      const polled = await Effect.runPromise(
+        pollDeviceAuthorization(pending.deviceAuthId, pending.userCode),
+      );
+      if (polled.pending)
+        return json({ connected: false, pending: true, intervalSeconds: pending.intervalSeconds });
       await authVault.putCredentials(polled.credentials);
-      return json({ connected: true, accountId: polled.credentials.accountId, expires: polled.credentials.expires });
+      return json({
+        connected: true,
+        accountId: polled.credentials.accountId,
+        expires: polled.credentials.expires,
+      });
     }
 
     if (url.pathname === "/api/auth/codex/disconnect" && request.method === "POST") {

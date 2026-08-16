@@ -53,7 +53,9 @@ const stepToward = (from: Vec2, to: Vec2, speed = 7): Vec2 => {
 };
 
 export const step = (state: Observation, decisions: readonly Decision[]): Observation => {
-  const orders = new Map(decisions.flatMap((decision) => decision.orders).map((order) => [order.unitId, order]));
+  const orders = new Map(
+    decisions.flatMap((decision) => decision.orders).map((order) => [order.unitId, order]),
+  );
   const units = state.units.map((unit) => ({ ...unit, position: { ...unit.position } }));
   const byId = new Map(units.map((unit) => [unit.id, unit]));
 
@@ -64,25 +66,39 @@ export const step = (state: Observation, decisions: readonly Decision[]): Observ
     if (order.type === "move") unit.position = stepToward(unit.position, order.target);
     if (order.type === "attack") {
       const target = byId.get(order.targetId);
-      if (target && target.hp > 0 && target.side !== unit.side && distance(unit.position, target.position) <= 22) {
+      if (
+        target &&
+        target.hp > 0 &&
+        target.side !== unit.side &&
+        distance(unit.position, target.position) <= 22
+      ) {
         target.hp = Math.max(0, target.hp - unit.attack);
       }
     }
   }
 
   const objectives = state.objectives.map((objective) => {
-    const nearby = units.filter((unit) => unit.hp > 0 && distance(unit.position, objective.position) <= 12);
+    const nearby = units.filter(
+      (unit) => unit.hp > 0 && distance(unit.position, objective.position) <= 12,
+    );
     const blue = nearby.filter((unit) => unit.side === "blue").length;
     const red = nearby.filter((unit) => unit.side === "red").length;
-    return { ...objective, owner: blue > red ? ("blue" as const) : red > blue ? ("red" as const) : objective.owner };
+    return {
+      ...objective,
+      owner: blue > red ? ("blue" as const) : red > blue ? ("red" as const) : objective.owner,
+    };
   });
 
   return { tick: state.tick + 1, units, objectives };
 };
 
 export const score = (state: Observation, side: Side): number => {
-  const hp = state.units.filter((unit) => unit.side === side).reduce((sum, unit) => sum + unit.hp, 0);
-  const enemyHp = state.units.filter((unit) => unit.side === enemySide(side)).reduce((sum, unit) => sum + unit.hp, 0);
+  const hp = state.units
+    .filter((unit) => unit.side === side)
+    .reduce((sum, unit) => sum + unit.hp, 0);
+  const enemyHp = state.units
+    .filter((unit) => unit.side === enemySide(side))
+    .reduce((sum, unit) => sum + unit.hp, 0);
   const objectives = state.objectives.filter((objective) => objective.owner === side).length;
   return hp - enemyHp + objectives * 150;
 };

@@ -42,7 +42,10 @@ const decodeJwtAccountId = (token: string): string | undefined => {
   try {
     const payload = token.split(".")[1];
     if (!payload) return undefined;
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    const normalized = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=");
     const json = JSON.parse(atob(normalized)) as Record<string, unknown>;
     const auth = json["https://api.openai.com/auth"] as Record<string, unknown> | undefined;
     return typeof auth?.chatgpt_account_id === "string" ? auth.chatgpt_account_id : undefined;
@@ -58,7 +61,12 @@ export const startDeviceAuthorization = Effect.tryPromise({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ client_id: CLIENT_ID }),
     });
-    if (!response.ok) throw new CodexAuthError({ operation: "device.start", message: await response.text(), status: response.status });
+    if (!response.ok)
+      throw new CodexAuthError({
+        operation: "device.start",
+        message: await response.text(),
+        status: response.status,
+      });
     const decoded = Schema.decodeUnknownSync(DeviceAuthorization)(await response.json());
     return {
       deviceAuthId: decoded.device_auth_id,
@@ -67,21 +75,33 @@ export const startDeviceAuthorization = Effect.tryPromise({
       verificationUri: DEVICE_VERIFICATION_URI,
     };
   },
-  catch: (cause) => cause instanceof CodexAuthError
-    ? cause
-    : new CodexAuthError({ operation: "device.start", message: cause instanceof Error ? cause.message : String(cause) }),
+  catch: (cause) =>
+    cause instanceof CodexAuthError
+      ? cause
+      : new CodexAuthError({
+          operation: "device.start",
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
 });
 
 export const pollDeviceAuthorization = (deviceAuthId: string, userCode: string) =>
   Effect.tryPromise({
-    try: async (): Promise<{ readonly pending: true } | { readonly pending: false; readonly credentials: CodexCredentials }> => {
+    try: async (): Promise<
+      | { readonly pending: true }
+      | { readonly pending: false; readonly credentials: CodexCredentials }
+    > => {
       const response = await fetch(DEVICE_TOKEN_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ device_auth_id: deviceAuthId, user_code: userCode }),
       });
       if (response.status === 403 || response.status === 404) return { pending: true };
-      if (!response.ok) throw new CodexAuthError({ operation: "device.poll", message: await response.text(), status: response.status });
+      if (!response.ok)
+        throw new CodexAuthError({
+          operation: "device.poll",
+          message: await response.text(),
+          status: response.status,
+        });
       const device = Schema.decodeUnknownSync(DevicePoll)(await response.json());
       const tokenResponse = await fetch(TOKEN_URL, {
         method: "POST",
@@ -94,7 +114,12 @@ export const pollDeviceAuthorization = (deviceAuthId: string, userCode: string) 
           redirect_uri: DEVICE_REDIRECT_URI,
         }),
       });
-      if (!tokenResponse.ok) throw new CodexAuthError({ operation: "token.exchange", message: await tokenResponse.text(), status: tokenResponse.status });
+      if (!tokenResponse.ok)
+        throw new CodexAuthError({
+          operation: "token.exchange",
+          message: await tokenResponse.text(),
+          status: tokenResponse.status,
+        });
       const token = Schema.decodeUnknownSync(TokenResponse)(await tokenResponse.json());
       return {
         pending: false,
@@ -106,9 +131,13 @@ export const pollDeviceAuthorization = (deviceAuthId: string, userCode: string) 
         },
       };
     },
-    catch: (cause) => cause instanceof CodexAuthError
-      ? cause
-      : new CodexAuthError({ operation: "device.poll", message: cause instanceof Error ? cause.message : String(cause) }),
+    catch: (cause) =>
+      cause instanceof CodexAuthError
+        ? cause
+        : new CodexAuthError({
+            operation: "device.poll",
+            message: cause instanceof Error ? cause.message : String(cause),
+          }),
   });
 
 export const refreshCodexCredentials = (refreshToken: string) =>
@@ -123,7 +152,12 @@ export const refreshCodexCredentials = (refreshToken: string) =>
           client_id: CLIENT_ID,
         }),
       });
-      if (!response.ok) throw new CodexAuthError({ operation: "token.refresh", message: await response.text(), status: response.status });
+      if (!response.ok)
+        throw new CodexAuthError({
+          operation: "token.refresh",
+          message: await response.text(),
+          status: response.status,
+        });
       const token = Schema.decodeUnknownSync(TokenResponse)(await response.json());
       return {
         access: token.access_token,
@@ -132,7 +166,11 @@ export const refreshCodexCredentials = (refreshToken: string) =>
         accountId: decodeJwtAccountId(token.access_token),
       };
     },
-    catch: (cause) => cause instanceof CodexAuthError
-      ? cause
-      : new CodexAuthError({ operation: "token.refresh", message: cause instanceof Error ? cause.message : String(cause) }),
+    catch: (cause) =>
+      cause instanceof CodexAuthError
+        ? cause
+        : new CodexAuthError({
+            operation: "token.refresh",
+            message: cause instanceof Error ? cause.message : String(cause),
+          }),
   });
