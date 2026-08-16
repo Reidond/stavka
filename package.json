@@ -1,0 +1,28 @@
+{
+  "name": "warbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp exec wrangler dev",
+    "check": "vp check",
+    "test": "vp test --run",
+    "build": "vp build",
+    "verify": "vp check && vp test --run && vp build",
+    "deploy": "vp exec wrangler deploy"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.84.2",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260801.1",
+    "@types/node": "24.3.0",
+    "typescript": "7.0.2",
+    "vite-plus": "0.2.7",
+    "wrangler": "4.31.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
