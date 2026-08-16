@@ -7,6 +7,8 @@ import { makeScenario, score, step } from "./sim";
 
 export const scenarioFamilies = ["balanced", "north-pressure", "south-pressure"] as const;
 export type ScenarioFamily = (typeof scenarioFamilies)[number];
+export const minimumRunsPerFamily = 10;
+export const defaultDecisionEveryTicks = 5;
 
 export interface SeedResult {
   readonly seed: number;
@@ -28,13 +30,14 @@ export interface BenchmarkSummary {
   readonly winRate: number;
   readonly invalidDecisionRate: number;
   readonly p95DecisionLatencyMs: number;
-  readonly families: Readonly<Record<ScenarioFamily, { meanScore: number; winRate: number }>>;
+  readonly families: Readonly<Record<ScenarioFamily, { meanScore: number; winRate: number; runs: number }>>;
 }
 
 export interface HypothesisResult {
   readonly status: "PASS" | "FAIL" | "INCONCLUSIVE";
   readonly baseline: BenchmarkSummary;
   readonly candidate?: BenchmarkSummary;
+  readonly sampleReady: boolean;
   readonly gates: {
     readonly meanScoreImprovement: boolean;
     readonly winRateImprovement: boolean;
@@ -93,10 +96,11 @@ export const summarize = (
             familyResults.length === 0
               ? 0
               : familyResults.filter((result) => result.won).length / familyResults.length,
+          runs: familyResults.length,
         },
       ];
     }),
-  ) as Record<ScenarioFamily, { meanScore: number; winRate: number }>;
+  ) as Record<ScenarioFamily, { meanScore: number; winRate: number; runs: number }>;
 
   return {
     controller,
@@ -113,10 +117,19 @@ export const evaluateHypothesis = (
   baseline: BenchmarkSummary,
   candidate?: BenchmarkSummary,
 ): HypothesisResult => {
+  const sampleReady =
+    candidate !== undefined &&
+    scenarioFamilies.every(
+      (family) =>
+        baseline.families[family].runs >= minimumRunsPerFamily &&
+        candidate.families[family].runs >= minimumRunsPerFamily,
+    );
+
   if (!candidate) {
     return {
       status: "INCONCLUSIVE",
       baseline,
+      sampleReady,
       gates: {
         meanScoreImprovement: false,
         winRateImprovement: false,
@@ -146,21 +159,35 @@ export const evaluateHypothesis = (
     familyRegression,
   };
   return {
-    status: Object.values(gates).every(Boolean) ? "PASS" : "FAIL",
+    status: sampleReady ? (Object.values(gates).every(Boolean) ? "PASS" : "FAIL") : "INCONCLUSIVE",
     baseline,
     candidate,
+    sampleReady,
     gates,
   };
 };
 
-export const runRuleSeed = (seed: number, family: ScenarioFamily, ticks = 40) =>
+export const runRuleSeed = (
+  seed: number,
+  family: ScenarioFamily,
+  ticks = 40,
+  decisionEveryTicks = defaultDecisionEveryTicks,
+) =>
   Effect.gen(function* () {
     let state = scenarioFor(seed, family);
     const blue = ruleController("blue");
     const red = ruleController("red");
+    let blueDecision: Decision = { orders: [] };
+    let redDecision: Decision = { orders: [] };
+    let decisionCount = 0;
     for (let tick = 0; tick < ticks; tick += 1) {
-      const decisions = yield* Effect.all([blue(state), red(state)], { concurrency: "unbounded" });
-      state = step(state, decisions);
+      if (tick % decisionEveryTicks === 0) {
+        decisionCount += 1;
+        [blueDecision, redDecision] = yield* Effect.all([blue(state), red(state)], {
+          concurrency: "unbounded",
+        });
+      }
+      state = step(state, [blueDecision, redDecision]);
     }
     const blueScore = score(state, "blue");
     const redScore = score(state, "red");
@@ -172,7 +199,7 @@ export const runRuleSeed = (seed: number, family: ScenarioFamily, ticks = 40) =>
       opponentScore: redScore,
       won: blueScore > redScore,
       invalidDecisions: 0,
-      decisionCount: ticks,
+      decisionCount,
       decisionLatenciesMs: [],
     } satisfies SeedResult;
   });
@@ -183,12 +210,13 @@ export const runCodexSeed = (
   credentials: CodexCredentials,
   requestedModel?: string,
   ticks = 40,
-  decisionEveryTicks = 5,
+  decisionEveryTicks = defaultDecisionEveryTicks,
 ) =>
   Effect.gen(function* () {
     let state = scenarioFor(seed, family);
     const red = ruleController("red");
     let blueDecision: Decision = { orders: [] };
+    let redDecision: Decision = { orders: [] };
     let invalidDecisions = 0;
     let decisionCount = 0;
     const decisionLatenciesMs: number[] = [];
@@ -212,8 +240,8 @@ export const runCodexSeed = (
             return yield* Effect.fail(failure);
           }
         }
+        redDecision = yield* red(state);
       }
-      const redDecision = yield* red(state);
       state = step(state, [blueDecision, redDecision]);
     }
 
