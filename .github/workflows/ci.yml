@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -20,6 +20,18 @@ jobs:
           cache: true
           run-install: false
       - run: vp install
+      - name: Bootstrap canonical formatting
+        if: github.event_name == 'push'
+        run: |
+          vp check --fix
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add package.json pnpm-workspace.yaml src vite.config.ts wrangler.jsonc
+            git commit -m "style: apply vite-plus formatting"
+            git push
+            exit 1
+          fi
       - run: vp check
       - run: vp test --run
       - run: vp build
