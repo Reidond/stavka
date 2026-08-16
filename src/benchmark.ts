@@ -229,6 +229,7 @@ export const runCodexSeed = (
     for (let tick = 0; tick < ticks; tick += 1) {
       if (tick % decisionEveryTicks === 0) {
         decisionCount += 1;
+        const started = performance.now();
         const candidate = yield* Effect.result(
           decideWithCodex(state, "blue", credentials, requestedModel),
         );
@@ -238,9 +239,10 @@ export const runCodexSeed = (
           resolvedModel = candidate.success.model;
         } else {
           invalidDecisions += 1;
+          decisionLatenciesMs.push(performance.now() - started);
           blueDecision = { orders: [] };
           const failure = candidate.failure;
-          if (failure instanceof CodexControllerError && failure.reason === "request") {
+          if (failure instanceof CodexControllerError && failure.reason === "model") {
             return yield* Effect.fail(failure);
           }
         }
