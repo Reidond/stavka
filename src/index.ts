@@ -16,6 +16,7 @@ import {
   startDeviceAuthorization,
   type CodexCredentials,
 } from "./codex-auth";
+import { renderHypothesisPdf } from "./pdf-report";
 
 export { AuthVault, BenchmarkStore };
 
@@ -83,6 +84,15 @@ const freshCredentials = async (env: AppEnv): Promise<CodexCredentials> => {
   return refreshed;
 };
 
+const hypothesisFromRows = async (env: AppEnv) => {
+  const rows = await resultsStore(env).list();
+  const baselineRows = rows.filter((row) => row.controller === "rule");
+  const candidateRows = rows.filter((row) => row.controller === "codex");
+  const baseline = summarize("rule", baselineRows);
+  const candidate = candidateRows.length > 0 ? summarize("codex", candidateRows) : undefined;
+  return { rows, hypothesis: evaluateHypothesis(baseline, candidate) };
+};
+
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -95,7 +105,7 @@ const html = `<!doctype html>
 <h1>Warbench</h1><p class="muted">Independent LLM commander hypothesis benchmark.</p>
 <div class="card"><h2>Operator access</h2><div class="row"><input id="key" type="password" placeholder="WAR_BENCH_ADMIN_KEY"><button onclick="saveKey()">Use key</button></div></div>
 <div class="card"><h2>Codex subscription</h2><p id="status">Checking…</p><div class="row"><button onclick="connect()">Connect ChatGPT</button><button onclick="disconnect()">Disconnect</button><select id="model"></select></div><div id="device"></div></div>
-<div class="card"><h2>Study</h2><p>Final conclusion requires at least 10 held-out seeds in each of 3 scenario families for both controllers.</p><div class="row"><label>Seeds/family <input id="seeds" type="number" min="1" max="20" value="1" style="width:70px"></label><button onclick="runBaseline()">Run rule baseline</button><button onclick="runCodex()">Run Codex candidate</button><button onclick="clearResults()">Clear</button></div><p id="progress" class="muted"></p><pre id="result">No results yet.</pre></div>
+<div class="card"><h2>Study</h2><p>Final conclusion requires at least 10 held-out seeds in each of 3 scenario families for both controllers.</p><div class="row"><label>Seeds/family <input id="seeds" type="number" min="1" max="20" value="1" style="width:70px"></label><button onclick="runBaseline()">Run rule baseline</button><button onclick="runCodex()">Run Codex candidate</button><button onclick="downloadReport()">PDF report</button><button onclick="clearResults()">Clear</button></div><p id="progress" class="muted"></p><pre id="result">No results yet.</pre></div>
 <div class="card"><h2>Acceptance gates</h2><p>Mean score +5%; win rate +5 percentage points; invalid decisions ≤2%; p95 decision latency ≤5s; no scenario-family score regression worse than 10%.</p></div>
 <script>
 let adminKey=sessionStorage.getItem('warbench-admin-key')||'';document.getElementById('key').value=adminKey;
@@ -111,6 +121,7 @@ async function runArm(controller){const count=studyCount();const model=document.
 async function runBaseline(){try{await runArm('baseline')}catch(e){document.getElementById('progress').textContent=e.message}}
 async function runCodex(){try{await runArm('codex')}catch(e){document.getElementById('progress').textContent=e.message}}
 async function results(){try{const r=await api('/api/benchmark/results');const statusClass=r.hypothesis.status==='PASS'?'ok':r.hypothesis.status==='FAIL'?'bad':'warn';document.getElementById('result').innerHTML='<span class="'+statusClass+'">'+r.hypothesis.status+'</span>\n'+JSON.stringify(r,null,2)}catch(e){document.getElementById('result').textContent=e.message}}
+async function downloadReport(){const r=await fetch('/api/benchmark/report.pdf',{headers:{'x-warbench-admin-key':adminKey}});if(!r.ok){alert(await r.text());return}const blob=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='warbench-test-report.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 async function clearResults(){await api('/api/benchmark/results',{method:'DELETE'});results()}
 async function refreshAll(){await Promise.all([status(),results()])}
 if(adminKey)refreshAll();else document.getElementById('status').textContent='Enter operator key first.';
@@ -210,12 +221,18 @@ export default {
       }
 
       if (url.pathname === "/api/benchmark/results" && request.method === "GET") {
-        const rows = await resultsStore(env).list();
-        const baselineRows = rows.filter((row) => row.controller === "rule");
-        const candidateRows = rows.filter((row) => row.controller === "codex");
-        const baseline = summarize("rule", baselineRows);
-        const candidate = candidateRows.length > 0 ? summarize("codex", candidateRows) : undefined;
-        return json({ rows, hypothesis: evaluateHypothesis(baseline, candidate) });
+        return json(await hypothesisFromRows(env));
+      }
+
+      if (url.pathname === "/api/benchmark/report.pdf" && request.method === "GET") {
+        const { hypothesis } = await hypothesisFromRows(env);
+        return new Response(renderHypothesisPdf(hypothesis), {
+          headers: {
+            "content-type": "application/pdf",
+            "content-disposition": 'attachment; filename="warbench-test-report.pdf"',
+            "cache-control": "no-store",
+          },
+        });
       }
 
       if (url.pathname === "/api/benchmark/results" && request.method === "DELETE") {
