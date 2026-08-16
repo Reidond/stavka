@@ -30,8 +30,17 @@ const base64ToBytes = (value: string): Uint8Array => {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 };
 
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+};
+
 const importKey = (encoded: string) =>
-  crypto.subtle.importKey("raw", base64ToBytes(encoded), "AES-GCM", false, ["encrypt", "decrypt"]);
+  crypto.subtle.importKey("raw", toArrayBuffer(base64ToBytes(encoded)), "AES-GCM", false, [
+    "encrypt",
+    "decrypt",
+  ]);
 
 export class AuthVault extends DurableObject<Env> {
   async setPending(value: PendingDeviceAuth): Promise<void> {
@@ -50,7 +59,11 @@ export class AuthVault extends DurableObject<Env> {
     const key = await importKey(this.env.WAR_BENCH_ENCRYPTION_KEY);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const plaintext = new TextEncoder().encode(JSON.stringify(credentials));
-    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      key,
+      toArrayBuffer(plaintext),
+    );
     const encoded: EncryptedValue = {
       iv: bytesToBase64(iv),
       ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
@@ -64,9 +77,9 @@ export class AuthVault extends DurableObject<Env> {
     if (!encoded) return undefined;
     const key = await importKey(this.env.WAR_BENCH_ENCRYPTION_KEY);
     const plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: base64ToBytes(encoded.iv) },
+      { name: "AES-GCM", iv: toArrayBuffer(base64ToBytes(encoded.iv)) },
       key,
-      base64ToBytes(encoded.ciphertext),
+      toArrayBuffer(base64ToBytes(encoded.ciphertext)),
     );
     return JSON.parse(new TextDecoder().decode(plaintext)) as CodexCredentials;
   }
