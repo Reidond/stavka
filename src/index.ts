@@ -4,6 +4,7 @@ import {
   pollDeviceAuthorization,
   refreshCodexCredentials,
   startDeviceAuthorization,
+  type CodexCredentials,
 } from "./codex-auth";
 
 export { AuthVault };
@@ -11,7 +12,7 @@ export { AuthVault };
 const json = (body: unknown, init: ResponseInit = {}) =>
   Response.json(body, {
     ...init,
-    headers: { "cache-control": "no-store", ...init.headers },
+    headers: { "cache-control": "no-store", ...(init.headers ?? {}) },
   });
 
 const safeEqual = (left: string, right: string): boolean => {
@@ -85,10 +86,13 @@ export default {
     }
 
     if (url.pathname === "/api/auth/codex/status" && request.method === "GET") {
-      let credentials = await authVault.getCredentials();
+      let credentials: CodexCredentials | undefined = await authVault.getCredentials();
       if (credentials && credentials.expires <= Date.now() + 60_000) {
-        credentials = await Effect.runPromise(refreshCodexCredentials(credentials.refresh));
-        await authVault.putCredentials(credentials);
+        const refreshed: CodexCredentials = await Effect.runPromise(
+          refreshCodexCredentials(credentials.refresh),
+        );
+        await authVault.putCredentials(refreshed);
+        credentials = refreshed;
       }
       if (credentials)
         return json({
