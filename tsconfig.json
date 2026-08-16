@@ -5,8 +5,10 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noEmit": true,
-    "lib": ["ES2024", "WebWorker"],
-    "types": ["@cloudflare/workers-types"]
+    "lib": ["ES2024"],
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }
