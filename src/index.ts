@@ -20,7 +20,6 @@ import {
 } from "./codex-auth";
 import { decideWithCodex } from "./codex-controller";
 import { dashboardHtml } from "./dashboard";
-import { migrateLegacyOwnerState } from "./owner-state";
 import { renderHypothesisPdf } from "./pdf-report";
 
 export { AuthVault, BenchmarkStore };
@@ -109,15 +108,6 @@ export default {
 
       const authVault = getVault(env, authorization.objectName);
       const benchmarkStore = getResultsStore(env, authorization.objectName);
-      const migration = await migrateLegacyOwnerState({
-        scopedVault: authVault,
-        legacyVault: getVault(env, "owner"),
-        legacyResults: getResultsStore(env, "primary"),
-      });
-
-      if (url.pathname === "/api/internal/legacy-migration" && request.method === "GET") {
-        return json(migration);
-      }
 
       if (url.pathname === "/")
         return new Response(dashboardHtml, {

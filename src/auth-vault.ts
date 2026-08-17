@@ -19,8 +19,6 @@ interface EncryptedValue {
   readonly ciphertext: string;
 }
 
-const legacyOwnerMigrationKey = "migration:legacy-owner:v1";
-
 const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -88,17 +86,5 @@ export class AuthVault extends DurableObject<Env> {
 
   async clearCredentials(): Promise<void> {
     await this.ctx.storage.delete("codex:credentials");
-  }
-
-  async clearOAuthState(): Promise<void> {
-    await this.ctx.storage.delete(["codex:credentials", "codex:pending"]);
-  }
-
-  async isLegacyOwnerMigrationComplete(): Promise<boolean> {
-    return (await this.ctx.storage.get<number>(legacyOwnerMigrationKey)) === 1;
-  }
-
-  async markLegacyOwnerMigrationComplete(): Promise<void> {
-    await this.ctx.storage.put(legacyOwnerMigrationKey, 1);
   }
 }
