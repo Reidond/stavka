@@ -189,6 +189,7 @@ export default {
               upstreamStatus: result.failure.upstreamStatus,
               requestId: result.failure.requestId,
               cfRay: result.failure.cfRay,
+              cfMitigated: result.failure.cfMitigated,
             }),
           );
           return json(

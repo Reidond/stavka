@@ -44,6 +44,7 @@ describe("Pi Codex Worker adapter", () => {
     expect(headers.get("authorization")).toBe(`Bearer ${credentials.access}`);
     expect(headers.get("chatgpt-account-id")).toBe(credentials.accountId);
     expect(headers.get("originator")).toBe("Codex Warbench");
+    expect(headers.get("user-agent")).toBe("Codex-Warbench/0.1.0 (Cloudflare-Workers)");
     expect(headers.has("openai-beta")).toBe(false);
   });
 
@@ -66,7 +67,7 @@ describe("Pi Codex Worker adapter", () => {
   });
 
   test("uses diagnostics and HTTP status when Pi returns a blank error", () => {
-    expect(codexFailureMessage({ errorMessage: "", rawStopReason: "" }, 403)).toBe(
+    expect(codexFailureMessage({ errorMessage: "", rawStopReason: "" }, { status: 403 })).toBe(
       "Codex upstream returned HTTP 403",
     );
     expect(
@@ -81,5 +82,14 @@ describe("Pi Codex Worker adapter", () => {
         ],
       }),
     ).toBe("Bearer [redacted] was rejected");
+  });
+
+  test("replaces a Cloudflare challenge page with a concise failure", () => {
+    expect(
+      codexFailureMessage(
+        { errorMessage: "<html>challenge body</html>" },
+        { status: 403, cfMitigated: "challenge" },
+      ),
+    ).toBe("Codex upstream blocked the request with HTTP 403 (Cloudflare challenge)");
   });
 });

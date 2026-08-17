@@ -13,6 +13,7 @@ export class CodexControllerError extends Data.TaggedError("CodexControllerError
   readonly upstreamStatus?: number;
   readonly requestId?: string;
   readonly cfRay?: string;
+  readonly cfMitigated?: string;
 }> {}
 
 export interface CodexDecisionResult {
@@ -100,6 +101,7 @@ export const makeCodexFetch =
     headers.set("Authorization", `Bearer ${credentials.access}`);
     headers.set("ChatGPT-Account-ID", credentials.accountId);
     headers.set("originator", "Codex Warbench");
+    headers.set("User-Agent", "Codex-Warbench/0.1.0 (Cloudflare-Workers)");
 
     // The Codex SSE endpoint does not require the WebSocket beta header. Pi
     // 0.84.2 adds an older responses=experimental value, so remove it here.
@@ -115,7 +117,7 @@ const safeFailureMessage = (message: string, fallback = "Codex request failed"):
 
 export const codexFailureMessage = (
   error: Pick<AssistantMessage, "diagnostics" | "errorMessage" | "rawStopReason">,
-  upstreamStatus?: number,
+  upstream: { readonly status?: number; readonly cfMitigated?: string } = {},
 ): string => {
   const diagnosticMessage = error.diagnostics
     ?.map((diagnostic) => diagnostic.error?.message.trim())
@@ -123,11 +125,14 @@ export const codexFailureMessage = (
   const message = [error.errorMessage, error.rawStopReason, diagnosticMessage]
     .map((candidate) => candidate?.trim())
     .find((candidate): candidate is string => Boolean(candidate));
+  if (upstream.cfMitigated === "challenge") {
+    return `Codex upstream blocked the request with HTTP ${upstream.status ?? 403} (Cloudflare challenge)`;
+  }
   return safeFailureMessage(
     message ??
-      (upstreamStatus === undefined
+      (upstream.status === undefined
         ? "Codex request failed"
-        : `Codex upstream returned HTTP ${upstreamStatus}`),
+        : `Codex upstream returned HTTP ${upstream.status}`),
   );
 };
 
@@ -141,6 +146,7 @@ export const decideWithCodex = (
     status?: number;
     requestId?: string;
     cfRay?: string;
+    cfMitigated?: string;
   } = {};
   return Effect.tryPromise({
     try: async () => {
@@ -190,8 +196,10 @@ export const decideWithCodex = (
           upstream.status = response.status;
           const requestId = response.headers.get("x-request-id");
           const cfRay = response.headers.get("cf-ray");
+          const cfMitigated = response.headers.get("cf-mitigated");
           if (requestId) upstream.requestId = requestId;
           if (cfRay) upstream.cfRay = cfRay;
+          if (cfMitigated) upstream.cfMitigated = cfMitigated;
         }),
         reasoning: "low",
         transport: "sse",
@@ -204,12 +212,13 @@ export const decideWithCodex = (
         if (event.type === "error") {
           throw new CodexControllerError({
             reason: "request",
-            message: codexFailureMessage(event.error, upstream.status),
+            message: codexFailureMessage(event.error, upstream),
             latencyMs: performance.now() - started,
             model: model.id,
             ...(upstream.status === undefined ? {} : { upstreamStatus: upstream.status }),
             ...(upstream.requestId ? { requestId: upstream.requestId } : {}),
             ...(upstream.cfRay ? { cfRay: upstream.cfRay } : {}),
+            ...(upstream.cfMitigated ? { cfMitigated: upstream.cfMitigated } : {}),
           });
         }
       }
@@ -255,6 +264,7 @@ export const decideWithCodex = (
             ...(upstream.status === undefined ? {} : { upstreamStatus: upstream.status }),
             ...(upstream.requestId ? { requestId: upstream.requestId } : {}),
             ...(upstream.cfRay ? { cfRay: upstream.cfRay } : {}),
+            ...(upstream.cfMitigated ? { cfMitigated: upstream.cfMitigated } : {}),
           }),
   });
 };
