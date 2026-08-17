@@ -4,13 +4,11 @@ import { authorizeOwner, ownerObjectName, type OwnerAccessEnv } from "./access-c
 
 const ownerSub = "ae27d994-4919-5cb1-8d45-c3b776a64c48";
 const otherSub = "7335d417-61da-459d-899c-0a01c76a2f94";
-const legacyUuid = "57cf8cf2-f55a-4588-9ac9-f5e41e9f09b4";
 const accessAud = "7".repeat(64);
 const env: OwnerAccessEnv = {
   WAR_BENCH_ACCESS_AUD: accessAud,
   WAR_BENCH_ACCESS_TEAM_DOMAIN: "https://team.cloudflareaccess.com",
   WAR_BENCH_OWNER_SUB: ownerSub,
-  WAR_BENCH_OWNER_USER_UUID: legacyUuid,
 };
 
 const accessFor = (aud = accessAud): CloudflareAccessContext => ({
@@ -30,7 +28,6 @@ describe("Cloudflare Access owner authorization", () => {
     await expect(authorizeOwner(requestFor(), accessFor(), env, verifyJwt)).resolves.toEqual({
       authorized: true,
       objectName: ownerObjectName(ownerSub),
-      legacyObjectName: ownerObjectName(legacyUuid),
       sub: ownerSub,
     });
     expect(verifyJwt).toHaveBeenCalledWith("signed-access-jwt", env);

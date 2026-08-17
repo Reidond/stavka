@@ -4,14 +4,12 @@ export interface OwnerAccessEnv {
   readonly WAR_BENCH_ACCESS_AUD: string;
   readonly WAR_BENCH_ACCESS_TEAM_DOMAIN: string;
   readonly WAR_BENCH_OWNER_SUB: string;
-  readonly WAR_BENCH_OWNER_USER_UUID?: string;
 }
 
 export type OwnerAuthorization =
   | {
       readonly authorized: true;
       readonly objectName: string;
-      readonly legacyObjectName?: string;
       readonly sub: string;
     }
   | {
@@ -115,13 +113,9 @@ export const authorizeOwner = async (
   }
 
   const objectName = ownerObjectName(payload.sub);
-  const legacyObjectName = env.WAR_BENCH_OWNER_USER_UUID
-    ? ownerObjectName(env.WAR_BENCH_OWNER_USER_UUID)
-    : undefined;
   return {
     authorized: true,
     objectName,
-    ...(legacyObjectName && legacyObjectName !== objectName ? { legacyObjectName } : {}),
     sub: payload.sub,
   };
 };

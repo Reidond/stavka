@@ -109,35 +109,6 @@ export default {
       const authVault = getVault(env, authorization.objectName);
       const benchmarkStore = getResultsStore(env, authorization.objectName);
 
-      if (authorization.legacyObjectName) {
-        const legacyAuthVault = getVault(env, authorization.legacyObjectName);
-        const [credentials, pending, legacyCredentials, legacyPending] = await Promise.all([
-          authVault.getCredentials(),
-          authVault.getPending(),
-          legacyAuthVault.getCredentials(),
-          legacyAuthVault.getPending(),
-        ]);
-        if (!credentials && legacyCredentials) await authVault.putCredentials(legacyCredentials);
-        if (!credentials && !legacyCredentials && !pending && legacyPending) {
-          await authVault.setPending(legacyPending);
-        }
-        if (legacyCredentials) await legacyAuthVault.clearCredentials();
-        if (legacyPending) await legacyAuthVault.clearPending();
-
-        const legacyBenchmarkStore = getResultsStore(env, authorization.legacyObjectName);
-        const [rows, legacyRows] = await Promise.all([
-          benchmarkStore.list(),
-          legacyBenchmarkStore.list(),
-        ]);
-        const existing = new Set(rows.map((row) => `${row.controller}:${row.family}:${row.seed}`));
-        for (const row of legacyRows) {
-          if (!existing.has(`${row.controller}:${row.family}:${row.seed}`)) {
-            await benchmarkStore.put(row);
-          }
-        }
-        if (legacyRows.length > 0) await legacyBenchmarkStore.clear();
-      }
-
       if (url.pathname === "/")
         return new Response(dashboardHtml, {
           headers: { "content-type": "text/html; charset=utf-8" },
