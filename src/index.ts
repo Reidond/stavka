@@ -27,6 +27,7 @@ export { AuthVault, BenchmarkStore };
 interface AppEnv extends Env, OwnerAccessEnv {
   readonly BENCHMARK_STORE: DurableObjectNamespace<BenchmarkStore>;
   readonly WAR_BENCH_CODEX_MODEL?: string;
+  readonly WAR_BENCH_CODEX_BASE_URL?: string;
 }
 
 const json = (body: unknown, init: ResponseInit = {}) =>
@@ -175,6 +176,7 @@ export default {
               "blue",
               credentials,
               requestedModel ?? env.WAR_BENCH_CODEX_MODEL,
+              env.WAR_BENCH_CODEX_BASE_URL,
             ),
           ),
         );
@@ -240,6 +242,7 @@ export default {
             input.family,
             credentials,
             input.model ?? env.WAR_BENCH_CODEX_MODEL,
+            env.WAR_BENCH_CODEX_BASE_URL,
           ),
         );
         await benchmarkStore.put(result);

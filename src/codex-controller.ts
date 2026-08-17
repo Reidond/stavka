@@ -95,6 +95,7 @@ export const makeCodexFetch =
   (
     credentials: CodexCredentials & { readonly accountId: string },
     onResponse?: (response: Response) => void,
+    transportBaseUrl?: string,
   ): typeof globalThis.fetch =>
   async (input, init) => {
     const headers = new Headers(init?.headers);
@@ -107,7 +108,11 @@ export const makeCodexFetch =
     // 0.84.2 adds an older responses=experimental value, so remove it here.
     headers.delete("OpenAI-Beta");
 
-    const response = await globalThis.fetch(input, { ...init, headers });
+    const inputUrl = input instanceof Request ? input.url : String(input);
+    const target = transportBaseUrl
+      ? `${transportBaseUrl.replace(/\/$/, "")}${new URL(inputUrl).pathname}`
+      : input;
+    const response = await globalThis.fetch(target, { ...init, headers });
     onResponse?.(response);
     return response;
   };
@@ -141,6 +146,7 @@ export const decideWithCodex = (
   side: Side,
   credentials: CodexCredentials,
   requestedModel?: string,
+  transportBaseUrl?: string,
 ): Effect.Effect<CodexDecisionResult, CodexControllerError> => {
   const upstream: {
     status?: number;
@@ -192,15 +198,19 @@ export const decideWithCodex = (
       };
       const stream = provider.streamSimple(model, context, {
         apiKey: makePiAccountToken(credentials.accountId),
-        fetch: makeCodexFetch(accountCredentials, (response) => {
-          upstream.status = response.status;
-          const requestId = response.headers.get("x-request-id");
-          const cfRay = response.headers.get("cf-ray");
-          const cfMitigated = response.headers.get("cf-mitigated");
-          if (requestId) upstream.requestId = requestId;
-          if (cfRay) upstream.cfRay = cfRay;
-          if (cfMitigated) upstream.cfMitigated = cfMitigated;
-        }),
+        fetch: makeCodexFetch(
+          accountCredentials,
+          (response) => {
+            upstream.status = response.status;
+            const requestId = response.headers.get("x-request-id");
+            const cfRay = response.headers.get("cf-ray");
+            const cfMitigated = response.headers.get("cf-mitigated");
+            if (requestId) upstream.requestId = requestId;
+            if (cfRay) upstream.cfRay = cfRay;
+            if (cfMitigated) upstream.cfMitigated = cfMitigated;
+          },
+          transportBaseUrl,
+        ),
         reasoning: "low",
         transport: "sse",
         timeoutMs: 30_000,
@@ -270,8 +280,13 @@ export const decideWithCodex = (
 };
 
 export const codexController =
-  (side: Side, credentials: CodexCredentials, requestedModel?: string): Controller =>
+  (
+    side: Side,
+    credentials: CodexCredentials,
+    requestedModel?: string,
+    transportBaseUrl?: string,
+  ): Controller =>
   (observation) =>
-    decideWithCodex(observation, side, credentials, requestedModel).pipe(
+    decideWithCodex(observation, side, credentials, requestedModel, transportBaseUrl).pipe(
       Effect.map((result) => result.decision),
     );

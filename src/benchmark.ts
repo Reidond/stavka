@@ -267,6 +267,7 @@ export const runCodexSeed = (
   family: ScenarioFamily,
   credentials: CodexCredentials,
   requestedModel?: string,
+  transportBaseUrl?: string,
   ticks = 40,
   decisionEveryTicks = defaultDecisionEveryTicks,
 ) =>
@@ -286,7 +287,7 @@ export const runCodexSeed = (
       if (tick % decisionEveryTicks === 0) {
         decisionCount += 1;
         const candidate = yield* Effect.result(
-          decideWithCodex(state, "blue", credentials, requestedModel),
+          decideWithCodex(state, "blue", credentials, requestedModel, transportBaseUrl),
         );
         if (candidate._tag === "Success") {
           blueDecision = candidate.success.decision;
