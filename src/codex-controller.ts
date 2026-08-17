@@ -16,6 +16,8 @@ export interface CodexDecisionResult {
   readonly model: string;
 }
 
+const accountClaim = "https://api.openai.com/auth";
+
 const systemPrompt = (side: Side) => `You are a battlefield commander in a deterministic evaluation.
 You command only ${side} units.
 Return exactly one JSON object and no markdown or commentary.
@@ -49,8 +51,9 @@ const validateSemantics = (
   const ordered = new Set<string>();
 
   for (const order of decision.orders) {
-    if (!own.has(order.unitId))
+    if (!own.has(order.unitId)) {
       throw new Error(`order references non-commandable unit ${order.unitId}`);
+    }
     if (ordered.has(order.unitId)) throw new Error(`duplicate order for ${order.unitId}`);
     ordered.add(order.unitId);
     if (order.type === "attack" && !enemies.has(order.targetId)) {
@@ -65,6 +68,37 @@ const validateSemantics = (
   }
   return decision;
 };
+
+/**
+ * Pi 0.84.2 extracts the ChatGPT account id by applying atob() directly to
+ * the JWT payload. OAuth JWTs use base64url, so that extraction can fail in a
+ * Worker before any HTTP request is made. Give Pi a decode-only token whose
+ * claim is standard base64, then restore the real OAuth bearer token in the
+ * injected fetch implementation.
+ */
+export const makePiAccountToken = (accountId: string): string => {
+  const payload = btoa(
+    JSON.stringify({
+      [accountClaim]: { chatgpt_account_id: accountId },
+    }),
+  );
+  return `e30.${payload}.e30`;
+};
+
+export const makeCodexFetch =
+  (credentials: CodexCredentials & { readonly accountId: string }): typeof globalThis.fetch =>
+  async (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set("Authorization", `Bearer ${credentials.access}`);
+    headers.set("ChatGPT-Account-ID", credentials.accountId);
+    headers.set("originator", "Codex Warbench");
+
+    // The Codex SSE endpoint does not require the WebSocket beta header. Pi
+    // 0.84.2 adds an older responses=experimental value, so remove it here.
+    headers.delete("OpenAI-Beta");
+
+    return globalThis.fetch(input, { ...init, headers });
+  };
 
 export const decideWithCodex = (
   observation: Observation,
@@ -88,6 +122,13 @@ export const decideWithCodex = (
         });
       }
 
+      if (!credentials.accountId) {
+        throw new CodexControllerError({
+          reason: "request",
+          message: "The Codex OAuth token does not contain a ChatGPT account id; reconnect ChatGPT",
+        });
+      }
+
       const context: Context = {
         systemPrompt: systemPrompt(side),
         messages: [
@@ -101,11 +142,17 @@ export const decideWithCodex = (
       };
 
       const started = performance.now();
+      const accountCredentials = {
+        ...credentials,
+        accountId: credentials.accountId,
+      };
       const stream = provider.streamSimple(model, context, {
-        apiKey: credentials.access,
+        apiKey: makePiAccountToken(credentials.accountId),
+        fetch: makeCodexFetch(accountCredentials),
         reasoning: "low",
         transport: "sse",
-        timeoutMs: 5_000,
+        timeoutMs: 30_000,
+        maxRetries: 1,
       });
       let text = "";
       for await (const event of stream) {

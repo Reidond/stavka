@@ -238,13 +238,13 @@ export const runCodexSeed = (
           decisionLatenciesMs.push(candidate.success.latencyMs);
           resolvedModel = candidate.success.model;
         } else {
+          const failure = candidate.failure;
+          if (failure instanceof CodexControllerError && failure.reason !== "invalid_decision") {
+            return yield* Effect.fail(failure);
+          }
           invalidDecisions += 1;
           decisionLatenciesMs.push(performance.now() - started);
           blueDecision = { orders: [] };
-          const failure = candidate.failure;
-          if (failure instanceof CodexControllerError && failure.reason === "model") {
-            return yield* Effect.fail(failure);
-          }
         }
         redDecision = yield* red(state);
       }
