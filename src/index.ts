@@ -6,6 +6,7 @@ import {
   runCodexSeed,
   runRuleSeed,
   scenarioFamilies,
+  scenarioFor,
   summarize,
   type ScenarioFamily,
 } from "./benchmark";
@@ -16,6 +17,7 @@ import {
   startDeviceAuthorization,
   type CodexCredentials,
 } from "./codex-auth";
+import { decideWithCodex } from "./codex-controller";
 import { dashboardHtml } from "./dashboard";
 import { renderHypothesisPdf } from "./pdf-report";
 
@@ -54,13 +56,25 @@ const readRunRequest = async (
   };
 };
 
+const readOptionalModel = async (request: Request): Promise<string | undefined> => {
+  const text = await request.text();
+  if (!text.trim()) return undefined;
+  const body = JSON.parse(text) as Record<string, unknown>;
+  return typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
+};
+
 const freshCredentials = async (env: AppEnv): Promise<CodexCredentials> => {
   const authVault = vault(env);
   const current = await authVault.getCredentials();
   if (!current) throw new Error("Codex is not connected");
+  if (!current.accountId) {
+    throw new Error(
+      "Stored Codex authorization has no ChatGPT account id; disconnect and reconnect",
+    );
+  }
   if (current.expires > Date.now() + 60_000) return current;
   const refreshed: CodexCredentials = await Effect.runPromise(
-    refreshCodexCredentials(current.refresh),
+    refreshCodexCredentials(current.refresh, current.accountId),
   );
   await authVault.putCredentials(refreshed);
   return refreshed;
@@ -95,6 +109,14 @@ export default {
 
       if (url.pathname === "/api/auth/codex/status" && request.method === "GET") {
         let credentials: CodexCredentials | undefined = await authVault.getCredentials();
+        if (credentials && !credentials.accountId) {
+          return json({
+            connected: false,
+            pending: false,
+            reauthorizationRequired: true,
+            error: "Stored authorization has no ChatGPT account id; disconnect and reconnect",
+          });
+        }
         if (credentials && credentials.expires <= Date.now() + 60_000) {
           credentials = await freshCredentials(env);
         }
@@ -128,6 +150,39 @@ export default {
         await authVault.clearPending();
         await authVault.clearCredentials();
         return json({ ok: true });
+      }
+
+      if (url.pathname === "/api/auth/codex/probe" && request.method === "POST") {
+        const credentials = await freshCredentials(env);
+        const requestedModel = await readOptionalModel(request);
+        const result = await Effect.runPromise(
+          Effect.result(
+            decideWithCodex(
+              scenarioFor(1, "balanced"),
+              "blue",
+              credentials,
+              requestedModel ?? env.WAR_BENCH_CODEX_MODEL,
+            ),
+          ),
+        );
+        if (result._tag === "Failure") {
+          return json(
+            {
+              ok: false,
+              reason: result.failure.reason,
+              error: result.failure.message,
+              latencyMs: result.failure.latencyMs,
+              model: result.failure.model,
+            },
+            { status: 502 },
+          );
+        }
+        return json({
+          ok: true,
+          model: result.success.model,
+          latencyMs: result.success.latencyMs,
+          orderCount: result.success.decision.orders.length,
+        });
       }
 
       if (url.pathname === "/api/models/codex" && request.method === "GET") {

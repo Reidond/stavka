@@ -8,10 +8,17 @@ describe("dashboard browser script", () => {
     expect(script).toBeDefined();
 
     const elements = new Map(
-      ["status", "device", "model", "seeds", "progress", "result"].map((id) => [
-        id,
-        { innerHTML: "", textContent: "", value: id === "seeds" ? "1" : "" },
-      ]),
+      ["status", "device", "model", "seeds", "progress", "result", "probe", "codex-run"].map(
+        (id) => [
+          id,
+          {
+            innerHTML: "",
+            textContent: "",
+            value: id === "seeds" ? "1" : "",
+            disabled: false,
+          },
+        ],
+      ),
     );
     const requests: Array<{ path: string; method: string }> = [];
     const fetch = vi.fn(async (path: string, init: RequestInit = {}) => {
@@ -32,6 +39,7 @@ describe("dashboard browser script", () => {
     });
     const context = vm.createContext({
       alert: vi.fn(),
+      confirm: vi.fn(() => true),
       document: {
         getElementById: (id: string) => elements.get(id),
       },

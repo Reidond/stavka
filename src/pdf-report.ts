@@ -12,12 +12,14 @@ const reportLines = (result: HypothesisResult): string[] => {
     `Generated: ${new Date().toISOString()}`,
     `Conclusion: ${result.status}`,
     `Minimum sample ready: ${result.sampleReady ? "yes" : "no"}`,
+    `Valid live-model evidence ready: ${result.evidenceReady ? "yes" : "no"}`,
     "",
     "Acceptance criteria",
     `Mean score improvement >= 5%: ${result.gates.meanScoreImprovement ? "PASS" : "FAIL"}`,
     `Win-rate improvement >= 5 percentage points: ${result.gates.winRateImprovement ? "PASS" : "FAIL"}`,
-    `Invalid decisions <= 2%: ${result.gates.invalidDecisionRate ? "PASS" : "FAIL"}`,
-    `Decision latency p95 <= 5000 ms: ${result.gates.latency ? "PASS" : "FAIL"}`,
+    `Invalid model decisions <= 2%: ${result.gates.invalidDecisionRate ? "PASS" : "FAIL"}`,
+    `Provider request failures <= 2%: ${result.gates.requestReliability ? "PASS" : "FAIL"}`,
+    `Successful model-response latency p95 <= 5000 ms: ${result.gates.latency ? "PASS" : "FAIL"}`,
     `No scenario family regression worse than 10%: ${result.gates.familyRegression ? "PASS" : "FAIL"}`,
     "",
     "Rule baseline",
@@ -33,27 +35,41 @@ const reportLines = (result: HypothesisResult): string[] => {
       `Runs: ${result.candidate.runs}`,
       `Mean score: ${number(result.candidate.meanScore)}`,
       `Win rate: ${percent(result.candidate.winRate)}`,
-      `Invalid decision rate: ${percent(result.candidate.invalidDecisionRate)}`,
-      `Decision latency p95: ${number(result.candidate.p95DecisionLatencyMs)} ms`,
+      `Actual model responses: ${result.candidate.modelResponseCount}`,
+      `Invalid model decision rate: ${percent(result.candidate.invalidDecisionRate)}`,
+      `Provider request failure rate: ${percent(result.candidate.requestFailureRate)}`,
+      `Successful response latency p95: ${number(result.candidate.p95DecisionLatencyMs)} ms`,
+      `Legacy evidence rows: ${result.candidate.legacyRuns}`,
       "",
       "Scenario families",
     );
     for (const [family, candidate] of Object.entries(result.candidate.families)) {
       const baseline = result.baseline.families[family as keyof typeof result.baseline.families];
       lines.push(
-        `${family}: rule score ${number(baseline.meanScore)}, Codex score ${number(candidate.meanScore)}, rule wins ${percent(baseline.winRate)}, Codex wins ${percent(candidate.winRate)}`,
+        `${family}: rule score ${number(baseline.meanScore)}, Codex score ${number(candidate.meanScore)}, rule wins ${percent(baseline.winRate)}, Codex wins ${percent(candidate.winRate)}, model responses ${candidate.modelResponses}, request failures ${candidate.requestFailures}`,
       );
+    }
+    if (result.candidate.failureMessages.length > 0) {
+      lines.push("", "Observed provider/model failures");
+      for (const message of result.candidate.failureMessages) lines.push(`- ${message}`);
     }
   } else {
     lines.push("", "Codex candidate: no live results recorded.");
   }
 
-  lines.push(
-    "",
-    result.status === "INCONCLUSIVE"
-      ? "This report is not evidence that the hypothesis passed or failed. Complete the required live sample."
-      : "This conclusion was computed mechanically from the acceptance gates above.",
-  );
+  lines.push("");
+  if (!result.evidenceReady) {
+    lines.push(
+      "This report is INCONCLUSIVE because it does not contain valid live-model evidence for every scenario family.",
+      "Clear legacy rows, pass the Codex connection probe, and rerun both study arms.",
+    );
+  } else if (result.status === "INCONCLUSIVE") {
+    lines.push("Complete the minimum required sample before interpreting the hypothesis.");
+  } else {
+    lines.push(
+      "This conclusion was computed mechanically from valid live-model evidence and the acceptance gates above.",
+    );
+  }
   return lines;
 };
 

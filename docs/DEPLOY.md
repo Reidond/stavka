@@ -32,20 +32,24 @@ vp exec wrangler dev
 
 For local credential encryption, replace `WAR_BENCH_ENCRYPTION_KEY` with a real base64-encoded 32-byte value.
 
-## Connect the ChatGPT/Codex subscription
+## Connect and validate the ChatGPT/Codex subscription
 
 1. Open `https://warbench.sands.red` and sign in through Cloudflare Access.
 2. Choose **Connect ChatGPT**.
 3. Warbench starts OpenAI's Codex device authorization and shows the verification URL and user code.
 4. Complete authorization in the OpenAI page.
 5. Warbench polls the device flow, exchanges the authorization code, extracts the ChatGPT account id, encrypts the access/refresh credentials with AES-GCM, and stores them in the `AuthVault` Durable Object.
-6. Expired access credentials are refreshed server-side before an experiment run.
+6. Expired access credentials are refreshed server-side before an experiment run. The previously verified account id is retained when a refreshed token does not repeat that claim.
+7. Choose **Test Codex connection**. Do not run a study until the probe reports a real model, legal order count, and nontrivial request latency.
+8. If the dashboard asks for reauthorization, disconnect and connect ChatGPT again.
 
 The dashboard never stores the Codex OAuth credential in browser storage. Cloudflare Access is the sole operator gate in front of the entire application.
 
 ## Study procedure
 
 A smoke run can use one seed per family, but it can only produce `INCONCLUSIVE`.
+
+Before every study performed after a benchmark protocol or provider-integration change, choose **Clear**. Stored rows carry an evidence-schema version; legacy rows deliberately keep the report `INCONCLUSIVE` rather than being mixed into a new conclusion.
 
 The minimum hypothesis sample is 10 seeds in each of three families for both arms:
 
@@ -59,20 +63,22 @@ For every `(family, seed)` pair:
 2. Run the **Codex candidate** using the same deterministic initial state.
 3. Both sides update strategic orders at the same five-tick cadence.
 4. Red is always the deterministic rule opponent.
-5. Codex output is parsed as strict JSON and semantically validated. Malformed or illegal decisions count as invalid; Warbench does not repair them.
+5. Codex output is parsed as strict JSON and semantically validated. Malformed or illegal model responses count as invalid decisions; Warbench does not repair them.
+6. Authentication, timeout, transport, and provider failures are counted separately as request failures. They do not masquerade as invalid tactical decisions.
 
-The final result is computed mechanically. It is `PASS` only when all of these gates hold after the minimum sample is reached:
+The final result is computed mechanically. It is `PASS` only when all of these gates hold after the minimum sample and valid evidence are reached:
 
 - mean score is at least 5% above the rule baseline;
 - win rate is at least 5 percentage points above the rule baseline;
-- invalid decision rate is at most 2%;
-- p95 model decision latency is at most 5 seconds;
+- invalid model-decision rate is at most 2%;
+- provider request-failure rate is at most 2%;
+- p95 successful model-response latency is at most 5 seconds;
 - no scenario family's mean score regresses by more than 10%.
 
-Otherwise the result is `FAIL`. Before the minimum sample is complete, it remains `INCONCLUSIVE`.
+A conclusion also requires current-schema evidence and at least one actual model response in every scenario family. A provider outage, missing account id, stale evidence, or zero live model responses produces `INCONCLUSIVE`, even if the run counters meet the minimum sample.
 
 ## Evidence report
 
 The dashboard's **PDF report** button downloads `/api/benchmark/report.pdf`.
 
-The PDF is generated from the same durable rows and the same `evaluateHypothesis` result used by the dashboard. It cannot independently override the benchmark conclusion.
+The PDF is generated from the same durable rows and the same `evaluateHypothesis` result used by the dashboard. It cannot independently override the benchmark conclusion. It includes actual model-response count, request-failure rate, legacy-row count, per-family evidence readiness, and sanitized failure messages.

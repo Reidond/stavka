@@ -121,13 +121,20 @@ export const pollDeviceAuthorization = (deviceAuthId: string, userCode: string) 
           status: tokenResponse.status,
         });
       const token = Schema.decodeUnknownSync(TokenResponse)(await tokenResponse.json());
+      const accountId = decodeJwtAccountId(token.access_token);
+      if (!accountId) {
+        throw new CodexAuthError({
+          operation: "token.exchange",
+          message: "OpenAI access token did not contain a ChatGPT account id",
+        });
+      }
       return {
         pending: false,
         credentials: {
           access: token.access_token,
           refresh: token.refresh_token,
           expires: Date.now() + token.expires_in * 1000,
-          accountId: decodeJwtAccountId(token.access_token),
+          accountId,
         },
       };
     },
@@ -140,7 +147,7 @@ export const pollDeviceAuthorization = (deviceAuthId: string, userCode: string) 
           }),
   });
 
-export const refreshCodexCredentials = (refreshToken: string) =>
+export const refreshCodexCredentials = (refreshToken: string, fallbackAccountId?: string) =>
   Effect.tryPromise({
     try: async (): Promise<CodexCredentials> => {
       const response = await fetch(TOKEN_URL, {
@@ -159,11 +166,18 @@ export const refreshCodexCredentials = (refreshToken: string) =>
           status: response.status,
         });
       const token = Schema.decodeUnknownSync(TokenResponse)(await response.json());
+      const accountId = decodeJwtAccountId(token.access_token) ?? fallbackAccountId;
+      if (!accountId) {
+        throw new CodexAuthError({
+          operation: "token.refresh",
+          message: "Refreshed OpenAI token did not contain a ChatGPT account id",
+        });
+      }
       return {
         access: token.access_token,
         refresh: token.refresh_token,
         expires: Date.now() + token.expires_in * 1000,
-        accountId: decodeJwtAccountId(token.access_token),
+        accountId,
       };
     },
     catch: (cause) =>

@@ -8,6 +8,8 @@ import type { Controller } from "./sim";
 export class CodexControllerError extends Data.TaggedError("CodexControllerError")<{
   readonly reason: "model" | "request" | "invalid_decision";
   readonly message: string;
+  readonly latencyMs?: number;
+  readonly model?: string;
 }> {}
 
 export interface CodexDecisionResult {
@@ -100,6 +102,9 @@ export const makeCodexFetch =
     return globalThis.fetch(input, { ...init, headers });
   };
 
+const safeFailureMessage = (message: string): string =>
+  message.replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]").slice(0, 500);
+
 export const decideWithCodex = (
   observation: Observation,
   side: Side,
@@ -119,6 +124,7 @@ export const decideWithCodex = (
           message: requestedModel
             ? `Codex model ${requestedModel} is not in Pi's current catalog`
             : "Pi returned no Codex subscription models",
+          ...(requestedModel ? { model: requestedModel } : {}),
         });
       }
 
@@ -126,6 +132,7 @@ export const decideWithCodex = (
         throw new CodexControllerError({
           reason: "request",
           message: "The Codex OAuth token does not contain a ChatGPT account id; reconnect ChatGPT",
+          model: model.id,
         });
       }
 
@@ -160,7 +167,9 @@ export const decideWithCodex = (
         if (event.type === "error") {
           throw new CodexControllerError({
             reason: "request",
-            message: event.error.errorMessage ?? "Codex request failed",
+            message: safeFailureMessage(event.error.errorMessage ?? "Codex request failed"),
+            latencyMs: performance.now() - started,
+            model: model.id,
           });
         }
       }
@@ -173,6 +182,8 @@ export const decideWithCodex = (
         throw new CodexControllerError({
           reason: "invalid_decision",
           message: "Codex response was not strict JSON",
+          latencyMs,
+          model: model.id,
         });
       }
 
@@ -187,7 +198,11 @@ export const decideWithCodex = (
         if (cause instanceof CodexControllerError) throw cause;
         throw new CodexControllerError({
           reason: "invalid_decision",
-          message: cause instanceof Error ? cause.message : "Codex decision failed validation",
+          message: safeFailureMessage(
+            cause instanceof Error ? cause.message : "Codex decision failed validation",
+          ),
+          latencyMs,
+          model: model.id,
         });
       }
     },
@@ -196,7 +211,7 @@ export const decideWithCodex = (
         ? cause
         : new CodexControllerError({
             reason: "request",
-            message: cause instanceof Error ? cause.message : String(cause),
+            message: safeFailureMessage(cause instanceof Error ? cause.message : String(cause)),
           }),
   });
 
