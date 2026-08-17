@@ -1,5 +1,6 @@
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import { Effect } from "effect";
+import { authorizeOwner, type OwnerAccessEnv } from "./access-control";
 import { AuthVault, type Env } from "./auth-vault";
 import {
   evaluateHypothesis,
@@ -19,11 +20,12 @@ import {
 } from "./codex-auth";
 import { decideWithCodex } from "./codex-controller";
 import { dashboardHtml } from "./dashboard";
+import { migrateLegacyOwnerState } from "./owner-state";
 import { renderHypothesisPdf } from "./pdf-report";
 
 export { AuthVault, BenchmarkStore };
 
-interface AppEnv extends Env {
+interface AppEnv extends Env, OwnerAccessEnv {
   readonly BENCHMARK_STORE: DurableObjectNamespace<BenchmarkStore>;
   readonly WAR_BENCH_CODEX_MODEL?: string;
 }
@@ -34,8 +36,9 @@ const json = (body: unknown, init: ResponseInit = {}) =>
     headers: { "cache-control": "no-store", ...init.headers },
   });
 
-const vault = (env: AppEnv) => env.AUTH_VAULT.getByName("owner");
-const resultsStore = (env: AppEnv) => env.BENCHMARK_STORE.getByName("primary");
+const getVault = (env: AppEnv, objectName: string) => env.AUTH_VAULT.getByName(objectName);
+const getResultsStore = (env: AppEnv, objectName: string) =>
+  env.BENCHMARK_STORE.getByName(objectName);
 
 const readRunRequest = async (
   request: Request,
@@ -63,8 +66,9 @@ const readOptionalModel = async (request: Request): Promise<string | undefined> 
   return typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
 };
 
-const freshCredentials = async (env: AppEnv): Promise<CodexCredentials> => {
-  const authVault = vault(env);
+const freshCredentials = async (
+  authVault: DurableObjectStub<AuthVault>,
+): Promise<CodexCredentials> => {
   const current = await authVault.getCredentials();
   if (!current) throw new Error("Codex is not connected");
   if (!current.accountId) {
@@ -80,8 +84,8 @@ const freshCredentials = async (env: AppEnv): Promise<CodexCredentials> => {
   return refreshed;
 };
 
-const hypothesisFromRows = async (env: AppEnv) => {
-  const rows = await resultsStore(env).list();
+const hypothesisFromRows = async (benchmarkStore: DurableObjectStub<BenchmarkStore>) => {
+  const rows = await benchmarkStore.list();
   const baselineRows = rows.filter((row) => row.controller === "rule");
   const candidateRows = rows.filter((row) => row.controller === "codex");
   const baseline = summarize("rule", baselineRows);
@@ -90,16 +94,35 @@ const hypothesisFromRows = async (env: AppEnv) => {
 };
 
 export default {
-  async fetch(request: Request, env: AppEnv): Promise<Response> {
+  async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.pathname === "/healthz") return json({ ok: true, service: "warbench" });
+
+      const authorization = await authorizeOwner(ctx.access, env);
+      if (!authorization.authorized) {
+        if (authorization.reason === "misconfigured") {
+          console.error(JSON.stringify({ message: "Warbench owner access is not configured" }));
+        }
+        return json({ error: "forbidden" }, { status: authorization.status });
+      }
+
+      const authVault = getVault(env, authorization.objectName);
+      const benchmarkStore = getResultsStore(env, authorization.objectName);
+      const migration = await migrateLegacyOwnerState({
+        scopedVault: authVault,
+        legacyVault: getVault(env, "owner"),
+        legacyResults: getResultsStore(env, "primary"),
+      });
+
+      if (url.pathname === "/api/internal/legacy-migration" && request.method === "GET") {
+        return json(migration);
+      }
+
       if (url.pathname === "/")
         return new Response(dashboardHtml, {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
-
-      const authVault = vault(env);
 
       if (url.pathname === "/api/auth/codex/start" && request.method === "POST") {
         const result = await Effect.runPromise(startDeviceAuthorization);
@@ -118,7 +141,7 @@ export default {
           });
         }
         if (credentials && credentials.expires <= Date.now() + 60_000) {
-          credentials = await freshCredentials(env);
+          credentials = await freshCredentials(authVault);
         }
         if (credentials)
           return json({
@@ -153,7 +176,7 @@ export default {
       }
 
       if (url.pathname === "/api/auth/codex/probe" && request.method === "POST") {
-        const credentials = await freshCredentials(env);
+        const credentials = await freshCredentials(authVault);
         const requestedModel = await readOptionalModel(request);
         const result = await Effect.runPromise(
           Effect.result(
@@ -200,13 +223,13 @@ export default {
       if (url.pathname === "/api/benchmark/baseline" && request.method === "POST") {
         const input = await readRunRequest(request);
         const result = await Effect.runPromise(runRuleSeed(input.seed, input.family));
-        await resultsStore(env).put(result);
+        await benchmarkStore.put(result);
         return json(result);
       }
 
       if (url.pathname === "/api/benchmark/codex" && request.method === "POST") {
         const input = await readRunRequest(request);
-        const credentials = await freshCredentials(env);
+        const credentials = await freshCredentials(authVault);
         const result = await Effect.runPromise(
           runCodexSeed(
             input.seed,
@@ -215,16 +238,16 @@ export default {
             input.model ?? env.WAR_BENCH_CODEX_MODEL,
           ),
         );
-        await resultsStore(env).put(result);
+        await benchmarkStore.put(result);
         return json(result);
       }
 
       if (url.pathname === "/api/benchmark/results" && request.method === "GET") {
-        return json(await hypothesisFromRows(env));
+        return json(await hypothesisFromRows(benchmarkStore));
       }
 
       if (url.pathname === "/api/benchmark/report.pdf" && request.method === "GET") {
-        const { hypothesis } = await hypothesisFromRows(env);
+        const { hypothesis } = await hypothesisFromRows(benchmarkStore);
         return new Response(renderHypothesisPdf(hypothesis), {
           headers: {
             "content-type": "application/pdf",
@@ -235,7 +258,7 @@ export default {
       }
 
       if (url.pathname === "/api/benchmark/results" && request.method === "DELETE") {
-        await resultsStore(env).clear();
+        await benchmarkStore.clear();
         return json({ ok: true });
       }
 

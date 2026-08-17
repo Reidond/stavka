@@ -7,6 +7,9 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "warbench.sands.red", "custom_domain": true }],
+  "vars": {
+    "WAR_BENCH_ACCESS_AUD": "7d92471ccc10cf2755ed8c4cc0219ccc8a23b2d846eae909748c24ee9ee8cead",
+  },
   "durable_objects": {
     "bindings": [
       { "name": "AUTH_VAULT", "class_name": "AuthVault" },
