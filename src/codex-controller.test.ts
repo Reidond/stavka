@@ -66,26 +66,6 @@ describe("Pi Codex Worker adapter", () => {
     expect(observed).toEqual([upstreamResponse]);
   });
 
-  test("routes Codex requests through a configured transport base URL", async () => {
-    const mockedFetch = vi.fn(async () => new Response("ok"));
-    vi.stubGlobal("fetch", mockedFetch);
-
-    const authenticatedFetch = makeCodexFetch(
-      credentials,
-      undefined,
-      "https://gateway.example/custom-warbench-codex/",
-    );
-    await authenticatedFetch("https://chatgpt.com/backend-api/codex/responses", {
-      method: "POST",
-      body: "request-body",
-    });
-
-    expect(mockedFetch).toHaveBeenCalledWith(
-      "https://gateway.example/custom-warbench-codex/backend-api/codex/responses",
-      expect.objectContaining({ method: "POST", body: "request-body" }),
-    );
-  });
-
   test("uses diagnostics and HTTP status when Pi returns a blank error", () => {
     expect(codexFailureMessage({ errorMessage: "", rawStopReason: "" }, { status: 403 })).toBe(
       "Codex upstream returned HTTP 403",
@@ -110,6 +90,16 @@ describe("Pi Codex Worker adapter", () => {
         { errorMessage: "<html>challenge body</html>" },
         { status: 403, cfMitigated: "challenge" },
       ),
-    ).toBe("Codex upstream blocked the request with HTTP 403 (Cloudflare challenge)");
+    ).toBe(
+      "ChatGPT blocked this Cloudflare Worker request with HTTP 403 before OAuth verification",
+    );
+    expect(
+      codexFailureMessage(
+        { errorMessage: "<!DOCTYPE html><html>challenge body</html>" },
+        { status: 403 },
+      ),
+    ).toBe(
+      "ChatGPT blocked this Cloudflare Worker request with HTTP 403 before OAuth verification",
+    );
   });
 });

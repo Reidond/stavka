@@ -9,7 +9,6 @@
   "routes": [{ "pattern": "warbench.sands.red", "custom_domain": true }],
   "vars": {
     "WAR_BENCH_ACCESS_AUD": "7d92471ccc10cf2755ed8c4cc0219ccc8a23b2d846eae909748c24ee9ee8cead",
-    "WAR_BENCH_CODEX_BASE_URL": "https://gateway.ai.cloudflare.com/v1/3f5946e8e68fa04a86d36a5f83617f4b/warbench/custom-warbench-codex",
   },
   "durable_objects": {
     "bindings": [
