@@ -9,6 +9,7 @@
   "routes": [{ "pattern": "warbench.sands.red", "custom_domain": true }],
   "vars": {
     "WAR_BENCH_ACCESS_AUD": "7d92471ccc10cf2755ed8c4cc0219ccc8a23b2d846eae909748c24ee9ee8cead",
+    "WAR_BENCH_ACCESS_TEAM_DOMAIN": "https://andriishafar.cloudflareaccess.com",
   },
   "durable_objects": {
     "bindings": [

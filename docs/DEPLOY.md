@@ -7,7 +7,7 @@ The `production` environment in `Reidond/warbench` must contain four stable secr
 - `CLOUDFLARE_API_TOKEN` — token with permission to deploy Workers and manage Worker secrets for the target account.
 - `CLOUDFLARE_ACCOUNT_ID` — target Cloudflare account id.
 - `WAR_BENCH_ENCRYPTION_KEY` — base64 encoding of exactly 32 random bytes. This must remain stable because it encrypts the stored Codex OAuth credentials.
-- `WAR_BENCH_OWNER_USER_UUID` — the unique Zero Trust user UUID returned for the only authorized owner.
+- `WAR_BENCH_OWNER_SUB` — the only authorized owner's Cloudflare Access JWT `sub` claim.
 
 Generate the Warbench encryption key locally without committing it:
 
@@ -31,7 +31,7 @@ vp run build
 vp exec wrangler dev
 ```
 
-For local credential encryption, replace `WAR_BENCH_ENCRYPTION_KEY` with a real base64-encoded 32-byte value and set `WAR_BENCH_OWNER_USER_UUID` to the simulated Access identity UUID.
+For local credential encryption, replace `WAR_BENCH_ENCRYPTION_KEY` with a real base64-encoded 32-byte value and set `WAR_BENCH_OWNER_SUB` to the simulated Access JWT `sub`.
 
 ## Connect and validate the ChatGPT/Codex subscription
 
@@ -44,7 +44,7 @@ For local credential encryption, replace `WAR_BENCH_ENCRYPTION_KEY` with a real 
 7. Choose **Test Codex connection**. Do not run a study until the probe reports a real model, legal order count, and nontrivial request latency.
 8. If the dashboard asks for reauthorization, disconnect and connect ChatGPT again.
 
-The dashboard never stores the Codex OAuth credential in browser storage. Cloudflare Access is the outer gate; the Worker also requires the expected Access audience and owner user UUID. Both the OAuth vault and benchmark evidence store are selected with `access-user:<user_uuid>`.
+The dashboard never stores the Codex OAuth credential in browser storage. Cloudflare Access is the outer gate; the Worker also validates the JWT signature, team issuer, application audience, token type, and owner `sub`. Both the OAuth vault and benchmark evidence store are selected with `access-user:<sub>`.
 
 ## Study procedure
 

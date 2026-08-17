@@ -32,7 +32,7 @@ Before the minimum sample and valid live-model evidence are complete, the result
 1. Sign in to the hosted Warbench dashboard through Cloudflare Access.
 2. Choose **Connect ChatGPT**.
 3. Warbench starts OpenAI's Codex device authorization and displays the verification URL/code.
-4. Complete ChatGPT authorization in the browser. Warbench encrypts the refreshable credentials at rest in an `AuthVault` Durable Object bound to the validated Cloudflare Access user UUID.
+4. Complete ChatGPT authorization in the browser. Warbench encrypts the refreshable credentials at rest in an `AuthVault` Durable Object bound to the validated Cloudflare Access JWT `sub`.
 5. Choose **Test Codex connection**. The candidate arm stays disabled until Pi receives and validates a real model response.
 6. Clear evidence created under an older benchmark/integration protocol.
 7. Run the rule baseline across the held-out seeds.
@@ -60,9 +60,9 @@ GitHub Actions verifies every pull request and `main` push. Production deploymen
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `WAR_BENCH_ENCRYPTION_KEY`
-- `WAR_BENCH_OWNER_USER_UUID`
+- `WAR_BENCH_OWNER_SUB`
 
-The Worker is available only at `warbench.sands.red`; `workers.dev` and preview URLs are disabled. Cloudflare Access protects the entire application, and the Worker independently checks the Access audience and owner UUID before selecting per-user Durable Objects.
+The Worker is available only at `warbench.sands.red`; `workers.dev` and preview URLs are disabled. Cloudflare Access protects the entire application, and the Worker independently verifies the Access JWT signature, issuer, audience, token type, and owner `sub` before selecting per-user Durable Objects.
 
 See [`docs/DEPLOY.md`](docs/DEPLOY.md) for generation, deployment, Codex connection, study execution, and report instructions.
 
