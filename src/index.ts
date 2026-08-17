@@ -179,6 +179,18 @@ export default {
           ),
         );
         if (result._tag === "Failure") {
+          console.error(
+            JSON.stringify({
+              message: "Codex probe failed",
+              reason: result.failure.reason,
+              error: result.failure.message,
+              latencyMs: result.failure.latencyMs,
+              model: result.failure.model,
+              upstreamStatus: result.failure.upstreamStatus,
+              requestId: result.failure.requestId,
+              cfRay: result.failure.cfRay,
+            }),
+          );
           return json(
             {
               ok: false,
@@ -186,6 +198,7 @@ export default {
               error: result.failure.message,
               latencyMs: result.failure.latencyMs,
               model: result.failure.model,
+              upstreamStatus: result.failure.upstreamStatus,
             },
             { status: 502 },
           );

@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import { Data, Effect, Schema } from "effect";
 import type { CodexCredentials } from "./codex-auth";
@@ -10,6 +10,9 @@ export class CodexControllerError extends Data.TaggedError("CodexControllerError
   readonly message: string;
   readonly latencyMs?: number;
   readonly model?: string;
+  readonly upstreamStatus?: number;
+  readonly requestId?: string;
+  readonly cfRay?: string;
 }> {}
 
 export interface CodexDecisionResult {
@@ -88,7 +91,10 @@ export const makePiAccountToken = (accountId: string): string => {
 };
 
 export const makeCodexFetch =
-  (credentials: CodexCredentials & { readonly accountId: string }): typeof globalThis.fetch =>
+  (
+    credentials: CodexCredentials & { readonly accountId: string },
+    onResponse?: (response: Response) => void,
+  ): typeof globalThis.fetch =>
   async (input, init) => {
     const headers = new Headers(init?.headers);
     headers.set("Authorization", `Bearer ${credentials.access}`);
@@ -99,19 +105,44 @@ export const makeCodexFetch =
     // 0.84.2 adds an older responses=experimental value, so remove it here.
     headers.delete("OpenAI-Beta");
 
-    return globalThis.fetch(input, { ...init, headers });
+    const response = await globalThis.fetch(input, { ...init, headers });
+    onResponse?.(response);
+    return response;
   };
 
-const safeFailureMessage = (message: string): string =>
-  message.replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]").slice(0, 500);
+const safeFailureMessage = (message: string, fallback = "Codex request failed"): string =>
+  (message.trim() || fallback).replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]").slice(0, 500);
+
+export const codexFailureMessage = (
+  error: Pick<AssistantMessage, "diagnostics" | "errorMessage" | "rawStopReason">,
+  upstreamStatus?: number,
+): string => {
+  const diagnosticMessage = error.diagnostics
+    ?.map((diagnostic) => diagnostic.error?.message.trim())
+    .find((message): message is string => Boolean(message));
+  const message = [error.errorMessage, error.rawStopReason, diagnosticMessage]
+    .map((candidate) => candidate?.trim())
+    .find((candidate): candidate is string => Boolean(candidate));
+  return safeFailureMessage(
+    message ??
+      (upstreamStatus === undefined
+        ? "Codex request failed"
+        : `Codex upstream returned HTTP ${upstreamStatus}`),
+  );
+};
 
 export const decideWithCodex = (
   observation: Observation,
   side: Side,
   credentials: CodexCredentials,
   requestedModel?: string,
-): Effect.Effect<CodexDecisionResult, CodexControllerError> =>
-  Effect.tryPromise({
+): Effect.Effect<CodexDecisionResult, CodexControllerError> => {
+  const upstream: {
+    status?: number;
+    requestId?: string;
+    cfRay?: string;
+  } = {};
+  return Effect.tryPromise({
     try: async () => {
       const provider = openaiCodexProvider();
       const models = provider.getModels();
@@ -155,7 +186,13 @@ export const decideWithCodex = (
       };
       const stream = provider.streamSimple(model, context, {
         apiKey: makePiAccountToken(credentials.accountId),
-        fetch: makeCodexFetch(accountCredentials),
+        fetch: makeCodexFetch(accountCredentials, (response) => {
+          upstream.status = response.status;
+          const requestId = response.headers.get("x-request-id");
+          const cfRay = response.headers.get("cf-ray");
+          if (requestId) upstream.requestId = requestId;
+          if (cfRay) upstream.cfRay = cfRay;
+        }),
         reasoning: "low",
         transport: "sse",
         timeoutMs: 30_000,
@@ -167,9 +204,12 @@ export const decideWithCodex = (
         if (event.type === "error") {
           throw new CodexControllerError({
             reason: "request",
-            message: safeFailureMessage(event.error.errorMessage ?? "Codex request failed"),
+            message: codexFailureMessage(event.error, upstream.status),
             latencyMs: performance.now() - started,
             model: model.id,
+            ...(upstream.status === undefined ? {} : { upstreamStatus: upstream.status }),
+            ...(upstream.requestId ? { requestId: upstream.requestId } : {}),
+            ...(upstream.cfRay ? { cfRay: upstream.cfRay } : {}),
           });
         }
       }
@@ -212,8 +252,12 @@ export const decideWithCodex = (
         : new CodexControllerError({
             reason: "request",
             message: safeFailureMessage(cause instanceof Error ? cause.message : String(cause)),
+            ...(upstream.status === undefined ? {} : { upstreamStatus: upstream.status }),
+            ...(upstream.requestId ? { requestId: upstream.requestId } : {}),
+            ...(upstream.cfRay ? { cfRay: upstream.cfRay } : {}),
           }),
   });
+};
 
 export const codexController =
   (side: Side, credentials: CodexCredentials, requestedModel?: string): Controller =>

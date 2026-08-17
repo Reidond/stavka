@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { makeCodexFetch, makePiAccountToken } from "./codex-controller";
+import { codexFailureMessage, makeCodexFetch, makePiAccountToken } from "./codex-controller";
 
 const accountClaim = "https://api.openai.com/auth";
 const credentials = {
@@ -45,5 +45,41 @@ describe("Pi Codex Worker adapter", () => {
     expect(headers.get("chatgpt-account-id")).toBe(credentials.accountId);
     expect(headers.get("originator")).toBe("Codex Warbench");
     expect(headers.has("openai-beta")).toBe(false);
+  });
+
+  test("captures a response for request-local upstream diagnostics", async () => {
+    const upstreamResponse = new Response("blocked", {
+      status: 403,
+      headers: { "cf-ray": "test-ray", "x-request-id": "test-request" },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => upstreamResponse),
+    );
+    const observed: Response[] = [];
+
+    const authenticatedFetch = makeCodexFetch(credentials, (response) => observed.push(response));
+    const response = await authenticatedFetch("https://chatgpt.com/backend-api/codex/responses");
+
+    expect(response).toBe(upstreamResponse);
+    expect(observed).toEqual([upstreamResponse]);
+  });
+
+  test("uses diagnostics and HTTP status when Pi returns a blank error", () => {
+    expect(codexFailureMessage({ errorMessage: "", rawStopReason: "" }, 403)).toBe(
+      "Codex upstream returned HTTP 403",
+    );
+    expect(
+      codexFailureMessage({
+        errorMessage: "",
+        diagnostics: [
+          {
+            type: "request",
+            timestamp: 1,
+            error: { message: "Bearer secret-token was rejected" },
+          },
+        ],
+      }),
+    ).toBe("Bearer [redacted] was rejected");
   });
 });
