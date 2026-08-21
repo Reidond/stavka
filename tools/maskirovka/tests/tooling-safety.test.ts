@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -23,36 +23,53 @@ describe("Maskirovka workflow safety", () => {
     }
   });
 
-  it("keeps one CI workflow and gates the automatic production deploy", async () => {
+  it("keeps verification and deployment in separate gated workflows", async () => {
     const workflowDirectory = resolve(repositoryRoot, ".github/workflows");
-    expect(existsSync(resolve(workflowDirectory, "deploy.yml"))).toBe(false);
     expect(
       readdirSync(workflowDirectory)
         .filter((name) => name.endsWith(".yml"))
         .sort(),
-    ).toEqual(["ci.yml"]);
+    ).toEqual(["ci.yml", "deploy.yml"]);
 
     const workflow = await readFile(resolve(workflowDirectory, "ci.yml"), "utf8");
-    expect(workflow).not.toContain("pnpm ai:smoke");
     expect(workflow).toContain("pull_request:");
     expect(workflow).toContain("branches: [main]");
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("3d3c42e5aac5ba805825da76410c181273ba90b1");
     expect(workflow).toContain("313600b80b104eadebb9111787d37a2e83e014ca");
     expect(workflow).toContain("persist-credentials: false");
+    // Verification provisions pnpm explicitly from the pinned root version.
+    expect(workflow).toContain("pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86");
+    expect(workflow).toContain("version: 11.18.0");
     expect(workflow).toContain("run-install: false");
     expect(workflow).toContain("group: ci-${{ github.ref }}");
     expect(workflow).toContain("cancel-in-progress: true");
-    expect(workflow).toContain("needs: verify");
-    expect(workflow).toContain("github.event_name == 'push'");
-    expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
-    expect(workflow).toContain("github.ref == 'refs/heads/main'");
-    expect(workflow).toContain("environment: production");
-    expect(workflow).toContain("group: cloudflare-production");
-    expect(workflow).toContain("cancel-in-progress: false");
-    expect(workflow).toContain("CLOUDFLARE_API_TOKEN");
-    expect(workflow).toContain("CLOUDFLARE_ACCOUNT_ID");
-    expect(workflow).toContain("pnpm run deploy:production");
+    // Verification runs every deterministic gate.
+    for (const gate of [
+      "pnpm check",
+      "pnpm lint:tailwind",
+      "pnpm test",
+      "pnpm typecheck",
+      "pnpm build",
+      "pnpm eval -- --replay",
+      "pnpm ai:smoke",
+    ]) {
+      expect(workflow).toContain(gate);
+    }
+    // Verification never deploys or touches Cloudflare credentials.
+    expect(workflow).not.toContain("deploy:production");
+    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN");
+
+    const deploy = await readFile(resolve(workflowDirectory, "deploy.yml"), "utf8");
+    expect(deploy).toContain("workflow_dispatch:");
+    expect(deploy).not.toContain("push:");
+    expect(deploy).toContain("github.ref == 'refs/heads/main'");
+    expect(deploy).toContain("environment: production");
+    expect(deploy).toContain("group: cloudflare-production");
+    expect(deploy).toContain("cancel-in-progress: false");
+    expect(deploy).toContain("CLOUDFLARE_API_TOKEN");
+    expect(deploy).toContain("CLOUDFLARE_ACCOUNT_ID");
+    expect(deploy).toContain("pnpm run deploy:production");
   });
 
   it("keeps both Container builds pinned and frozen", async () => {
