@@ -1,4 +1,4 @@
-import type { HypothesisResult } from "./benchmark";
+import type { HypothesisResult } from "@stavka/warbench-core";
 
 const escapePdf = (value: string): string =>
   value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");

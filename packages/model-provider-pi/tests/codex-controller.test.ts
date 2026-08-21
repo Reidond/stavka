@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { codexFailureMessage, makeCodexFetch, makePiAccountToken } from "./codex-controller";
+import { codexFailureMessage, makeCodexFetch, makePiAccountToken } from "../src/codex-controller";
 
 const accountClaim = "https://api.openai.com/auth";
 const credentials = {
@@ -25,7 +25,7 @@ describe("Pi Codex Worker adapter", () => {
   });
 
   test("replaces the local account carrier with the real OAuth credential", async () => {
-    const mockedFetch = vi.fn(async () => new Response("ok"));
+    const mockedFetch = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response("ok"));
     vi.stubGlobal("fetch", mockedFetch);
 
     const authenticatedFetch = makeCodexFetch(credentials);

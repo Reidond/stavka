@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import { ruleController } from "./controllers";
-import { makeScenario, runMatch } from "./sim";
+import { ruleController } from "../src/controllers";
+import { makeScenario, runMatch } from "../src/sim";
 
 describe("warbench deterministic controls", () => {
   it("generates identical scenarios for the same seed", () => {

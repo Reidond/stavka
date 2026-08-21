@@ -6,7 +6,7 @@ import {
   scenarioFamilies,
   summarize,
   type SeedResult,
-} from "./benchmark";
+} from "../src/benchmark";
 
 const rows = (
   controller: "rule" | "codex",

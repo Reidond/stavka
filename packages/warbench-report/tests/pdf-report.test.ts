@@ -5,8 +5,8 @@ import {
   scenarioFamilies,
   summarize,
   type SeedResult,
-} from "./benchmark";
-import { renderHypothesisPdf } from "./pdf-report";
+} from "@stavka/warbench-core";
+import { renderHypothesisPdf } from "../src/pdf-report";
 
 const baselineRows: SeedResult[] = scenarioFamilies.flatMap((family) =>
   Array.from({ length: 10 }, (_, index) => ({

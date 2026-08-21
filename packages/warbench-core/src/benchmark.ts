@@ -1,6 +1,5 @@
 import { Effect } from "effect";
-import type { CodexCredentials } from "./codex-auth";
-import { CodexControllerError, decideWithCodex } from "./codex-controller";
+import type { ControllerError, EvaluationController } from "./controller";
 import { ruleController } from "./controllers";
 import type { Decision, Observation } from "./domain";
 import { makeScenario, score, step } from "./sim";
@@ -262,11 +261,10 @@ export const runRuleSeed = (
     } satisfies SeedResult;
   });
 
-export const runCodexSeed = (
+export const runCandidateSeed = (
   seed: number,
   family: ScenarioFamily,
-  credentials: CodexCredentials,
-  requestedModel?: string,
+  candidate: EvaluationController,
   ticks = 40,
   decisionEveryTicks = defaultDecisionEveryTicks,
 ) =>
@@ -285,15 +283,13 @@ export const runCodexSeed = (
     for (let tick = 0; tick < ticks; tick += 1) {
       if (tick % decisionEveryTicks === 0) {
         decisionCount += 1;
-        const candidate = yield* Effect.result(
-          decideWithCodex(state, "blue", credentials, requestedModel),
-        );
-        if (candidate._tag === "Success") {
-          blueDecision = candidate.success.decision;
-          decisionLatenciesMs.push(candidate.success.latencyMs);
-          resolvedModel = candidate.success.model;
+        const attempt = yield* Effect.result(candidate.decide(state));
+        if (attempt._tag === "Success") {
+          blueDecision = attempt.success.decision;
+          decisionLatenciesMs.push(attempt.success.latencyMs);
+          resolvedModel = attempt.success.model;
         } else {
-          const failure = candidate.failure;
+          const failure: ControllerError = attempt.failure;
           failureMessages.add(`${failure.reason}: ${failure.message}`);
           resolvedModel ??= failure.model;
           if (failure.reason === "invalid_decision") {
@@ -303,7 +299,7 @@ export const runCodexSeed = (
             requestFailures += 1;
           }
           blueDecision = { orders: [] };
-          if (failure instanceof CodexControllerError && failure.reason === "model") {
+          if (failure.reason === "model") {
             return yield* Effect.fail(failure);
           }
         }
