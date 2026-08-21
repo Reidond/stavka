@@ -33,12 +33,21 @@ vi.mock("cloudflare:workers", () => ({
 // 32 raw bytes, base64-encoded.
 const validKey = btoa(String.fromCharCode(...Array.from({ length: 32 }, (_, i) => i + 1)));
 
+const fakeState = {
+  storage: {
+    get: async <T>(key: string) => storage.get(key) as T | undefined,
+    put: async (key: string, value: unknown) => {
+      storage.set(key, value);
+    },
+    delete: async (key: string) => storage.delete(key),
+  },
+} as never as DurableObjectState;
+
 const newVault = async () => {
   const { CredentialVault } = await import("../src/durable-objects/credential-vault");
-  const vault = new CredentialVault(
-    { storage: undefined as never },
-    { STAVKA_PROVIDER_CREDENTIALS_KEY: validKey },
-  );
+  const vault = new CredentialVault(fakeState, {
+    STAVKA_PROVIDER_CREDENTIALS_KEY: validKey,
+  });
   return vault as InstanceType<typeof CredentialVault>;
 };
 
@@ -109,7 +118,7 @@ describe("provider credential vault", () => {
     const { CredentialVault, VaultKeyError } =
       await import("../src/durable-objects/credential-vault");
     const vault = new CredentialVault(
-      { storage: undefined as never },
+      fakeState,
       { STAVKA_PROVIDER_CREDENTIALS_KEY: btoa("too-short") },
     );
     await expect(vault.putCredentials(ownerSub, "codex", {})).rejects.toBeInstanceOf(VaultKeyError);

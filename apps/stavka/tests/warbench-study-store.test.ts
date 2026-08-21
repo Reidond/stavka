@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SeedResult } from "@stavka/warbench-core";
 
-import type { StudyManifest } from "../src/durable-objects/warbench-study-store";
+import type { StudyManifest, StudyResult } from "../src/durable-objects/warbench-study-store";
 
 const storage = new Map<string, unknown>();
 
@@ -48,12 +47,12 @@ const manifest: StudyManifest = {
 };
 
 const resultFor = (
-  overrides: Partial<SeedResult> & {
+  overrides: Partial<StudyResult> & {
     readonly arm?: "rule" | "codex";
     readonly seed?: number;
-    readonly family?: SeedResult["family"];
+    readonly family?: StudyResult["family"];
   },
-): Parameters<InstanceType<typeof Store>["recordResult"]>[0] => {
+): StudyResult => {
   const { arm, ...rest } = overrides;
   return {
     studyId: "study-v1",
@@ -72,7 +71,7 @@ const resultFor = (
     decisionLatenciesMs: [],
     failureMessages: [],
     ...rest,
-  };
+  } as StudyResult;
 };
 
 type Store = import("../src/durable-objects/warbench-study-store").WarbenchStudyStore;

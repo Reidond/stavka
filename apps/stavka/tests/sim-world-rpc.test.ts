@@ -161,6 +161,8 @@ const makeWorld = (
 ): InstanceType<typeof SimWorld> => {
   const world = new SimWorld({ id: { name } } as unknown as DurableObjectState, {
     SIM_WORLD: {} as Env["SIM_WORLD"],
+    CREDENTIAL_VAULT: {} as Env["CREDENTIAL_VAULT"],
+    WAR_BENCH_STUDY_STORE: {} as Env["WAR_BENCH_STUDY_STORE"],
     ...overrides,
   });
   world.setState(world.initialState);

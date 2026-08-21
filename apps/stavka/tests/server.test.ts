@@ -29,6 +29,8 @@ const { handleRequest } = await import("../src/server");
 
 const makeEnv = (overrides: Partial<Env> = {}): Env => ({
   SIM_WORLD: {} as Env["SIM_WORLD"],
+  CREDENTIAL_VAULT: {} as Env["CREDENTIAL_VAULT"],
+  WAR_BENCH_STUDY_STORE: {} as Env["WAR_BENCH_STUDY_STORE"],
   ...overrides,
 });
 
