@@ -14,6 +14,7 @@ import { routeAgentRequest } from "agents";
 import { accessConfig, type Env } from "./config";
 
 export { SimWorld } from "./sim-world";
+export { CredentialVault } from "./durable-objects/credential-vault";
 
 class WorkerBindings extends Context.Service<WorkerBindings, Env>()(
   "stavka/poligon/WorkerBindings",

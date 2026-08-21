@@ -17,6 +17,10 @@ vi.mock("agents", () => ({
   routeAgentRequest: mocks.agentRoute,
 }));
 
+vi.mock("cloudflare:workers", () => ({
+  DurableObject: class {},
+}));
+
 vi.mock("@tanstack/react-start/server-entry", () => ({
   default: { fetch: mocks.tanStackFetch },
 }));

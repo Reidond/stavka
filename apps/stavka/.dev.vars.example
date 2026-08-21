@@ -4,3 +4,5 @@ ACCESS_TEAM_DOMAIN=
 ACCESS_AUD=
 COMMANDER_URL=http://127.0.0.1:8787
 COMMANDER_API_KEY=sk-stavka-replace-me
+# Generate afresh with: pnpm generate-key (base64-encoded 32-byte AES-256 key).
+STAVKA_PROVIDER_CREDENTIALS_KEY=

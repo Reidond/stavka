@@ -7,9 +7,15 @@
   "workers_dev": true,
   "preview_urls": true,
   "durable_objects": {
-    "bindings": [{ "name": "SIM_WORLD", "class_name": "SimWorld" }],
+    "bindings": [
+      { "name": "SIM_WORLD", "class_name": "SimWorld" },
+      { "name": "CREDENTIAL_VAULT", "class_name": "CredentialVault" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SimWorld"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SimWorld"] },
+    { "tag": "v2", "new_sqlite_classes": ["CredentialVault"] },
+  ],
   "vars": {
     "ENVIRONMENT": "production",
     "COMMANDER_URL": "https://stavka-commander.andrii-shafar.workers.dev",
