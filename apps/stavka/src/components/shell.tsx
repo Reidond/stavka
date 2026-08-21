@@ -7,7 +7,6 @@ const sections = [
   { to: "/simulations", label: "Simulations" },
   { to: "/decisions", label: "Decisions" },
   { to: "/replays", label: "Replays" },
-  { to: "/experiments/warbench", label: "Warbench" },
   { to: "/models", label: "Models" },
   { to: "/usage", label: "Usage" },
   { to: "/settings/providers", label: "Settings" },

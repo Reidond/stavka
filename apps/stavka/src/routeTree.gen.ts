@@ -16,7 +16,6 @@ import { Route as ReplaysRouteImport } from './routes/replays'
 import { Route as SimulationsRouteImport } from './routes/simulations'
 import { Route as SystemRouteImport } from './routes/system'
 import { Route as UsageRouteImport } from './routes/usage'
-import { Route as ExperimentsWarbenchRouteImport } from './routes/experiments/warbench'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
 import { Route as SettingsAccessRouteImport } from './routes/settings/access'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
@@ -56,11 +55,6 @@ const UsageRoute = UsageRouteImport.update({
   path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ExperimentsWarbenchRoute = ExperimentsWarbenchRouteImport.update({
-  id: '/experiments/warbench',
-  path: '/experiments/warbench',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
@@ -85,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/simulations': typeof SimulationsRoute
   '/system': typeof SystemRoute
   '/usage': typeof UsageRoute
-  '/experiments/warbench': typeof ExperimentsWarbenchRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -98,7 +91,6 @@ export interface FileRoutesByTo {
   '/simulations': typeof SimulationsRoute
   '/system': typeof SystemRoute
   '/usage': typeof UsageRoute
-  '/experiments/warbench': typeof ExperimentsWarbenchRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -112,7 +104,6 @@ export interface FileRoutesById {
   '/simulations': typeof SimulationsRoute
   '/system': typeof SystemRoute
   '/usage': typeof UsageRoute
-  '/experiments/warbench': typeof ExperimentsWarbenchRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -127,7 +118,6 @@ export interface FileRouteTypes {
     | '/simulations'
     | '/system'
     | '/usage'
-    | '/experiments/warbench'
     | '/sessions/$sessionId'
     | '/settings/access'
     | '/settings/providers'
@@ -140,7 +130,6 @@ export interface FileRouteTypes {
     | '/simulations'
     | '/system'
     | '/usage'
-    | '/experiments/warbench'
     | '/sessions/$sessionId'
     | '/settings/access'
     | '/settings/providers'
@@ -153,7 +142,6 @@ export interface FileRouteTypes {
     | '/simulations'
     | '/system'
     | '/usage'
-    | '/experiments/warbench'
     | '/sessions/$sessionId'
     | '/settings/access'
     | '/settings/providers'
@@ -167,7 +155,6 @@ export interface RootRouteChildren {
   SimulationsRoute: typeof SimulationsRoute
   SystemRoute: typeof SystemRoute
   UsageRoute: typeof UsageRoute
-  ExperimentsWarbenchRoute: typeof ExperimentsWarbenchRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   SettingsAccessRoute: typeof SettingsAccessRoute
   SettingsProvidersRoute: typeof SettingsProvidersRoute
@@ -224,13 +211,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/experiments/warbench': {
-      id: '/experiments/warbench'
-      path: '/experiments/warbench'
-      fullPath: '/experiments/warbench'
-      preLoaderRoute: typeof ExperimentsWarbenchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
       path: '/sessions/$sessionId'
@@ -263,7 +243,6 @@ const rootRouteChildren: RootRouteChildren = {
   SimulationsRoute: SimulationsRoute,
   SystemRoute: SystemRoute,
   UsageRoute: UsageRoute,
-  ExperimentsWarbenchRoute: ExperimentsWarbenchRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SettingsAccessRoute: SettingsAccessRoute,
   SettingsProvidersRoute: SettingsProvidersRoute,

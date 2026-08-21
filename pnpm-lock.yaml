@@ -511,6 +511,34 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.3.0)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.7(@types/node@24.3.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))
 
+  tools/warbench:
+    dependencies:
+      '@earendil-works/pi-ai':
+        specifier: 0.84.2
+        version: 0.84.2(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.4.3))(supports-color@10.2.2)(ws@8.21.1)(zod@4.4.3)
+      '@effect/platform-node':
+        specifier: 4.0.0-beta.102
+        version: 4.0.0-beta.102(effect@4.0.0-beta.102)(ioredis@5.11.1(supports-color@10.2.2))
+      '@stavka/model-provider-pi':
+        specifier: workspace:*
+        version: link:../../packages/model-provider-pi
+      '@stavka/warbench-core':
+        specifier: workspace:*
+        version: link:../../packages/warbench-core
+      '@stavka/warbench-report':
+        specifier: workspace:*
+        version: link:../../packages/warbench-report
+      effect:
+        specifier: 4.0.0-beta.102
+        version: 4.0.0-beta.102
+    devDependencies:
+      '@types/node':
+        specifier: ^24.3.0
+        version: 24.3.0
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.1
+
 packages:
 
   '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.220':
