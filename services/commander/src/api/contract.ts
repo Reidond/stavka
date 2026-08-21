@@ -107,12 +107,23 @@ const StrictMapUploadRequest = strictPayload(MapUploadRequest);
 
 const HealthResponse = Schema.Struct({
   ok: Schema.Boolean,
+  /** live: fully configured; degraded: serving but incomplete alias/provider config; not_ready: unusable. */
+  status: Schema.Literals(["live", "degraded", "not_ready"]),
   service: Schema.Literal("stavka-commander"),
   protocol_version: Schema.Literal(1),
   ai: Schema.Struct({
     provider: Schema.Literals(["mock", "openai", "anthropic"]),
     commander: Schema.String,
     sergeant: Schema.String,
+    heavy: Schema.String,
+    /** Per-alias readiness: each active alias must resolve to a non-empty model id. */
+    aliases: Schema.Array(
+      Schema.Struct({
+        alias: Schema.String,
+        model: Schema.String,
+        ready: Schema.Boolean,
+      }),
+    ),
   }),
 });
 

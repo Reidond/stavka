@@ -18,7 +18,14 @@ import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/u
 
 import { MaskirovkaConfiguration, type MaskirovkaConfig } from "./config";
 import { normalizeRequest } from "./domain/protocol";
-import { GatewayError, seatKinds, tierAliases, type Dialect, type TierAlias } from "./domain/types";
+import {
+  GatewayError,
+  seatKinds,
+  tierAliases,
+  type Dialect,
+  type RequestMetadata,
+  type TierAlias,
+} from "./domain/types";
 import {
   StaticAssetRepository,
   type StaticAssetRepositoryService,
@@ -417,18 +424,24 @@ const json = (body: unknown, status = 200): HttpServerResponse.HttpServerRespons
 
 const attachMetadata = (
   response: HttpServerResponse.HttpServerResponse,
-  metadata: {
-    readonly requestId: string;
-    readonly seat: string;
-    readonly cacheHit: boolean;
-    readonly queueDepth: number;
-  },
+  metadata: RequestMetadata,
 ): HttpServerResponse.HttpServerResponse =>
+  // These response headers are the single trusted channel for routing and
+  // accounting metadata. Callers cannot influence them.
   HttpServerResponse.setHeaders(response, {
     "x-request-id": metadata.requestId,
+    "x-maskirovka-tier": metadata.tier,
     "x-maskirovka-seat": metadata.seat,
+    "x-maskirovka-provider":
+      metadata.seat === "claude" ? "claude" : metadata.seat === "codex" ? "codex" : metadata.seat,
+    "x-maskirovka-model": metadata.model,
     "x-maskirovka-cache": metadata.cacheHit ? "hit" : "miss",
     "x-maskirovka-queue-depth": String(metadata.queueDepth),
+    "x-maskirovka-input-tokens": String(metadata.inputTokens),
+    "x-maskirovka-output-tokens": String(metadata.outputTokens),
+    "x-maskirovka-cost-actual-usd": metadata.actualCostUsd.toFixed(6),
+    "x-maskirovka-cost-list-usd": metadata.apiListCostUsd.toFixed(6),
+    "x-maskirovka-cost-plan-credit-usd": metadata.planCreditUsd.toFixed(6),
   });
 
 const invoke = (

@@ -215,15 +215,51 @@ const PublicLive = HttpApiBuilder.group(CommanderApi, "public", (handlers) =>
   handlers.handle("health", () =>
     Effect.gen(function* () {
       const env = yield* CommanderEnvironment;
-      const config = yield* readConfigEffect(env).pipe(Effect.catch((error) => Effect.die(error)));
+      const config = yield* readConfigEffect(env).pipe(
+        // Misconfiguration is a reportable health state, not a crash.
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (!config) {
+        return {
+          ok: false as const,
+          status: "not_ready" as const,
+          service: "stavka-commander" as const,
+          protocol_version: 1 as const,
+          ai: {
+            provider: "mock" as const,
+            commander: "",
+            sergeant: "",
+            heavy: "",
+            aliases: [],
+          },
+        };
+      }
+      const transportReady =
+        config.aiProvider === "mock" ||
+        config.inferenceService !== undefined ||
+        (config.aiKey !== undefined && config.aiBaseUrl !== undefined);
+      const aliases = [
+        { alias: "stavka/commander", model: config.commanderModel },
+        { alias: "stavka/sergeant", model: config.sergeantModel },
+        { alias: "stavka/heavy", model: config.heavyModel },
+      ].map(({ alias, model }) => ({ alias, model, ready: model.length > 0 }));
+      const aliasesReady = aliases.every((entry) => entry.ready);
+      const status = !transportReady
+        ? ("not_ready" as const)
+        : aliasesReady && config.aiProvider !== "mock"
+          ? ("live" as const)
+          : ("degraded" as const);
       return {
-        ok: true as const,
+        ok: status !== "not_ready",
+        status,
         service: "stavka-commander" as const,
         protocol_version: 1 as const,
         ai: {
           provider: config.aiProvider,
           commander: config.commanderModel,
           sergeant: config.sergeantModel,
+          heavy: config.heavyModel,
+          aliases,
         },
       };
     }),

@@ -10,6 +10,7 @@ import {
   type GatewayProvider,
   type GatewaySeat,
   type GatewayTier,
+  gatewayTiers,
   readGatewayConfig,
 } from "./config";
 import {
@@ -329,7 +330,12 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         return errorResponse("GATEWAY_AUTH_MISSING", "No subscription credential is configured");
       yield* this.ensureContainerReady(auth);
       const headers = new Headers(request.headers);
-      const requestId = headers.get("x-maskirovka-request-id") ?? crypto.randomUUID();
+      // Routing metadata is decided by the inference service, never by the
+      // caller: strip every inbound x-maskirovka-* header before forwarding.
+      for (const name of headers.keys()) {
+        if (name.toLowerCase().startsWith("x-maskirovka-")) headers.delete(name);
+      }
+      const requestId = crypto.randomUUID();
       headers.set("x-maskirovka-request-id", requestId);
       headers.delete("authorization");
       headers.delete("cf-access-jwt-assertion");
@@ -349,9 +355,17 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
           ),
         ),
       );
-      const providerHeader = headers.get("x-maskirovka-provider");
-      const seatHeader = headers.get("x-maskirovka-seat");
-      const modelHeader = headers.get("x-maskirovka-model");
+      // Persist only metadata returned by the inference service itself.
+      const trusted = new Headers(response.headers);
+      const seatHeader = trusted.get("x-maskirovka-seat") ?? undefined;
+      const providerHeader = trusted.get("x-maskirovka-provider") ?? undefined;
+      const tierHeader = trusted.get("x-maskirovka-tier") ?? undefined;
+      const numberHeader = (name: string): number | undefined => {
+        const raw = trusted.get(name);
+        if (raw === null) return undefined;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      };
       const metadata: GatewayRequestMetadata = {
         requestId,
         timestamp: started,
@@ -360,10 +374,31 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
           ? { provider: providerHeader }
           : {}),
         ...(seatHeader && gatewaySeat(seatHeader) ? { seat: seatHeader } : {}),
-        ...(modelHeader ? { model: modelHeader } : {}),
+        ...(tierHeader !== undefined && gatewayTier(tierHeader) ? { tier: tierHeader } : {}),
+        ...(trusted.get("x-maskirovka-model")
+          ? { model: trusted.get("x-maskirovka-model") as string }
+          : {}),
         status: response.status,
         latencyMs: Math.max(0, Date.now() - started),
-        queueDepth: Number(headers.get("x-maskirovka-queue-depth") ?? 0) || 0,
+        queueDepth: numberHeader("x-maskirovka-queue-depth") ?? 0,
+        ...(trusted.get("x-maskirovka-cache")
+          ? { cacheHit: trusted.get("x-maskirovka-cache") === "hit" }
+          : {}),
+        ...withDefined(numberHeader("x-maskirovka-input-tokens"), (inputTokens) => ({
+          inputTokens,
+        })),
+        ...withDefined(numberHeader("x-maskirovka-output-tokens"), (outputTokens) => ({
+          outputTokens,
+        })),
+        ...withDefined(numberHeader("x-maskirovka-cost-actual-usd"), (actualCostUsd) => ({
+          actualCostUsd,
+        })),
+        ...withDefined(numberHeader("x-maskirovka-cost-list-usd"), (listCostUsd) => ({
+          listCostUsd,
+        })),
+        ...withDefined(numberHeader("x-maskirovka-cost-plan-credit-usd"), (planCreditUsd) => ({
+          planCreditUsd,
+        })),
       };
       yield* this.requests.append(metadata).pipe(Effect.catch(() => Effect.void));
       const currentWindow =
@@ -374,7 +409,12 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         .pipe(Effect.catch(() => Effect.void));
       const outputHeaders = new Headers(response.headers);
       outputHeaders.delete("x-maskirovka-auth-checkpoint");
-      return new Response(response.body, {
+      // Enforce the actual streamed byte count; Content-Length is untrusted.
+      const limitBytes = numberFromEnv(
+        (this.env as GatewayEnv).MASKIROVKA_MAX_RESPONSE_BYTES,
+        DEFAULT_MAX_RESPONSE_BYTES,
+      );
+      return new Response(limitStreamBytes(response.body, limitBytes), {
         status: response.status,
         statusText: response.statusText,
         headers: outputHeaders,
@@ -515,6 +555,44 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
 const gatewaySeat = (value: string): value is GatewaySeat =>
   ["mock", "claude", "codex", "api"].includes(value as GatewaySeat);
+
+const gatewayTier = (value: string): value is GatewayTier =>
+  gatewayTiers.includes(value as GatewayTier);
+
+const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+const numberFromEnv = (raw: string | undefined, fallback: number): number => {
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+/**
+ * Caps the actual streamed byte count of a proxied response. The stream
+ * errors once the limit is exceeded, regardless of any Content-Length header.
+ */
+export const limitStreamBytes = (
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+): ReadableStream<Uint8Array> | null => {
+  if (body === null) return body;
+  let total = 0;
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength;
+        if (total > maxBytes) {
+          controller.error(new Error(`response exceeded ${maxBytes} byte limit`));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+};
+
+const withDefined = <T, R>(value: T | undefined, project: (defined: T) => R): Partial<R> =>
+  value === undefined ? {} : project(value);
 
 const metadataFromAuth = (persisted: PersistedGatewayAuth): GatewayAdminAuthResult => ({
   provider: persisted.provider,

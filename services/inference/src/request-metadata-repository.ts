@@ -34,6 +34,12 @@ export interface GatewayRequestMetadata {
   readonly status: number;
   readonly latencyMs: number;
   readonly queueDepth: number;
+  readonly cacheHit?: boolean;
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
+  readonly actualCostUsd?: number;
+  readonly listCostUsd?: number;
+  readonly planCreditUsd?: number;
 }
 
 export interface RequestMetadataRepositoryService {

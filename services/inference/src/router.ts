@@ -26,6 +26,7 @@ import {
   hostedAccessConfig,
   type GatewayEnv,
   type GatewayProvider,
+  type GatewaySeat,
   type GatewayTier,
 } from "./config";
 import type {
@@ -220,7 +221,31 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
             catch: () =>
               new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Gateway status is unavailable"),
           });
-          return json(status, status.ok ? 200 : 503);
+          // Health validates every active alias against its seat's provider
+          // credential — never merely "some credential exists".
+          const configuredProviders = new Set(
+            Object.values(status.auth)
+              .filter((meta) => meta.configured)
+              .map((meta) => meta.provider),
+          );
+          const seatNeedsProvider = (seat: GatewaySeat): seat is "claude" | "codex" =>
+            seat === "claude" || seat === "codex";
+          const aliasesReady =
+            status.aliases.length > 0 &&
+            status.aliases.every((alias) => {
+              if (alias.model.trim().length === 0) return false;
+              return !seatNeedsProvider(alias.seat) || configuredProviders.has(alias.seat);
+            });
+          const health =
+            !status.ok || status.killed
+              ? ("not_ready" as const)
+              : aliasesReady
+                ? ("live" as const)
+                : ("degraded" as const);
+          return json(
+            { ...status, health, aliases_ready: aliasesReady },
+            health === "not_ready" ? 503 : 200,
+          );
         }),
       ),
     )
@@ -399,6 +424,18 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
     ),
 );
 
+/**
+ * SPA fallback discipline: a miss may fall back to index.html only for HTML
+ * navigations. Missing scripts, styles, images, and source maps must remain
+ * HTTP 404 instead of receiving HTML.
+ */
+export const isHtmlNavigation = (webRequest: Request, path: string): boolean => {
+  const mode = webRequest.headers.get("sec-fetch-mode");
+  if (mode !== null && mode !== undefined) return mode === "navigate";
+  const acceptsHtml = (webRequest.headers.get("accept") ?? "").includes("text/html");
+  return acceptsHtml && !/\.[a-z0-9]+$/i.test(path);
+};
+
 const dashboardAsset = (
   request: HttpServerRequest.HttpServerRequest,
   path: string,
@@ -424,18 +461,25 @@ const dashboardAsset = (
             "Gateway dashboard assets are unavailable",
           ),
       });
-      const asset =
-        requested.status === 404
-          ? yield* Effect.tryPromise({
-              try: () => assets.fetch(new Request("https://maskirovka-assets.invalid/index.html")),
-              catch: () =>
-                new WorkerHttpError(
-                  503,
-                  "DASHBOARD_UNAVAILABLE",
-                  "Gateway dashboard assets are unavailable",
-                ),
-            })
-          : requested;
+      const navigationMiss = requested.status === 404 && isHtmlNavigation(webRequest, path);
+      if (requested.status === 404 && !navigationMiss) {
+        throw new WorkerHttpError(
+          404,
+          "DASHBOARD_ASSET_NOT_FOUND",
+          "Dashboard asset does not exist",
+        );
+      }
+      const asset = navigationMiss
+        ? yield* Effect.tryPromise({
+            try: () => assets.fetch(new Request("https://maskirovka-assets.invalid/index.html")),
+            catch: () =>
+              new WorkerHttpError(
+                503,
+                "DASHBOARD_UNAVAILABLE",
+                "Gateway dashboard assets are unavailable",
+              ),
+          })
+        : requested;
       if (!asset.ok)
         throw new WorkerHttpError(
           503,
@@ -445,7 +489,7 @@ const dashboardAsset = (
       const headers = new Headers(asset.headers);
       headers.set(
         "cache-control",
-        path === "index.html" || requested.status === 404
+        path === "index.html" || navigationMiss
           ? "no-cache"
           : "public, max-age=31536000, immutable",
       );

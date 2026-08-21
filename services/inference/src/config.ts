@@ -53,6 +53,8 @@ export type GatewayEnv = RuntimeBindings &
     readonly MASKIROVKA_CODEX_WINDOW_CALL_LIMIT: string;
     readonly MASKIROVKA_CODEX_WINDOW_TOKEN_LIMIT: string;
     readonly MASKIROVKA_CODEX_WINDOW_HOURS: string;
+    /** Hard cap on proxied response bytes (Content-Length cannot be trusted). */
+    readonly MASKIROVKA_MAX_RESPONSE_BYTES?: string;
   };
 
 export interface GatewayRuntimeConfig {
