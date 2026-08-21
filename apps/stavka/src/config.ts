@@ -5,6 +5,9 @@ export interface Env {
   readonly CREDENTIAL_VAULT: DurableObjectNamespace<
     import("./durable-objects/credential-vault").CredentialVault
   >;
+  readonly WAR_BENCH_STUDY_STORE: DurableObjectNamespace<
+    import("./durable-objects/warbench-study-store").WarbenchStudyStore
+  >;
   readonly ENVIRONMENT?: string;
   readonly DEV_ACCESS_EMAIL?: string;
   readonly ACCESS_TEAM_DOMAIN?: string;

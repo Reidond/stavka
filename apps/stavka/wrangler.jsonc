@@ -10,11 +10,13 @@
     "bindings": [
       { "name": "SIM_WORLD", "class_name": "SimWorld" },
       { "name": "CREDENTIAL_VAULT", "class_name": "CredentialVault" },
+      { "name": "WAR_BENCH_STUDY_STORE", "class_name": "WarbenchStudyStore" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["SimWorld"] },
     { "tag": "v2", "new_sqlite_classes": ["CredentialVault"] },
+    { "tag": "v3", "new_sqlite_classes": ["WarbenchStudyStore"] },
   ],
   "vars": {
     "ENVIRONMENT": "production",
