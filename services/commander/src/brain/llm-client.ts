@@ -140,7 +140,10 @@ const httpClientLayer = (config: CommanderConfig): Layer.Layer<HttpClient.HttpCl
   const service = config.inferenceService;
   if (service === undefined) return FetchHttpClient.layer;
   const bindingFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    service.fetch(input instanceof Request ? input : String(input), init)) as unknown as typeof globalThis.fetch;
+    service.fetch(
+      input instanceof Request ? input : String(input),
+      init,
+    )) as unknown as typeof globalThis.fetch;
   // The Fetch reference is read per request; the concrete binding wins over the default.
   return Layer.merge(FetchHttpClient.layer, Layer.succeed(FetchHttpClient.Fetch, bindingFetch));
 };
