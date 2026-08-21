@@ -497,7 +497,8 @@ export class SimWorld extends Agent<Env, PoligonState> {
     faction: string,
     state: PoligonState,
   ): Promise<{ readonly link: RestCommanderLink; readonly sessionId: string } | undefined> {
-    if (!this.env.COMMANDER_URL || !this.env.COMMANDER_API_KEY) return undefined;
+    if (!this.env.COMMANDER_API_KEY) return undefined;
+    if (!this.env.COMMANDER_SERVICE && !this.env.COMMANDER_URL) return undefined;
     const sessionId = commanderSessionId({
       scenario: state.scenario,
       seed: state.seed,
@@ -509,14 +510,26 @@ export class SimWorld extends Agent<Env, PoligonState> {
     const existing = this.#links.get(sessionId);
     if (existing) return { link: existing, sessionId };
 
+    // Production rides the private COMMANDER_SERVICE binding; COMMANDER_URL
+    // remains a local-development fallback.
+    const service = this.env.COMMANDER_SERVICE;
     const link = new RestCommanderLink({
-      endpoint: this.env.COMMANDER_URL,
+      endpoint: service ? "https://commander.internal" : (this.env.COMMANDER_URL as string),
       apiKey: this.env.COMMANDER_API_KEY,
       sessionId,
       faction,
       doctrine: state.doctrine,
       missionEpoch: 1,
       mapName: "Poligon Procedural",
+      ...(service
+        ? {
+            fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
+              service.fetch(
+                input instanceof Request ? input : String(input),
+                init,
+              )) as typeof globalThis.fetch,
+          }
+        : {}),
     });
     const checkpoint = state.linkCheckpoints[sessionId];
     if (checkpoint) {

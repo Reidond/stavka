@@ -130,6 +130,21 @@ const generatedDecision = (
     objectName: "stavka_decision",
   });
 
+/**
+ * When a private inference service binding is configured, all model traffic
+ * flows through the binding and never touches a public inference origin.
+ * Otherwise requests use platform fetch against the configured base URL
+ * (local development).
+ */
+const httpClientLayer = (config: CommanderConfig): Layer.Layer<HttpClient.HttpClient> => {
+  const service = config.inferenceService;
+  if (service === undefined) return FetchHttpClient.layer;
+  const bindingFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+    service.fetch(input instanceof Request ? input : String(input), init)) as unknown as typeof globalThis.fetch;
+  // The Fetch reference is read per request; the concrete binding wins over the default.
+  return Layer.merge(FetchHttpClient.layer, Layer.succeed(FetchHttpClient.Fetch, bindingFetch));
+};
+
 const withOpenAi = (
   config: CommanderConfig,
   model: string,
@@ -142,7 +157,7 @@ const withOpenAi = (
   const client = OpenAiClient.layer({
     apiUrl: openAiUrl(config.aiBaseUrl),
     ...(config.aiKey ? { apiKey: Redacted.make(config.aiKey) } : {}),
-  }).pipe(Layer.provide(FetchHttpClient.layer));
+  }).pipe(Layer.provide(httpClientLayer(config)));
   const languageModel = OpenAiLanguageModel.layer({ model }).pipe(Layer.provide(client));
   return program.pipe(Effect.provide(languageModel));
 };
@@ -165,7 +180,7 @@ const withAnthropic = (
   const client = AnthropicClient.layer({
     apiUrl: anthropicUrl(config.aiBaseUrl),
     transformClient,
-  }).pipe(Layer.provide(FetchHttpClient.layer));
+  }).pipe(Layer.provide(httpClientLayer(config)));
   const languageModel = AnthropicLanguageModel.layer({
     model: ANTHROPIC_CAPABILITY_MODEL,
   }).pipe(Layer.provide(client));

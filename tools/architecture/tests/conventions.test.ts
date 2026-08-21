@@ -61,10 +61,10 @@ describe("project architecture conventions", () => {
     });
 
     const httpApplications = [
-      "apps/commander/src",
+      "services/commander/src",
       "apps/maskirovka-seat/src",
       "apps/stavka/src",
-      "apps/maskirovka-gateway/src",
+      "services/inference/src",
       "tools/maskirovka/src",
     ];
     const missingEffectContracts = httpApplications.filter((directory) => {
@@ -94,7 +94,7 @@ describe("project architecture conventions", () => {
       "apps/stavka/package.json",
       "tools/maskirovka/package.json",
       "apps/maskirovka-seat/package.json",
-      "apps/maskirovka-gateway/package.json",
+      "services/inference/package.json",
     ];
     const retiredPackageNames = [
       ["@stavka", "ui"].join("/"),
@@ -139,7 +139,7 @@ describe("project architecture conventions", () => {
     expect(manifest.scripts.deploy).toBeUndefined();
 
     const gatewayManifest = JSON.parse(
-      readFileSync(join(repositoryRoot, "apps/maskirovka-gateway/package.json"), "utf8"),
+      readFileSync(join(repositoryRoot, "services/inference/package.json"), "utf8"),
     ) as { readonly scripts: Readonly<Record<string, string>> };
     expect(gatewayManifest.scripts.build).toBe(
       "pnpm --filter @stavka/tasks build:maskirovka-gateway",
@@ -154,7 +154,7 @@ describe("project architecture conventions", () => {
       ".oxlintrc.stavka.json",
       ".oxlintrc.maskirovka-seat.json",
       ".oxlintrc.maskirovka.json",
-      ".oxlintrc.maskirovka-gateway.json",
+      ".oxlintrc.inference.json",
     ].map((path) => readFileSync(join(repositoryRoot, path), "utf8"));
     const settings = readFileSync(join(repositoryRoot, ".vscode/settings.json"), "utf8");
     const extensions = readFileSync(join(repositoryRoot, ".vscode/extensions.json"), "utf8");
@@ -163,7 +163,7 @@ describe("project architecture conventions", () => {
       "apps/stavka/src/styles.css",
       "tools/maskirovka/src/dashboard/styles.css",
       "apps/maskirovka-seat/src/dashboard/styles.css",
-      "apps/maskirovka-gateway/src/dashboard/styles.css",
+      "services/inference/src/dashboard/styles.css",
     ];
     const styles = stylePaths.map((path) => readFileSync(join(repositoryRoot, path), "utf8"));
 
@@ -181,13 +181,13 @@ describe("project architecture conventions", () => {
     expect(taskPlan).toContain(".oxlintrc.stavka.json");
     expect(taskPlan).toContain(".oxlintrc.maskirovka-seat.json");
     expect(taskPlan).toContain(".oxlintrc.maskirovka.json");
-    expect(taskPlan).toContain(".oxlintrc.maskirovka-gateway.json");
+    expect(taskPlan).toContain(".oxlintrc.inference.json");
     expect(settings).toContain('"tailwindCSS.classFunctions": []');
     expect(settings).toContain(
       '"apps/maskirovka-seat/src/dashboard/styles.css": "apps/maskirovka-seat/src/dashboard/**"',
     );
     expect(settings).toContain(
-      '"apps/maskirovka-gateway/src/dashboard/styles.css": "apps/maskirovka-gateway/src/dashboard/**"',
+      '"services/inference/src/dashboard/styles.css": "services/inference/src/dashboard/**"',
     );
     expect(extensions).toContain('"bradlc.vscode-tailwindcss"');
     expect(extensions).toContain('"oxc.oxc-vscode"');

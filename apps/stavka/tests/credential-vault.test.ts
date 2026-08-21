@@ -117,10 +117,9 @@ describe("provider credential vault", () => {
   it("refuses weak or malformed encryption keys before touching state", async () => {
     const { CredentialVault, VaultKeyError } =
       await import("../src/durable-objects/credential-vault");
-    const vault = new CredentialVault(
-      fakeState,
-      { STAVKA_PROVIDER_CREDENTIALS_KEY: btoa("too-short") },
-    );
+    const vault = new CredentialVault(fakeState, {
+      STAVKA_PROVIDER_CREDENTIALS_KEY: btoa("too-short"),
+    });
     await expect(vault.putCredentials(ownerSub, "codex", {})).rejects.toBeInstanceOf(VaultKeyError);
     expect(storage.size).toBe(0);
   });

@@ -14,6 +14,8 @@ export interface Env {
   readonly ACCESS_AUD?: string;
   readonly COMMANDER_URL?: string;
   readonly COMMANDER_API_KEY?: string;
+  /** Private service binding to Commander; replaces the public URL in production. */
+  readonly COMMANDER_SERVICE?: Fetcher;
   /** Base64-encoded 32-byte AES-256 key; generate afresh, never reuse. */
   readonly STAVKA_PROVIDER_CREDENTIALS_KEY?: string;
 }

@@ -4,8 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-02",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
-  "preview_urls": true,
+  // Private service: no public workers.dev or preview origin.
+  "workers_dev": false,
+  "preview_urls": false,
+  "services": [{ "binding": "INFERENCE_SERVICE", "service": "stavka-inference" }],
   "durable_objects": {
     "bindings": [{ "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }],
   },
@@ -26,8 +28,9 @@
     "TICK_INTERVAL_ACTIVE_MS": "750",
     "TICK_INTERVAL_BURST_MS": "300",
     "STAVKA_AI_PROVIDER": "openai",
-    // Replaced after gateway deploy with the live workers.dev origin.
-    "STAVKA_AI_BASE_URL": "https://stavka-maskirovka-gateway.andrii-shafar.workers.dev",
+    // Model traffic rides the INFERENCE_SERVICE service binding; this URL is
+    // only a local-development fallback (see .dev.vars).
+    "STAVKA_AI_BASE_URL": "http://127.0.0.1:4141",
   },
   "observability": { "enabled": true },
 }

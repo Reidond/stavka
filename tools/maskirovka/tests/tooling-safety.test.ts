@@ -74,7 +74,7 @@ describe("Maskirovka workflow safety", () => {
 
   it("keeps both Container builds pinned and frozen", async () => {
     const containerFiles = [
-      ["apps/maskirovka-gateway/Dockerfile", "apps/maskirovka-gateway/container-pnpm-lock.yaml"],
+      ["services/inference/Dockerfile", "services/inference/container-pnpm-lock.yaml"],
       ["apps/maskirovka-seat/Dockerfile", "apps/maskirovka-seat/container-pnpm-lock.yaml"],
     ] as const;
     const expectedNodeImage =
@@ -97,7 +97,7 @@ describe("Maskirovka workflow safety", () => {
     }
 
     const gatewayDockerfile = await readFile(
-      resolve(repositoryRoot, "apps/maskirovka-gateway/Dockerfile"),
+      resolve(repositoryRoot, "services/inference/Dockerfile"),
       "utf8",
     );
     expect(gatewayDockerfile).toContain("@anthropic-ai/claude-code@2.1.226");
@@ -105,7 +105,7 @@ describe("Maskirovka workflow safety", () => {
   });
 
   it("bundles first-party gateway code and smoke-tests the pruned runtime tree", async () => {
-    const gatewayDirectory = resolve(repositoryRoot, "apps/maskirovka-gateway");
+    const gatewayDirectory = resolve(repositoryRoot, "services/inference");
     const [dockerfile, packageSource, workspace, lockfile, smoke] = await Promise.all([
       readFile(resolve(gatewayDirectory, "Dockerfile"), "utf8"),
       readFile(resolve(gatewayDirectory, "container-package.json"), "utf8"),

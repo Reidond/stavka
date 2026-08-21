@@ -9,16 +9,16 @@ RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
 
 # The Wrangler image build context is the repository root. Keep the install
 # independent of workspace links: first-party source is bundled below.
-COPY apps/maskirovka-gateway/container-package.json ./package.json
-COPY apps/maskirovka-gateway/container-pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY apps/maskirovka-gateway/container-pnpm-lock.yaml ./pnpm-lock.yaml
+COPY services/inference/container-package.json ./package.json
+COPY services/inference/container-pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY services/inference/container-pnpm-lock.yaml ./pnpm-lock.yaml
 RUN --mount=type=cache,id=maskirovka-gateway-pnpm,target=/pnpm/store \
   pnpm install --frozen-lockfile
 
 COPY packages/access-auth/src ./packages/access-auth/src
 COPY packages/protocol/src ./packages/protocol/src
 COPY tools/maskirovka/src ./tools/maskirovka/src
-COPY apps/maskirovka-gateway/container-smoke.mjs ./container-smoke.mjs
+COPY services/inference/container-smoke.mjs ./container-smoke.mjs
 RUN pnpm exec esbuild tools/maskirovka/src/container/main.ts \
   --bundle \
   --format=esm \

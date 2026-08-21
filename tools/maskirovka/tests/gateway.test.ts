@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { describe, expect, it } from "vitest";
 
-import { runAiDecision } from "../../../apps/commander/src/brain/llm-client";
+import { runAiDecision } from "../../../services/commander/src/brain/llm-client";
 import { readConfig, type MaskirovkaConfig } from "../src/config";
 import { normalizeRequest } from "../src/domain/protocol";
 import { GatewayError, type SeatInvocation, type SeatResult } from "../src/domain/types";

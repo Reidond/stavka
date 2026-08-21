@@ -28,6 +28,11 @@ export interface Env {
   readonly STAVKA_AI_PROVIDER?: string;
   readonly STAVKA_AI_BASE_URL?: string;
   readonly STAVKA_AI_KEY?: string;
+  /**
+   * Private service binding to the inference Worker. When present it carries
+   * all model traffic and no public inference origin is needed.
+   */
+  readonly INFERENCE_SERVICE?: Fetcher;
   readonly STAVKA_SEAT_EXHAUSTION_POLICY?: string;
   readonly STAVKA_SEAT_STRETCH_MULTIPLIER?: string;
   readonly STAVKA_SEAT_HEARTBEAT_TTL_SECONDS?: string;
@@ -66,6 +71,8 @@ export interface CommanderConfig {
   readonly aiProvider: AiProvider;
   readonly aiBaseUrl: string;
   readonly aiKey?: string;
+  /** Service binding fetch for inference; when set, traffic never leaves the private network. */
+  readonly inferenceService?: Fetcher;
   readonly seatExhaustionPolicy: "fallback" | "stretch";
   readonly seatStretchMultiplier: number;
   readonly seatHeartbeatTtlSeconds: number;
@@ -125,6 +132,7 @@ export const readConfig = (env: Env): CommanderConfig => {
     tickBurstMs: Math.max(300, numberFrom(env.TICK_INTERVAL_BURST_MS, 300)),
     aiProvider,
     aiBaseUrl: maskirovkaBaseUrl(env.STAVKA_AI_BASE_URL),
+    ...(env.INFERENCE_SERVICE ? { inferenceService: env.INFERENCE_SERVICE } : {}),
     ...(env.STAVKA_AI_KEY ? { aiKey: env.STAVKA_AI_KEY } : {}),
     seatExhaustionPolicy: env.STAVKA_SEAT_EXHAUSTION_POLICY === "stretch" ? "stretch" : "fallback",
     seatStretchMultiplier: Math.min(

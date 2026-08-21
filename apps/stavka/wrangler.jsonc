@@ -13,6 +13,7 @@
       { "name": "WAR_BENCH_STUDY_STORE", "class_name": "WarbenchStudyStore" },
     ],
   },
+  "services": [{ "binding": "COMMANDER_SERVICE", "service": "stavka-commander" }],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["SimWorld"] },
     { "tag": "v2", "new_sqlite_classes": ["CredentialVault"] },
@@ -20,7 +21,7 @@
   ],
   "vars": {
     "ENVIRONMENT": "production",
-    "COMMANDER_URL": "https://stavka-commander.andrii-shafar.workers.dev",
+    "COMMANDER_URL": "http://127.0.0.1:8787",
   },
   "observability": { "enabled": true },
 }
