@@ -69,7 +69,7 @@ const FormSchema = Schema.Struct({
   host: Schema.Literals(["agent", "offline"]),
 });
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/simulations")({
   validateSearch: Schema.toStandardSchemaV1(SearchSchema),
   component: PoligonPage,
 });
@@ -233,7 +233,7 @@ const AgentPoligonPage = ({
           </h1>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button size="sm" onClick={() => void navigate({ to: "/replay" })}>
+          <Button size="sm" onClick={() => void navigate({ to: "/replays" })}>
             Replay import
           </Button>
           <PoligonBadge status={accessMode === "operator" ? "success" : "warning"}>
@@ -513,7 +513,7 @@ const OfflinePoligonPage = ({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void navigate({ to: "/replay" })}>
+          <Button size="sm" onClick={() => void navigate({ to: "/replays" })}>
             Replay import
           </Button>
           <PoligonBadge status="success">browser offline</PoligonBadge>

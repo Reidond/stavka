@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-const simulatorRoute = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
+const simulatorRoute = readFileSync(
+  new URL("../src/routes/simulations.tsx", import.meta.url),
+  "utf8",
+);
 const replayPage = readFileSync(
   new URL("../src/components/replay-page.tsx", import.meta.url),
   "utf8",

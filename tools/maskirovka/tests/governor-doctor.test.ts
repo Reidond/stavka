@@ -149,10 +149,10 @@ describe("doctor guardrails", () => {
     expect(writes).toEqual([
       "/repo/.dev.vars",
       "/repo/apps/commander/.dev.vars",
-      "/repo/apps/poligon/.dev.vars",
+      "/repo/apps/stavka/.dev.vars",
     ]);
     const commanderValues = writtenValues.get("/repo/apps/commander/.dev.vars");
-    const poligonValues = writtenValues.get("/repo/apps/poligon/.dev.vars");
+    const poligonValues = writtenValues.get("/repo/apps/stavka/.dev.vars");
     expect(commanderValues).toMatchObject({
       ENVIRONMENT: "local",
       DEV_ACCESS_EMAIL: "developer@localhost",

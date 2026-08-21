@@ -110,7 +110,7 @@ export class DoctorService {
       if (options.write) {
         const rootFilename = join(this.repositoryRoot, ".dev.vars");
         const commanderFilename = join(this.repositoryRoot, "apps/commander/.dev.vars");
-        const poligonFilename = join(this.repositoryRoot, "apps/poligon/.dev.vars");
+        const poligonFilename = join(this.repositoryRoot, "apps/stavka/.dev.vars");
         const [commanderExisting, poligonExisting] = yield* Effect.all([
           this.devVars.read(commanderFilename),
           this.devVars.read(poligonFilename),

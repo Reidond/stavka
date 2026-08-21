@@ -7,7 +7,7 @@ export interface TaskCommand {
 const gatewayFilter = "@stavka/maskirovka-gateway";
 const seatFilter = "@stavka/maskirovka-seat";
 const commanderFilter = "@stavka/commander";
-const poligonFilter = "@stavka/poligon";
+const poligonFilter = "@stavka/stavka";
 
 const filterScript = (filter: string, script: string): TaskCommand => ({
   label: `${filter} ${script}`,
@@ -74,10 +74,10 @@ export const evaluationTestFiles = [
   "apps/commander/tests/seat-router.test.ts",
   "apps/commander/tests/terrain-prompt.test.ts",
   "apps/commander/tests/semantic-replay.test.ts",
-  "apps/poligon/tests/sim-world.test.ts",
-  "apps/poligon/tests/sim-world-rpc.test.ts",
-  "apps/poligon/tests/offline-sim-host.test.ts",
-  "apps/poligon/tests/replay-dashboard.test.tsx",
+  "apps/stavka/tests/sim-world.test.ts",
+  "apps/stavka/tests/sim-world-rpc.test.ts",
+  "apps/stavka/tests/offline-sim-host.test.ts",
+  "apps/stavka/tests/replay-dashboard.test.tsx",
 ] as const;
 
 export const evaluationTask = (
@@ -126,9 +126,9 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
       "exec",
       "oxlint",
       "--config",
-      ".oxlintrc.poligon.json",
+      ".oxlintrc.stavka.json",
       "--deny-warnings",
-      "apps/poligon",
+      "apps/stavka",
     ],
   },
   {

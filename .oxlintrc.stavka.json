@@ -3,7 +3,7 @@
   "extends": ["./.oxlintrc.json"],
   "settings": {
     "better-tailwindcss": {
-      "cwd": "apps/poligon",
+      "cwd": "apps/stavka",
       "entryPoint": "src/styles.css",
       "detectComponentClasses": true
     }

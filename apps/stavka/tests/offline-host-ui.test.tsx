@@ -8,7 +8,7 @@ vi.mock("../src/components/battlefield", () => ({
   Battlefield: () => <div>Deterministic battlefield</div>,
 }));
 
-const { decodePoligonSearch, PoligonHost } = await import("../src/routes/index");
+const { decodePoligonSearch, PoligonHost } = await import("../src/routes/simulations");
 
 afterEach(() => {
   agents.useAgent.mockReset();

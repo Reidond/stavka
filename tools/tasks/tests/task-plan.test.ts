@@ -35,7 +35,7 @@ describe("repository task plans", () => {
       ),
     ).toEqual([
       ".oxlintrc.json",
-      ".oxlintrc.poligon.json",
+      ".oxlintrc.stavka.json",
       ".oxlintrc.maskirovka-seat.json",
       ".oxlintrc.maskirovka.json",
       ".oxlintrc.maskirovka-gateway.json",
@@ -65,13 +65,13 @@ describe("repository task plans", () => {
     expect(productionDeployTask.map((command) => command.arguments)).toEqual([
       ["--filter", "@stavka/maskirovka-gateway", "build:dashboard"],
       ["--filter", "@stavka/maskirovka-seat", "build:dashboard"],
-      ["--filter", "@stavka/poligon", "build"],
+      ["--filter", "@stavka/stavka", "build"],
       ["--filter", "@stavka/maskirovka-gateway", "exec", "wrangler", "deploy"],
       ["--filter", "@stavka/maskirovka-seat", "exec", "wrangler", "deploy"],
       ["--filter", "@stavka/commander", "exec", "wrangler", "deploy"],
       [
         "--filter",
-        "@stavka/poligon",
+        "@stavka/stavka",
         "exec",
         "wrangler",
         "deploy",
