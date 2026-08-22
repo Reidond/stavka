@@ -22,12 +22,7 @@ Commander and inference reachable only through Cloudflare service bindings.
    - Worker-side JWT verification is already enforced by
      `@stavka/access-auth`; configure `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`
      as Worker secrets/vars on `apps/stavka`.
-3. **Provider credentials key** (fresh — never reuse Warbench-era keys):
-   ```sh
-   pnpm generate-key            # base64-encoded 32-byte AES-256 key
-   wrangler secret put STAVKA_PROVIDER_CREDENTIALS_KEY --config apps/stavka/wrangler.jsonc
-   ```
-4. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
+3. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
    service tokens via `authorizeMachine`, not Access sessions.
 
 ## Deploy
@@ -65,12 +60,18 @@ Then sign in through Access and verify:
 If readiness fails: `wrangler rollback` per service in reverse dependency
 order (app → commander → inference).
 
-## Codex provider connection (after every new credential key)
+## Operator-local Codex provider connection
 
 ```sh
 pnpm warbench connect      # device authorization; stores operator-local file
 pnpm warbench probe        # one live request; prints sanitized diagnostics only
 ```
+
+Warbench credentials never enter Cloudflare Access, a Worker secret, browser
+storage, or Durable Object storage. The CLI creates its data directory with
+mode `0700`, writes `codex-credentials.json` with mode `0600`, and sends the
+credential only to the OpenAI provider endpoints required for authorization,
+refresh, and benchmark requests.
 
 Probe outcome interpretation (handoff §12):
 

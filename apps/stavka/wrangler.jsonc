@@ -9,7 +9,6 @@
   "durable_objects": {
     "bindings": [
       { "name": "SIM_WORLD", "class_name": "SimWorld" },
-      { "name": "CREDENTIAL_VAULT", "class_name": "CredentialVault" },
       { "name": "WAR_BENCH_STUDY_STORE", "class_name": "WarbenchStudyStore" },
     ],
   },
@@ -18,6 +17,7 @@
     { "tag": "v1", "new_sqlite_classes": ["SimWorld"] },
     { "tag": "v2", "new_sqlite_classes": ["CredentialVault"] },
     { "tag": "v3", "new_sqlite_classes": ["WarbenchStudyStore"] },
+    { "tag": "v4", "deleted_classes": ["CredentialVault"] },
   ],
   "vars": {
     "ENVIRONMENT": "production",
