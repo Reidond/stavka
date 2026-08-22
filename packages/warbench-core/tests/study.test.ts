@@ -166,7 +166,7 @@ describe("evidence assembly honesty", () => {
     const store = new MemoryStore();
     await Effect.runPromise(store.createStudy(manifestFor("study-v1", "full")));
     await Effect.runPromise(store.recordResult(ruleResult("study-v1", 1)));
-    await Effect.runPromise(store.recordResult(codexResult("study-v1", 1, 500)));
+    await Effect.runPromise(store.recordResult(codexResult("study-v1", 1, "balanced", 500)));
 
     const evidence = await Effect.runPromise(assembleEvidence(store, "study-v1"));
     expect(evidence.hypothesis.sampleReady).toBe(false);
