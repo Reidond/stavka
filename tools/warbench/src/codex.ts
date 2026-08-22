@@ -1,5 +1,5 @@
 import { Data, Effect } from "effect";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -53,9 +53,22 @@ export const writeCodexCredentials = (
   dataDir: string,
   credentials: CodexCredentials,
 ): Effect.Effect<void> =>
-  Effect.promise(() =>
-    writeFile(credentialsPath(dataDir), `${JSON.stringify(credentials, null, 2)}\n`, "utf8"),
-  );
+  Effect.promise(async () => {
+    await mkdir(dataDir, { recursive: true, mode: 0o700 });
+    await chmod(dataDir, 0o700);
+
+    const handle = await open(credentialsPath(dataDir), "w", 0o600);
+    try {
+      // `mode` only applies when a file is created. Tighten an existing file
+      // before replacing its contents so refreshed OAuth tokens are never
+      // written through group/world-readable permissions.
+      await handle.chmod(0o600);
+      await handle.writeFile(`${JSON.stringify(credentials, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  });
 
 const toProviderFailure = (error: { readonly message: string }): ProviderFailure =>
   new ProviderFailure({ message: error.message });

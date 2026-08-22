@@ -27,8 +27,9 @@ pnpm warbench evidence study-v1 --json out.json --pdf out.pdf
 ```
 
 - Study data lives in an operator-chosen directory (default `.warbench/`),
-  never committed. Credentials live beside it and are never migrated from the
-  standalone repository.
+  never committed. Credentials live beside it with owner-only directory/file
+  permissions (`0700`/`0600`), are never migrated from the standalone
+  repository, and are never copied into Cloudflare.
 - The CLI shares `@stavka/warbench-core` orchestration with the server-side
   `WarbenchStudyStore` Durable Object, so file-backed and DO-backed evidence
   enforce identical immutability rules.

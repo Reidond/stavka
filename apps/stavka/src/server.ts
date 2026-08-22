@@ -14,7 +14,6 @@ import { routeAgentRequest } from "agents";
 import { accessConfig, type Env } from "./config";
 
 export { SimWorld } from "./sim-world";
-export { CredentialVault } from "./durable-objects/credential-vault";
 export { WarbenchStudyStore } from "./durable-objects/warbench-study-store";
 
 class WorkerBindings extends Context.Service<WorkerBindings, Env>()(

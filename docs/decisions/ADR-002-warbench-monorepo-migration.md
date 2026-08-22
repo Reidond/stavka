@@ -40,8 +40,9 @@ duplicated auth, provider integrations, deployment pipelines, and dashboards.
    fails CI on violation.
 5. **Standalone credentials are not migrated.** The Warbench OAuth vault
    encryption key was exposed during development and must be treated as
-   compromised. The unified app generates a fresh
-   `STAVKA_PROVIDER_CREDENTIALS_KEY` and requires a new Codex authorization.
+   compromised. As amended by ADR-003, the replacement Codex authorization is
+   operator-local only; the unified Cloudflare application stores no provider
+   credentials or replacement vault key.
 
 ## Consequences
 
