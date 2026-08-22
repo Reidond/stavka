@@ -35,10 +35,10 @@ describe("repository task plans", () => {
       ),
     ).toEqual([
       ".oxlintrc.json",
-      ".oxlintrc.poligon.json",
+      ".oxlintrc.stavka.json",
       ".oxlintrc.maskirovka-seat.json",
       ".oxlintrc.maskirovka.json",
-      ".oxlintrc.maskirovka-gateway.json",
+      ".oxlintrc.inference.json",
     ]);
     expect(tailwindLintTask.every((command) => command.arguments.includes("--deny-warnings"))).toBe(
       true,
@@ -47,10 +47,10 @@ describe("repository task plans", () => {
 
   it("builds the gateway dashboard before its Worker dry run", () => {
     expect(maskirovkaGatewayBuildTask.map((command) => command.arguments)).toEqual([
-      ["--filter", "@stavka/maskirovka-gateway", "build:dashboard"],
+      ["--filter", "@stavka/inference", "build:dashboard"],
       [
         "--filter",
-        "@stavka/maskirovka-gateway",
+        "@stavka/inference",
         "exec",
         "wrangler",
         "deploy",
@@ -61,17 +61,15 @@ describe("repository task plans", () => {
     ]);
   });
 
-  it("prebuilds every service before deploying in dependency order", () => {
+  it("prebuilds every service before deploying in dependency order without the seat", () => {
     expect(productionDeployTask.map((command) => command.arguments)).toEqual([
-      ["--filter", "@stavka/maskirovka-gateway", "build:dashboard"],
-      ["--filter", "@stavka/maskirovka-seat", "build:dashboard"],
-      ["--filter", "@stavka/poligon", "build"],
-      ["--filter", "@stavka/maskirovka-gateway", "exec", "wrangler", "deploy"],
-      ["--filter", "@stavka/maskirovka-seat", "exec", "wrangler", "deploy"],
+      ["--filter", "@stavka/inference", "build:dashboard"],
+      ["--filter", "@stavka/stavka", "build"],
+      ["--filter", "@stavka/inference", "exec", "wrangler", "deploy"],
       ["--filter", "@stavka/commander", "exec", "wrangler", "deploy"],
       [
         "--filter",
-        "@stavka/poligon",
+        "@stavka/stavka",
         "exec",
         "wrangler",
         "deploy",
@@ -80,10 +78,13 @@ describe("repository task plans", () => {
       ],
     ]);
 
+    // The hosted Maskirovka seat is no longer part of production.
+    expect(JSON.stringify(productionDeployTask)).not.toContain("@stavka/maskirovka-seat");
+
     const firstDeploy = productionDeployTask.findIndex((command) =>
       command.arguments.includes("deploy"),
     );
-    expect(firstDeploy).toBe(3);
+    expect(firstDeploy).toBe(2);
     expect(
       productionDeployTask
         .slice(0, firstDeploy)

@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stavka-poligon",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "durable_objects": {
+    "bindings": [
+      { "name": "SIM_WORLD", "class_name": "SimWorld" },
+      { "name": "CREDENTIAL_VAULT", "class_name": "CredentialVault" },
+      { "name": "WAR_BENCH_STUDY_STORE", "class_name": "WarbenchStudyStore" },
+    ],
+  },
+  "services": [{ "binding": "COMMANDER_SERVICE", "service": "stavka-commander" }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SimWorld"] },
+    { "tag": "v2", "new_sqlite_classes": ["CredentialVault"] },
+    { "tag": "v3", "new_sqlite_classes": ["WarbenchStudyStore"] },
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "COMMANDER_URL": "http://127.0.0.1:8787",
+  },
+  "observability": { "enabled": true },
+}

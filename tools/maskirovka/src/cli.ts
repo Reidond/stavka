@@ -428,7 +428,7 @@ const runDeploySeat = (): Effect.Effect<void, GatewayError> =>
     const action = apply ? "deploy" : "build";
     const result = yield* new ProcessCliProbeRepository().run(
       "pnpm",
-      ["--filter", "@stavka/maskirovka-gateway", action],
+      ["--filter", "@stavka/inference", action],
       10 * 60 * 1_000,
     );
     if (result.output) yield* Console.log(result.output);

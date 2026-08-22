@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["./.oxlintrc.json"],
+  "settings": {
+    "better-tailwindcss": {
+      "cwd": "apps/stavka",
+      "entryPoint": "src/styles.css",
+      "detectComponentClasses": true
+    }
+  },
+  "rules": {
+    "better-tailwindcss/no-unknown-classes": "error"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@stavka/warbench-cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "warbench": "./src/cli.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vp test --run --config vitest.config.ts",
+    "warbench": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.84.2",
+    "@effect/platform-node": "4.0.0-beta.102",
+    "@stavka/model-provider-pi": "workspace:*",
+    "@stavka/warbench-core": "workspace:*",
+    "@stavka/warbench-report": "workspace:*",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stavka-inference",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-05",
+  "compatibility_flags": ["nodejs_compat"],
+  // Private inference service: no public workers.dev or preview origin.
+  // The bundled operations dashboard stays behind Cloudflare Access.
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist/dashboard",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": true,
+  },
+  "containers": [
+    {
+      "class_name": "MaskirovkaGateway",
+      "image": "./Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-2",
+      "max_instances": 1,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MASKIROVKA_GATEWAY", "class_name": "MaskirovkaGateway" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MaskirovkaGateway"] }],
+  "r2_buckets": [{ "binding": "REPLAY_CACHE", "bucket_name": "stavka-maskirovka-replay" }],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "GATEWAY_ID": "default-gateway",
+    "MODEL_ALIASES": "{\"stavka/commander\":{\"seat\":\"claude\",\"model\":\"claude-fable-5\"},\"stavka/sergeant\":{\"seat\":\"codex\",\"model\":\"gpt-5.6-luna\"},\"stavka/heavy\":{\"seat\":\"codex\",\"model\":\"gpt-5.6-terra\"}}",
+    "CONTAINER_SLEEP_AFTER": "15m",
+    "MASKIROVKA_MODE": "live",
+    "MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD": "0",
+    "MASKIROVKA_CODEX_WINDOW_CALL_LIMIT": "0",
+    "MASKIROVKA_CODEX_WINDOW_TOKEN_LIMIT": "0",
+    "MASKIROVKA_CODEX_WINDOW_HOURS": "5",
+    "MASKIROVKA_MAX_RESPONSE_BYTES": "10485760",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+  },
+}

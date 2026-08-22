@@ -25,6 +25,13 @@ export interface AccessConfig {
   readonly audience: string;
   readonly devEmail?: string;
   readonly automationPermissions?: readonly AccessPermission[];
+  /**
+   * Identities (Access `sub` or verified email) promoted to owner or operator.
+   * Verified humans never receive elevated roles implicitly: anyone not listed
+   * resolves to spectator.
+   */
+  readonly ownerSubjects?: readonly string[];
+  readonly operatorSubjects?: readonly string[];
 }
 
 export class AccessAuthError extends Data.TaggedError("AccessAuthError")<{
@@ -59,19 +66,42 @@ export const remoteAccessKeys = (teamDomain: string): AccessKeyResolver => {
   return resolver;
 };
 
+const matchesIdentity = (
+  candidates: readonly string[] | undefined,
+  subject: string,
+  email?: string,
+): boolean =>
+  candidates?.some(
+    (candidate) => candidate === subject || (email !== undefined && candidate === email),
+  ) === true;
+
+const humanRoleFor = (
+  subject: string,
+  email: string | undefined,
+  config: Pick<AccessConfig, "ownerSubjects" | "operatorSubjects">,
+): HumanRole => {
+  if (matchesIdentity(config.ownerSubjects, subject, email)) return "owner";
+  if (matchesIdentity(config.operatorSubjects, subject, email)) return "operator";
+  // Default to deny: a verified human is at most a spectator unless the
+  // deployment explicitly lists them as operator or owner.
+  return "spectator";
+};
+
 const identityFromPayload = (
   payload: JWTPayload,
   automationPermissions: readonly AccessPermission[] = ["read"],
+  roleConfig: Pick<AccessConfig, "ownerSubjects" | "operatorSubjects"> = {},
 ): AccessIdentity => {
   const serviceToken =
     typeof payload.common_name === "string" && (payload.sub === undefined || payload.sub === "");
   const subject = serviceToken
     ? String(payload.common_name)
     : String(payload.sub ?? payload.email ?? "unknown");
+  const email = typeof payload.email === "string" ? payload.email : undefined;
   return {
     subject,
-    ...(typeof payload.email === "string" ? { email: payload.email } : {}),
-    role: serviceToken ? "automation" : "owner",
+    ...(email ? { email } : {}),
+    role: serviceToken ? "automation" : humanRoleFor(subject, email, roleConfig),
     serviceToken,
     ...(serviceToken ? { permissions: [...new Set(automationPermissions)] } : {}),
     claims: payload,
@@ -133,7 +163,9 @@ export const verifyAccessRequest = (
     try: () => jwtVerify(token, keys ?? remoteAccessKeys(config.teamDomain), options),
     catch: () =>
       new AccessAuthError({ reason: "invalid", message: "Invalid Cloudflare Access JWT" }),
-  }).pipe(Effect.map(({ payload }) => identityFromPayload(payload, config.automationPermissions)));
+  }).pipe(
+    Effect.map(({ payload }) => identityFromPayload(payload, config.automationPermissions, config)),
+  );
 };
 
 export interface AccessAuthService {

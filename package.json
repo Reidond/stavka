@@ -20,6 +20,7 @@
     "ai:serve": "vp run --no-cache --filter @stavka/maskirovka serve",
     "ai:deploy-seat": "vp run --no-cache --filter @stavka/maskirovka deploy-seat",
     "eval": "pnpm --filter @stavka/tasks eval",
+    "warbench": "pnpm --filter @stavka/warbench-cli warbench",
     "deploy:production": "pnpm --filter @stavka/tasks deploy:production"
   },
   "devDependencies": {

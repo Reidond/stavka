@@ -5,7 +5,7 @@ import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import test12Fixture from "../../../packages/protocol/fixtures/test-12-round-trip.json";
-import type { Env as CommanderEnv } from "../../../apps/commander/src/config";
+import type { Env as CommanderEnv } from "../../../services/commander/src/config";
 
 import { readConfig } from "../src/config";
 import { FileDevVarsRepository } from "../src/repositories/dev-vars-repository";
@@ -17,7 +17,7 @@ vi.mock("agents", () => ({
 }));
 
 const { handleRequest: handleCommanderRequest } =
-  await import("../../../apps/commander/src/api/router");
+  await import("../../../services/commander/src/api/router");
 
 const directories: string[] = [];
 
@@ -52,10 +52,10 @@ describe("safe local development variables", () => {
 
     const report = await runDoctor(root, repository);
     const commander = await repository
-      .read(join(root, "apps/commander/.dev.vars"))
+      .read(join(root, "services/commander/.dev.vars"))
       .pipe(Effect.runPromise);
     const poligon = await repository
-      .read(join(root, "apps/poligon/.dev.vars"))
+      .read(join(root, "apps/stavka/.dev.vars"))
       .pipe(Effect.runPromise);
 
     expect(report.ok).toBe(true);
@@ -114,8 +114,8 @@ describe("safe local development variables", () => {
   it("preserves explicit operator values while replacing known placeholders", async () => {
     const root = await makeRoot();
     const repository = new FileDevVarsRepository();
-    const commanderFile = join(root, "apps/commander/.dev.vars");
-    const poligonFile = join(root, "apps/poligon/.dev.vars");
+    const commanderFile = join(root, "services/commander/.dev.vars");
+    const poligonFile = join(root, "apps/stavka/.dev.vars");
     await repository
       .write(commanderFile, {} as Readonly<Record<string, string>>)
       .pipe(Effect.runPromise);
@@ -124,7 +124,7 @@ describe("safe local development variables", () => {
       "API_KEY=operator-secret\nENVIRONMENT=preview\nCUSTOM_VALUE=keep-me\n",
       "utf8",
     );
-    await mkdir(join(root, "apps/poligon"), { recursive: true });
+    await mkdir(join(root, "apps/stavka"), { recursive: true });
     await writeFile(poligonFile, "COMMANDER_API_KEY=sk-stavka-replace-me\n", "utf8");
 
     await runDoctor(root, repository);

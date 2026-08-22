@@ -19,6 +19,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Provision pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11.18.0
+          run_install: false
       - uses: voidzero-dev/setup-vp@313600b80b104eadebb9111787d37a2e83e014ca
         with:
           node-version: "22"
@@ -34,45 +39,5 @@ jobs:
         run: pnpm eval -- --replay
         env:
           MASKIROVKA_MODE: replay
-
-  deploy:
-    needs: verify
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-    timeout-minutes: 90
-    concurrency:
-      group: cloudflare-production
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: voidzero-dev/setup-vp@313600b80b104eadebb9111787d37a2e83e014ca
-        with:
-          node-version: "22"
-          cache: true
-          run-install: false
-      - run: vp install --frozen-lockfile
-      - name: Check Cloudflare credentials
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "Missing production secret CLOUDFLARE_API_TOKEN" >&2
-            exit 1
-          fi
-          if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "Missing production secret CLOUDFLARE_ACCOUNT_ID" >&2
-            exit 1
-          fi
-      - run: pnpm run deploy:production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Offline gateway smoke
+        run: pnpm ai:smoke

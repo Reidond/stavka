@@ -3,7 +3,7 @@
   "jsPlugins": ["eslint-plugin-better-tailwindcss"],
   "settings": {
     "better-tailwindcss": {
-      "cwd": "apps/poligon",
+      "cwd": "apps/stavka",
       "entryPoint": "src/styles.css",
       "detectComponentClasses": true
     }

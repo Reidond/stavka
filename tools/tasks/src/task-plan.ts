@@ -4,10 +4,9 @@ export interface TaskCommand {
   readonly arguments: ReadonlyArray<string>;
 }
 
-const gatewayFilter = "@stavka/maskirovka-gateway";
-const seatFilter = "@stavka/maskirovka-seat";
+const gatewayFilter = "@stavka/inference";
 const commanderFilter = "@stavka/commander";
-const poligonFilter = "@stavka/poligon";
+const appFilter = "@stavka/stavka";
 
 const filterScript = (filter: string, script: string): TaskCommand => ({
   label: `${filter} ${script}`,
@@ -35,29 +34,23 @@ export const maskirovkaGatewayBuildTask: ReadonlyArray<TaskCommand> = [
 
 export const productionDeployTask: ReadonlyArray<TaskCommand> = [
   filterScript(gatewayFilter, "build:dashboard"),
-  filterScript(seatFilter, "build:dashboard"),
-  filterScript(poligonFilter, "build"),
+  filterScript(appFilter, "build"),
   {
-    label: "Deploy Maskirovka gateway",
+    label: "Deploy inference (private)",
     executable: "pnpm",
     arguments: ["--filter", gatewayFilter, "exec", "wrangler", "deploy"],
   },
   {
-    label: "Deploy Maskirovka seat",
-    executable: "pnpm",
-    arguments: ["--filter", seatFilter, "exec", "wrangler", "deploy"],
-  },
-  {
-    label: "Deploy Commander",
+    label: "Deploy Commander (private)",
     executable: "pnpm",
     arguments: ["--filter", commanderFilter, "exec", "wrangler", "deploy"],
   },
   {
-    label: "Deploy Poligon",
+    label: "Deploy unified Stavka app",
     executable: "pnpm",
     arguments: [
       "--filter",
-      poligonFilter,
+      appFilter,
       "exec",
       "wrangler",
       "deploy",
@@ -69,15 +62,15 @@ export const productionDeployTask: ReadonlyArray<TaskCommand> = [
 
 export const evaluationTestFiles = [
   "packages/sim-link/tests/sim-link.test.ts",
-  "apps/commander/tests/llm-client.test.ts",
-  "apps/commander/tests/command-validator.test.ts",
-  "apps/commander/tests/seat-router.test.ts",
-  "apps/commander/tests/terrain-prompt.test.ts",
-  "apps/commander/tests/semantic-replay.test.ts",
-  "apps/poligon/tests/sim-world.test.ts",
-  "apps/poligon/tests/sim-world-rpc.test.ts",
-  "apps/poligon/tests/offline-sim-host.test.ts",
-  "apps/poligon/tests/replay-dashboard.test.tsx",
+  "services/commander/tests/llm-client.test.ts",
+  "services/commander/tests/command-validator.test.ts",
+  "services/commander/tests/seat-router.test.ts",
+  "services/commander/tests/terrain-prompt.test.ts",
+  "services/commander/tests/semantic-replay.test.ts",
+  "apps/stavka/tests/sim-world.test.ts",
+  "apps/stavka/tests/sim-world-rpc.test.ts",
+  "apps/stavka/tests/offline-sim-host.test.ts",
+  "apps/stavka/tests/replay-dashboard.test.tsx",
 ] as const;
 
 export const evaluationTask = (
@@ -115,7 +108,7 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
       "--config",
       ".oxlintrc.json",
       "--deny-warnings",
-      "apps/commander",
+      "services/commander",
       "tools/architecture",
     ],
   },
@@ -126,9 +119,9 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
       "exec",
       "oxlint",
       "--config",
-      ".oxlintrc.poligon.json",
+      ".oxlintrc.stavka.json",
       "--deny-warnings",
-      "apps/poligon",
+      "apps/stavka",
     ],
   },
   {
@@ -162,9 +155,9 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
       "exec",
       "oxlint",
       "--config",
-      ".oxlintrc.maskirovka-gateway.json",
+      ".oxlintrc.inference.json",
       "--deny-warnings",
-      "apps/maskirovka-gateway",
+      "services/inference",
     ],
   },
 ];
