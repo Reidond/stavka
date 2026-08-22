@@ -68,6 +68,15 @@ export class StudyNotFound extends Data.TaggedError("StudyNotFound")<{
 
 export class ProviderFailure extends Data.TaggedError("ProviderFailure")<{
   readonly message: string;
+  /** Sanitized transport diagnostics; never tokens, account ids, or bodies. */
+  readonly diagnostic?: {
+    readonly status?: number;
+    readonly contentType?: string;
+    readonly cfRay?: string;
+    readonly cfMitigated?: string;
+    readonly requestId?: string;
+    readonly category?: string;
+  };
 }> {}
 
 /** Append-only study persistence port. */

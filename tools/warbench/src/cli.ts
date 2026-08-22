@@ -18,7 +18,7 @@ import {
 } from "@stavka/warbench-core";
 import { renderHypothesisPdf } from "@stavka/warbench-report";
 
-import { liveCodexProvider, runDeviceConnect } from "./codex";
+import { liveCodexProvider, probeCodex, runDeviceConnect } from "./codex";
 import { FileStudyStore } from "./store";
 
 const PI_VERSION = "0.84.2";
@@ -29,6 +29,11 @@ const usage = `warbench — independent rule-vs-model benchmark CLI
 Usage:
   warbench connect [--data-dir DIR]
       Run the Codex device authorization flow and store credentials locally.
+
+  warbench probe [--data-dir DIR]
+      Execute one live Codex request and print sanitized diagnostics
+      (status, content-type, cf-ray, cf-mitigated, x-request-id, category).
+      Never prints tokens, account ids, or challenge bodies.
 
   warbench create <studyId> --mode smoke|full [--model ID] [--data-dir DIR]
       Freeze a study manifest. Full mode requires 3 families x 10 seeds x 2 arms.
@@ -162,6 +167,13 @@ const program = (): Effect.Effect<void, unknown> =>
     if (command === "connect") {
       const result = yield* runDeviceConnect(resolve(flags.dataDir)).pipe(Effect.mapError(asError));
       yield* Console.log(`Codex connected for code ${result.userCode}.`);
+      return;
+    }
+
+    if (command === "probe") {
+      const outcome = yield* probeCodex(resolve(flags.dataDir));
+      yield* Console.log(JSON.stringify(outcome, null, 2));
+      if (!outcome.ok) yield* Effect.fail(new Error("Codex probe failed"));
       return;
     }
 

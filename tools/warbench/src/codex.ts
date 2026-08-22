@@ -106,6 +106,7 @@ export const liveCodexProvider = (
                       ? ""
                       : ` (HTTP ${error.diagnostic.status})`
                   }`,
+                  ...(error.diagnostic ? { diagnostic: error.diagnostic } : {}),
                 }),
             ),
           ),
@@ -152,4 +153,35 @@ export const runDeviceConnect = (
     const credentials = yield* pollLoop();
     yield* writeCodexCredentials(dataDir, credentials);
     return { userCode: start.userCode, verificationUri: start.verificationUri };
+  });
+
+export interface ProbeOutcome {
+  readonly ok: boolean;
+  readonly model?: string;
+  readonly message?: string;
+  /** Sanitized upstream diagnostics per the unification handoff §12. */
+  readonly diagnostic?: {
+    readonly status?: number;
+    readonly contentType?: string;
+    readonly cfRay?: string;
+    readonly cfMitigated?: string;
+    readonly requestId?: string;
+    readonly category?: string;
+  };
+}
+
+/**
+ * One live Codex request through the full validation pipeline. Never logs
+ * authorization headers, account ids, tokens, or challenge bodies — only the
+ * sanitized diagnostic fields needed to classify worker-direct vs runner
+ * transport failures.
+ */
+export const probeCodex = (dataDir: string): Effect.Effect<ProbeOutcome> =>
+  Effect.match(liveCodexProvider(dataDir).probe(), {
+    onFailure: (failure): ProbeOutcome => ({
+      ok: false,
+      message: failure.message,
+      ...(failure.diagnostic ? { diagnostic: failure.diagnostic } : {}),
+    }),
+    onSuccess: (probed): ProbeOutcome => ({ ok: true, model: probed.model }),
   });
