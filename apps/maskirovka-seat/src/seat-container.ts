@@ -1,5 +1,11 @@
 import { Container, type StopParams } from "@cloudflare/containers";
-import { Effect, Semaphore } from "effect";
+import {
+  ProviderCredentialSchema,
+  type ProviderAccountPublic,
+  type ProviderId,
+  type ProvisionProviderAccountPayload,
+} from "@stavka/provider-auth";
+import { Effect, Schema, Semaphore } from "effect";
 
 import {
   AUTH_CHECKPOINT_HEADER,
@@ -8,13 +14,7 @@ import {
   decodeAuthCheckpoint,
 } from "./auth-checkpoint";
 import { encodeBase64Url } from "./base64";
-import {
-  credentialForProvider,
-  readSeatConfig,
-  type SeatConfig,
-  type SeatEnv,
-  type SeatProvider,
-} from "./config";
+import { readSeatConfig, type SeatConfig, type SeatEnv, type SeatProvider } from "./config";
 import type {
   HostedSeatDialect,
   HostedSeatOperationsStatus,
@@ -45,6 +45,14 @@ const errorJson = (code: string, message: string, retry = false): Response =>
     },
   );
 
+const credentialFromEncoded = (encoded: string) =>
+  Schema.decodeUnknownSync(ProviderCredentialSchema)(
+    JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as unknown,
+  );
+
+const encodeCredential = (credential: typeof ProviderCredentialSchema.Type): string =>
+  Buffer.from(JSON.stringify(credential), "utf8").toString("base64url");
+
 export class MaskirovkaSeat extends Container<SeatEnv> {
   override defaultPort = 4141;
   override requiredPorts = [4141];
@@ -62,7 +70,7 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
 
   constructor(ctx: DurableObjectState<{}>, env: SeatEnv) {
     super(ctx, env);
-    this.repository = new SeatStateRepository(ctx.storage.sql);
+    this.repository = new SeatStateRepository(ctx.storage.sql, env.STAVKA_PROVIDER_VAULT_KEY);
     Effect.runSync(this.repository.initialize.pipe(Effect.orDie));
     this.sleepAfter = readSeatConfig(env).sleepAfter;
   }
@@ -94,6 +102,58 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
       Effect.gen({ self: this }, function* () {
         yield* this.repository.setKilled(enabled, Date.now());
         return yield* this.getOperationsStatusEffect();
+      }),
+    );
+  }
+
+  async listProviderAccounts(): Promise<readonly ProviderAccountPublic[]> {
+    return Effect.runPromise(this.repository.listProviderAccounts());
+  }
+
+  async putProviderAccount(
+    provider: ProviderId,
+    name: string,
+    payload: ProvisionProviderAccountPayload,
+  ): Promise<ProviderAccountPublic> {
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const config = readSeatConfig(this.env);
+        if (provider !== config.provider)
+          throw new Error(`This leaf serves ${config.provider} only`);
+        const encoded = encodeCredential(payload.credential);
+        const persisted = yield* this.repository.putProviderAccount(
+          provider,
+          name,
+          payload,
+          encoded,
+          yield* authTokenFingerprint(encoded),
+          Date.now(),
+        );
+        yield* this.restartForProviderAccount();
+        return persisted;
+      }),
+    );
+  }
+
+  async testProviderAccount(provider: ProviderId, name: string): Promise<ProviderAccountPublic> {
+    const accounts = await this.listProviderAccounts();
+    const account = accounts.find(
+      (candidate) => candidate.provider === provider && candidate.name === name,
+    );
+    if (!account) throw new Error(`Unknown provider account ${provider}/${name}`);
+    await Effect.runPromise(this.repository.readAuth(provider as SeatProvider));
+    return account;
+  }
+
+  async deleteProviderAccount(provider: ProviderId, name: string): Promise<void> {
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const account = (yield* this.repository.listProviderAccounts()).find(
+          (candidate) => candidate.provider === provider && candidate.name === name,
+        );
+        if (!account) throw new Error(`Unknown provider account ${provider}/${name}`);
+        yield* this.repository.deleteProviderAccount(provider);
+        yield* this.restartForProviderAccount();
       }),
     );
   }
@@ -146,9 +206,7 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
         ] as const,
         { concurrency: "unbounded" },
       );
-      const configured = Boolean(
-        credentialForProvider(this.env, config.provider) || persisted?.token,
-      );
+      const configured = persisted !== undefined;
       return {
         ok:
           configured &&
@@ -319,20 +377,19 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
   private resolveAuthState(
     provider: SeatProvider,
   ): Effect.Effect<PersistedAuthState | undefined, unknown> {
+    return this.repository.readAuth(provider);
+  }
+
+  private restartForProviderAccount(): Effect.Effect<void, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const bootstrap = credentialForProvider(this.env, provider);
-      const persisted = yield* this.repository.readAuth(provider);
-      if (!bootstrap) return persisted;
-      const bootstrapFingerprint = yield* authTokenFingerprint(bootstrap);
-      if (!persisted || persisted.bootstrapFingerprint !== bootstrapFingerprint) {
-        return yield* this.repository.replaceAuth(
-          provider,
-          bootstrap,
-          bootstrapFingerprint,
-          Date.now(),
-        );
+      const state = yield* Effect.tryPromise({
+        try: () => this.getState(),
+        catch: (cause) => cause,
+      });
+      if (stateIsRunning(state.status)) {
+        yield* this.repository.recordLifecycle("restarting_auth", Date.now());
+        yield* Effect.tryPromise({ try: () => this.stop("SIGTERM"), catch: (cause) => cause });
       }
-      return persisted;
     });
   }
 
@@ -374,9 +431,10 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
     return Effect.gen({ self: this }, function* () {
       yield* this.repository.recordLifecycle("starting", Date.now());
       const checkpoint = JSON.stringify({
-        version: 1,
+        version: 2,
         provider: authState.provider,
-        token: authState.token,
+        credential: credentialFromEncoded(authState.token),
+        base_fingerprint: authFingerprint,
         observed_at: authState.updatedAt,
       });
       yield* Effect.tryPromise({
@@ -420,7 +478,8 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
       const existing = yield* this.repository.readAuth(config.provider);
       if (!existing)
         return yield* Effect.fail(new Error("Checkpoint received before auth bootstrap"));
-      if (existing.token === checkpoint.token) {
+      const checkpointEncoded = encodeCredential(checkpoint.credential);
+      if (existing.token === checkpointEncoded) {
         const existingFingerprint = yield* authTokenFingerprint(existing.token);
         yield* this.repository.writeContainerAuthFingerprint(existingFingerprint);
         return;
@@ -431,7 +490,7 @@ export class MaskirovkaSeat extends Container<SeatEnv> {
       }
       const persisted = yield* this.repository.checkpointAuth(
         checkpoint.provider,
-        checkpoint.token,
+        checkpointEncoded,
         checkpoint.observed_at,
       );
       yield* this.repository.writeContainerAuthFingerprint(

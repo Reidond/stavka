@@ -12,16 +12,32 @@ afterEach(() => {
 });
 
 describe("gateway container subscription auth", () => {
-  it("restores both providers and strips metered API keys before SDKs start", async () => {
+  it("restores both named accounts and strips metered API keys before providers start", async () => {
     process.env.ANTHROPIC_API_KEY = "metered-anthropic";
     process.env.OPENAI_API_KEY = "metered-openai";
     process.env.CODEX_API_KEY = "metered-codex";
     process.env.MASKIROVKA_AUTH_STATE_B64 = encodeBase64Url(
       JSON.stringify({
-        version: 1,
+        version: 2,
         providers: {
-          claude: { token: "claude-subscription", fingerprint: "a".repeat(64) },
-          codex: { token: "codex-subscription", fingerprint: "b".repeat(64) },
+          claude: {
+            name: "max",
+            auth_kind: "claude-subscription",
+            credential: { kind: "claude-subscription", oauthToken: "claude-subscription" },
+            revision: 1,
+          },
+          codex: {
+            name: "plus",
+            auth_kind: "chatgpt-oauth",
+            credential: {
+              kind: "codex-chatgpt-oauth",
+              accessToken: "codex-access",
+              refreshToken: "codex-refresh",
+              expiresAt: Date.now() + 60_000,
+              accountId: "account-1",
+            },
+            revision: 2,
+          },
         },
         observed_at: 1,
       }),
@@ -29,8 +45,14 @@ describe("gateway container subscription auth", () => {
 
     await Effect.runPromise(restoreGatewaySubscriptionAuth());
 
-    expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBe("claude-subscription");
-    expect(process.env.CODEX_ACCESS_TOKEN).toBe("codex-subscription");
+    expect(
+      JSON.parse(Buffer.from(process.env.STAVKA_CLAUDE_ACCOUNT_B64!, "base64url").toString("utf8")),
+    ).toMatchObject({ name: "max", credential: { oauthToken: "claude-subscription" } });
+    expect(
+      JSON.parse(Buffer.from(process.env.STAVKA_CODEX_ACCOUNT_B64!, "base64url").toString("utf8")),
+    ).toMatchObject({ name: "plus", credential: { refreshToken: "codex-refresh" } });
+    expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+    expect(process.env.CODEX_ACCESS_TOKEN).toBeUndefined();
     expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(process.env.OPENAI_API_KEY).toBeUndefined();
     expect(process.env.CODEX_API_KEY).toBeUndefined();
@@ -42,16 +64,23 @@ describe("gateway container subscription auth", () => {
 
     await Effect.runPromise(restoreGatewaySubscriptionAuth());
 
-    expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
-    expect(process.env.CODEX_ACCESS_TOKEN).toBeUndefined();
+    expect(process.env.STAVKA_CLAUDE_ACCOUNT_B64).toBeUndefined();
+    expect(process.env.STAVKA_CODEX_ACCOUNT_B64).toBeUndefined();
     expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
   });
 
   it("rejects an invalid auth checkpoint instead of starting with partial secrets", async () => {
     process.env.MASKIROVKA_AUTH_STATE_B64 = encodeBase64Url(
       JSON.stringify({
-        version: 1,
-        providers: { claude: { token: "", fingerprint: "a".repeat(64) } },
+        version: 2,
+        providers: {
+          claude: {
+            name: "broken",
+            auth_kind: "claude-subscription",
+            credential: { kind: "claude-subscription", oauthToken: "" },
+            revision: 1,
+          },
+        },
         observed_at: 1,
       }),
     );

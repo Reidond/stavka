@@ -27,7 +27,6 @@ const forbiddenPackageImports = [
   "@stavka/sim-link",
   "@stavka/commander",
   "@stavka/model-provider",
-  "@stavka/model-provider-pi",
   "@cloudflare/",
   "@earendil-works/",
   "jose",

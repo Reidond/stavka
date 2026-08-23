@@ -33,8 +33,8 @@ describe("hosted gateway architecture boundaries", () => {
     const sources = `${contract}\n${worker}\n${container}`;
 
     expect(contract).toContain("HttpApiGroup.make");
-    expect(contract).toContain('HttpApiEndpoint.put("putAuth"');
-    expect(contract).toContain('HttpApiEndpoint.delete("deleteAuth"');
+    expect(contract).toContain('HttpApiEndpoint.put("putProviderAccount"');
+    expect(contract).toContain('HttpApiEndpoint.delete("deleteProviderAccount"');
     expect(worker).toContain("HttpApiBuilder.group");
     expect(worker).toContain("HttpRouter.toWebHandler");
     expect(sources).not.toMatch(/pathname\s*===|switch\s*\([^)]*pathname|from\s+["']hono["']/u);
@@ -42,7 +42,7 @@ describe("hosted gateway architecture boundaries", () => {
 
   it("exposes repository operations as Effects without Promise returns", () => {
     for (const filename of [
-      "auth-state-repository.ts",
+      "provider-account-repository.ts",
       "gateway-config-repository.ts",
       "request-metadata-repository.ts",
       "window-tracker-repository.ts",
@@ -56,13 +56,13 @@ describe("hosted gateway architecture boundaries", () => {
   it("never returns raw auth tokens from admin metadata helpers", () => {
     const container = readFileSync(resolve(sourceRoot, "gateway-container.ts"), "utf8");
     const dashboard = readFileSync(resolve(sourceRoot, "dashboard/src.tsx"), "utf8");
-    const metadataStart = container.indexOf("const metadataFromAuth");
+    const metadataStart = container.indexOf("const metadataFromAccount");
     const metadataEnd = container.indexOf("const emptyMetadata");
     const metadataHelpers = container.slice(metadataStart, metadataEnd);
 
     expect(metadataHelpers).toContain("configured: true");
     expect(metadataHelpers).not.toMatch(/\btoken\b/u);
-    expect(dashboard).toContain("never shown");
+    expect(dashboard).toContain("never accepted or rendered");
     expect(dashboard).not.toMatch(/status\.token|auth\.token|response\.token/u);
   });
 
@@ -71,15 +71,16 @@ describe("hosted gateway architecture boundaries", () => {
     expect(source).toContain("sleepAfter");
     expect(source).toContain("startAndWaitForPorts");
     expect(source).toContain("MASKIROVKA_AUTH_STATE_B64");
-    expect(source).toContain("putAuth");
-    expect(source).toContain("deleteAuth");
+    expect(source).toContain("putProviderAccount");
+    expect(source).toContain("deleteProviderAccount");
   });
 
   it("runs the image as a non-root user and never bakes provider credentials", () => {
     const dockerfile = readFileSync(resolve(appRoot, "Dockerfile"), "utf8");
     expect(dockerfile).toContain("USER maskirovka");
     expect(dockerfile).toContain("@anthropic-ai/claude-code");
-    expect(dockerfile).toContain("@openai/codex");
+    expect(dockerfile).not.toContain("@openai/codex");
+    expect(dockerfile).toContain("packages/model-provider-codex/src");
     expect(dockerfile).not.toMatch(/(?:sk-|oauth)[A-Za-z0-9_-]{12,}/u);
   });
 

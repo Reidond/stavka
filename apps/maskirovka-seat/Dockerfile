@@ -7,20 +7,28 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
 
-COPY container-package.json ./package.json
-COPY container-pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY container-pnpm-lock.yaml ./pnpm-lock.yaml
+COPY apps/maskirovka-seat/container-package.json ./package.json
+COPY apps/maskirovka-seat/container-pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY apps/maskirovka-seat/container-pnpm-lock.yaml ./pnpm-lock.yaml
 RUN --mount=type=cache,id=maskirovka-seat-pnpm,target=/pnpm/store \
   pnpm install --frozen-lockfile
 
-COPY container-tsconfig.json ./tsconfig.json
-COPY src ./src
+COPY apps/maskirovka-seat/container-tsconfig.json ./tsconfig.json
+COPY apps/maskirovka-seat/src ./src
+COPY packages/model-provider/src ./packages/model-provider/src
+COPY packages/model-provider-claude/src ./packages/model-provider-claude/src
+COPY packages/model-provider-codex/src ./packages/model-provider-codex/src
+COPY packages/provider-auth/src ./packages/provider-auth/src
 RUN pnpm exec esbuild src/container/main.ts \
   --bundle \
   --format=esm \
   --platform=node \
   --target=node22 \
   --packages=external \
+  --alias:@stavka/model-provider=./packages/model-provider/src/index.ts \
+  --alias:@stavka/model-provider-claude=./packages/model-provider-claude/src/index.ts \
+  --alias:@stavka/model-provider-codex=./packages/model-provider-codex/src/index.ts \
+  --alias:@stavka/provider-auth=./packages/provider-auth/src/index.ts \
   --outfile=dist/container.js
 RUN pnpm prune --prod
 
@@ -29,12 +37,11 @@ FROM --platform=${MASKIROVKA_PLATFORM} node:22-bookworm-slim@sha256:d649c27dae7b
 ENV NODE_ENV=production
 ENV PORT=4141
 ENV HOME=/home/maskirovka
-ENV CODEX_HOME=/home/maskirovka/.codex
 WORKDIR /app
 
 RUN groupadd --system maskirovka \
   && useradd --system --gid maskirovka --create-home maskirovka \
-  && mkdir -p /workspace /home/maskirovka/.codex \
+  && mkdir -p /workspace \
   && chown -R maskirovka:maskirovka /workspace /home/maskirovka
 
 COPY --from=build --chown=maskirovka:maskirovka /app/dist ./dist

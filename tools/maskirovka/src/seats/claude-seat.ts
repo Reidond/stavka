@@ -1,95 +1,55 @@
+import type { ModelProvider, ModelRequest } from "@stavka/model-provider";
 import { Effect } from "effect";
 
 import { GatewayError, type SeatInvocation, type SeatResult } from "../domain/types";
-import type { SeatAdapter } from "./seat-adapter";
-
-export const sanitizeClaudeSubscriptionEnvironment = (
-  environment: Readonly<Record<string, string | undefined>>,
-): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(environment).filter(
-      ([key, value]) =>
-        key !== "ANTHROPIC_API_KEY" &&
-        key !== "OPENAI_API_KEY" &&
-        key !== "CODEX_API_KEY" &&
-        value !== undefined,
-    ),
-  ) as Record<string, string>;
+import { estimateTokens, type SeatAdapter } from "./seat-adapter";
 
 export class ClaudeSeat implements SeatAdapter {
   readonly id = "claude" as const;
 
+  constructor(private readonly provider: ModelProvider) {}
+
   invoke(request: SeatInvocation): Effect.Effect<SeatResult, GatewayError> {
-    return Effect.tryPromise({
-      try: async (signal) => {
-        const { query } = await import("@anthropic-ai/claude-agent-sdk");
-        const abortController = new AbortController();
-        const abort = (): void => abortController.abort();
-        if (signal.aborted) abort();
-        else signal.addEventListener("abort", abort, { once: true });
-        try {
-          const stream = query({
-            prompt: request.prompt,
-            options: {
-              abortController,
-              env: sanitizeClaudeSubscriptionEnvironment(process.env),
-              model: request.model,
-              maxTurns: 1,
-              tools: [],
-              allowedTools: [],
-              permissionMode: "dontAsk",
-              systemPrompt: request.system ?? "Return only the requested answer. Do not use tools.",
-              ...(request.dialect === "anthropic-messages" &&
-              typeof request.request.max_tokens === "number"
-                ? { taskBudget: { total: request.request.max_tokens } }
-                : {}),
-              ...(request.outputSchema
-                ? { outputFormat: { type: "json_schema" as const, schema: request.outputSchema } }
-                : {}),
-            },
-          });
-          for await (const message of stream) {
-            if (message.type !== "result") continue;
-            if (message.subtype !== "success") {
-              throw new GatewayError(
-                502,
-                "CLAUDE_SEAT_FAILURE",
-                message.errors.join("; ") || message.subtype,
-                [],
-                {
-                  inputTokens: message.usage.input_tokens,
-                  outputTokens: message.usage.output_tokens,
-                  cachedInputTokens: message.usage.cache_read_input_tokens ?? 0,
-                  planCreditUsd: message.total_cost_usd,
-                },
-              );
-            }
-            const structured = message.structured_output;
-            const text = structured === undefined ? message.result : JSON.stringify(structured);
-            return {
-              text,
-              ...(structured !== undefined ? { structured } : {}),
-              usage: {
-                inputTokens: message.usage.input_tokens,
-                outputTokens: message.usage.output_tokens,
-                cachedInputTokens: message.usage.cache_read_input_tokens ?? 0,
-                planCreditUsd: message.total_cost_usd,
-              },
-            };
-          }
-          throw new Error("Claude Agent SDK completed without a result message");
-        } finally {
-          signal.removeEventListener("abort", abort);
-        }
-      },
-      catch: (cause) =>
-        cause instanceof GatewayError
-          ? cause
-          : new GatewayError(
-              502,
-              "CLAUDE_SEAT_FAILURE",
-              cause instanceof Error ? cause.message : "Claude Agent SDK invocation failed",
-            ),
-    });
+    const maxTokens =
+      request.dialect === "anthropic-messages" && typeof request.request.max_tokens === "number"
+        ? request.request.max_tokens
+        : undefined;
+    const modelRequest: ModelRequest = {
+      model: request.model,
+      input: request.prompt,
+      system: request.system ?? "Return only the requested answer. Do not use tools.",
+      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
+      ...(request.structuredOutputName ? { outputSchemaName: request.structuredOutputName } : {}),
+      ...(maxTokens === undefined ? {} : { maxOutputTokens: maxTokens }),
+      maxRetries: 0,
+    };
+    return this.provider.complete(modelRequest).pipe(
+      Effect.map((completion) => ({
+        text: completion.text,
+        ...(completion.structured === undefined ? {} : { structured: completion.structured }),
+        usage: {
+          inputTokens: completion.metadata.usage?.inputTokens ?? estimateTokens(request.prompt),
+          outputTokens: completion.metadata.usage?.outputTokens ?? estimateTokens(completion.text),
+          cachedInputTokens: completion.metadata.usage?.cachedInputTokens ?? 0,
+          ...(completion.metadata.usage?.actualCostUsd === undefined
+            ? {}
+            : { actualCostUsd: completion.metadata.usage.actualCostUsd }),
+          ...(completion.metadata.usage?.planCreditUsd === undefined
+            ? {}
+            : { planCreditUsd: completion.metadata.usage.planCreditUsd }),
+        },
+      })),
+      Effect.mapError(
+        (error) =>
+          new GatewayError(
+            error.kind === "auth" ? 401 : error.kind === "rate_limit" ? 429 : 502,
+            `CLAUDE_${error.kind.toUpperCase()}`,
+            error.message,
+            [],
+            undefined,
+            request.model,
+          ),
+      ),
+    );
   }
 }

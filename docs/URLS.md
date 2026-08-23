@@ -1,141 +1,104 @@
 # Stavka service URLs
 
-Canonical origins and important paths for local development and the
-`andrii-shafar` Cloudflare account. Worker script names match
-`wrangler.jsonc` `name` fields. Public `*.workers.dev` on this account is
-currently blocked by Cloudflare `error code: 1042` (upload can succeed while
-HTTP invocation fails).
+Stavka has one public production origin and one Cloudflare Access application.
+Commander, inference, and the hosted seat are private Workers reached only by
+service bindings.
 
-## Production (workers.dev)
+## Production
 
-Account subdomain: `andrii-shafar`  
-Account id: `3f5946e8e68fa04a86d36a5f83617f4b`
+| Surface        | Worker script            | Origin                     | Exposure                       |
+| -------------- | ------------------------ | -------------------------- | ------------------------------ |
+| Unified Stavka | `stavka-poligon`         | `https://stavka.sands.red` | Single Access-protected origin |
+| Commander      | `stavka-commander`       | none                       | Private service binding        |
+| Inference      | `stavka-inference`       | none                       | Private service binding        |
+| Hosted seat    | `stavka-maskirovka-seat` | none                       | Private Worker/Container       |
 
-| Service                | Worker name                 | Origin                                                        |
-| ---------------------- | --------------------------- | ------------------------------------------------------------- |
-| Maskirovka gateway     | `stavka-maskirovka-gateway` | `https://stavka-maskirovka-gateway.andrii-shafar.workers.dev` |
-| Hosted Maskirovka seat | `stavka-maskirovka-seat`    | `https://stavka-maskirovka-seat.andrii-shafar.workers.dev`    |
-| Commander              | `stavka-commander`          | `https://stavka-commander.andrii-shafar.workers.dev`          |
-| Poligon                | `stavka-poligon`            | `https://stavka-poligon.andrii-shafar.workers.dev`            |
+Production request flow:
 
-Cross-service wiring in production Wrangler vars:
-
-- Commander `STAVKA_AI_BASE_URL` → gateway origin above
-- Poligon `COMMANDER_URL` → Commander origin above
-
-### Production path map
-
-Paths are relative to each service origin.
-
-| Service   | Path                | Audience                               | Notes                                 |
-| --------- | ------------------- | -------------------------------------- | ------------------------------------- |
-| Gateway   | `/healthz`          | Machine bearer                         | Seat/budget/mode status               |
-| Gateway   | `/v1/models`        | Machine bearer                         | Tier aliases and resolutions          |
-| Gateway   | `/v1/responses`     | Machine bearer                         | OpenAI Responses dialect              |
-| Gateway   | `/v1/messages`      | Machine bearer                         | Anthropic Messages dialect            |
-| Gateway   | `/_/`               | Cloudflare Access                      | Operations SPA + provider token store |
-| Gateway   | `/admin/*`          | Access or machine (route-gated)        | Status, auth, aliases, kill switch    |
-| Seat      | `/healthz`, `/v1/*` | Machine bearer (`MASKIROVKA_SEAT_KEY`) | Single-provider leaf                  |
-| Seat      | `/_/`, `/admin/*`   | Cloudflare Access                      | Leaf ops SPA                          |
-| Commander | `/healthz`          | Public liveness                        | Protocol/version/AI alias summary     |
-| Commander | `/api/*`            | Machine bearer (`API_KEY`)             | Game/simulator connect, tick, map, …  |
-| Commander | `/admin/*`          | Cloudflare Access                      | Session, logs, seats, exports         |
-| Commander | `/agents/*`         | Cloudflare Access                      | Agents SDK HTTP/WebSocket             |
-| Poligon   | `/`                 | Cloudflare Access                      | Proving-ground UI                     |
-| Poligon   | `/?host=offline`    | Browser-local                          | Zero-network simulation               |
-| Poligon   | `/?mode=versus`     | Cloudflare Access                      | Isolated OPFOR/BLUFOR commanders      |
-| Poligon   | `/replay`           | Cloudflare Access                      | Local canonical export inspector      |
-| Poligon   | `/healthz`          | Public liveness                        | Worker health                         |
-
-### Cloudflare Access issuer pattern
-
-```
-https://<team>.cloudflareaccess.com
+```text
+browser / stavka CLI -> stavka.sands.red (Access: Stavka)
+                         |-- /admin/provider-accounts* -> INFERENCE_SERVICE
+                         `-- simulations -> COMMANDER_SERVICE -> INFERENCE_SERVICE
 ```
 
-Use the scheme-qualified team domain as `ACCESS_TEAM_DOMAIN`. Per-app
-Application Audience values are `ACCESS_AUD` on each Worker. Wrangler OAuth on
-this machine cannot create Access apps; configure them in Zero Trust.
+### Unified path map
 
-### Related Cloudflare resource names
+| Path                                                | Audience          | Notes                                    |
+| --------------------------------------------------- | ----------------- | ---------------------------------------- |
+| `/healthz`                                          | Public liveness   | Unified Worker health                    |
+| `/`, application routes                             | Cloudflare Access | Operator UI                              |
+| `/agents/*`                                         | Cloudflare Access | Agents SDK HTTP/WebSocket                |
+| `/admin/provider-accounts`                          | Access read       | Named Codex/Claude account metadata      |
+| `/admin/provider-accounts/:provider/:name`          | Access owner      | Provision or delete an encrypted account |
+| `/admin/provider-accounts/:provider/:name/test`     | Access owner      | Validate the stored credential           |
+| `/admin/provider-accounts/:provider/:name/activate` | Access owner      | Activate the account                     |
+
+The provider-account routes are forwarded over `INFERENCE_SERVICE`; they never
+require a public inference hostname. Automation service tokens are read-only.
+
+### Private bindings and storage
 
 | Kind          | Name / binding                                                 |
 | ------------- | -------------------------------------------------------------- |
+| Service       | Unified app `COMMANDER_SERVICE` -> `stavka-commander`          |
+| Service       | Unified app `INFERENCE_SERVICE` -> `stavka-inference`          |
+| Service       | Commander `INFERENCE_SERVICE` -> `stavka-inference`            |
 | KV            | Commander `TERRAIN_CACHE` (`7b6659541b754b71bf36f7eaf2997065`) |
-| R2            | Commander `SESSION_EXPORTS` → `stavka-session-exports`         |
-| R2            | Gateway `REPLAY_CACHE` → `stavka-maskirovka-replay`            |
-| Container app | `stavka-maskirovka-gateway-maskirovkagateway`                  |
+| R2            | Commander `SESSION_EXPORTS` -> `stavka-session-exports`        |
+| R2            | Inference `REPLAY_CACHE` -> `stavka-maskirovka-replay`         |
+| Container app | `stavka-inference-maskirovkagateway`                           |
+| Container app | `stavka-maskirovka-seat-maskirovkaseat`                        |
+
+## Cloudflare Access
+
+The only Access application is `Stavka`, covering `stavka.sands.red`. It keeps
+the human operator policy and a read-only `Stavka Codex automation` service
+token policy. Both the unified Worker and private inference Worker validate the
+same Access assertion with:
+
+```text
+https://<team>.cloudflareaccess.com
+```
+
+The unified Worker receives the current application audience as `ACCESS_AUD`.
+Inference receives the same audience plus `ACCESS_OWNER_SUBJECTS` so provider
+credential mutations fail closed for anyone except an explicitly listed owner.
 
 ## Local development
 
-| Surface                         | Default origin              | How to start                                                          |
-| ------------------------------- | --------------------------- | --------------------------------------------------------------------- |
-| Commander (`wrangler dev`)      | `http://127.0.0.1:8787`     | `pnpm --filter @stavka/commander dev`                                 |
-| Poligon (Vite)                  | `http://127.0.0.1:5173`     | `pnpm --filter @stavka/poligon dev` (prints the URL)                  |
-| Maskirovka gateway (`wrangler`) | Wrangler-assigned local URL | `build:dashboard` then `pnpm --filter @stavka/maskirovka-gateway dev` |
-| Hosted seat (`wrangler`)        | Wrangler-assigned local URL | `build:dashboard` then seat `dev` (optional leaf)                     |
-| Legacy Node Maskirovka          | `http://127.0.0.1:4141`     | `pnpm ai:up` (CI / offline helpers only)                              |
-
-Local Poligon `.dev.vars` should set `COMMANDER_URL=http://127.0.0.1:8787`.
-Commander may point `STAVKA_AI_BASE_URL` at the gateway `wrangler dev` origin
-or, for legacy offline helpers only, `http://127.0.0.1:4141`.
-
-### Local path map (same pathnames as production)
-
-| Origin                      | Useful paths                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `http://127.0.0.1:8787`     | `/healthz`, `/api/*`, `/admin/*`, `/agents/*`                                |
-| `http://127.0.0.1:5173`     | `/`, `/?host=offline`, `/?mode=versus`, `/replay`, `/healthz`                |
-| Gateway / seat wrangler-dev | `/healthz`, `/v1/*`, `/_/`, `/admin/*`                                       |
-| `http://127.0.0.1:4141`     | `/healthz`, `/v1/models`, `/v1/responses`, `/v1/messages`, `/_/`, `/admin/*` |
+| Surface                        | Default origin              | Start command                                               |
+| ------------------------------ | --------------------------- | ----------------------------------------------------------- |
+| Unified Stavka                 | Vite-assigned local URL     | `pnpm --filter @stavka/stavka dev`                          |
+| Commander                      | `http://127.0.0.1:8787`     | `pnpm --filter @stavka/commander dev`                       |
+| Inference gateway              | Wrangler-assigned local URL | build dashboard, then `pnpm --filter @stavka/inference dev` |
+| Hosted seat                    | Wrangler-assigned local URL | build dashboard, then seat `dev`                            |
+| Local Maskirovka compatibility | `http://127.0.0.1:4141`     | `pnpm ai:up`                                                |
 
 Exact-local Access synthesis requires `ENVIRONMENT=local` and
-`DEV_ACCESS_EMAIL` on the relevant Worker.
+`DEV_ACCESS_EMAIL`. Production URLs never accept that synthetic identity.
 
 ## Repository and CI
 
-| Resource                  | URL                                                                  |
-| ------------------------- | -------------------------------------------------------------------- |
-| GitHub repository         | `https://github.com/Reidond/stavka`                                  |
-| Actions (single workflow) | `https://github.com/Reidond/stavka/actions`                          |
-| Workflow file             | `.github/workflows/ci.yml`                                           |
-| GitHub Environment        | `production` (holds `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) |
+| Resource           | Value                               |
+| ------------------ | ----------------------------------- |
+| GitHub repository  | `https://github.com/Reidond/stavka` |
+| Workflow           | `.github/workflows/ci.yml`          |
+| GitHub environment | `production`                        |
 
-Automatic production deploy runs only after a successful `verify` job on a
-`main` push or a `workflow_dispatch` whose ref is `main`. Deploy order:
-gateway → hosted seat → Commander → Poligon.
+The `deploy` job runs only after `verify` succeeds on a `main` push or a manual
+dispatch whose ref is `main`. Deployment order is inference -> hosted seat ->
+Commander -> unified app.
 
 ## Quick probes
 
-After workers.dev serves traffic (not while `1042` persists):
-
 ```bash
-GW=https://stavka-maskirovka-gateway.andrii-shafar.workers.dev
-CMD=https://stavka-commander.andrii-shafar.workers.dev
-SEAT=https://stavka-maskirovka-seat.andrii-shafar.workers.dev
-POL=https://stavka-poligon.andrii-shafar.workers.dev
-
-curl --fail -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" "$GW/healthz"
-curl --fail -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" "$GW/v1/models"
-curl --fail "$CMD/healthz"
-curl --fail "$POL/healthz"
-# Optional leaf:
-curl --fail -H "Authorization: Bearer $MASKIROVKA_SEAT_KEY" "$SEAT/healthz"
+curl -sSI https://stavka.sands.red | head -n1
+pnpm stavka -- auth list --cloudflare production-automation
 ```
 
-Local Commander/Poligon:
-
-```bash
-curl --fail http://127.0.0.1:8787/healthz
-curl --fail http://127.0.0.1:5173/healthz
-```
-
-Legacy offline gateway:
-
-```bash
-curl --fail http://127.0.0.1:4141/healthz
-curl --fail http://127.0.0.1:4141/v1/models
-```
+The first request must be intercepted by Access for an unauthenticated caller.
+The second must pass Access through the read-only service token and return only
+provider-account metadata.
 
 Operator procedures, secrets, Access setup, and rollback live in
 [OPERATOR_GUIDE.md](./OPERATOR_GUIDE.md).

@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { argv, env } from "node:process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,7 @@ import { renderStudyEvidencePdf } from "@stavka/warbench-report";
 import { availableCodexModels, liveCodexProvider, probeCodex, runDeviceConnect } from "./codex";
 import { FileStudyStore } from "./store";
 
+const PROVIDER_VERSION = "stavka-codex/1.0.0";
 const PROTOCOL_VERSION = "2";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -35,7 +36,7 @@ const usage = `warbench - independent rule-vs-model benchmark CLI
 
 Usage:
   warbench models
-      List exact Codex model ids from the installed pinned Pi package.
+      List exact model ids supported by the first-party Codex integration.
 
   warbench connect [--data-dir DIR]
       Run device authorization and store credentials in an owner-only local file.
@@ -89,33 +90,6 @@ const gitStatusShort = (): Effect.Effect<string, Error> =>
     try: async () =>
       (await promisify(execFile)("git", ["status", "--porcelain", "--untracked-files=normal"]))
         .stdout,
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-const installedPiVersion = (): Effect.Effect<string, Error> =>
-  Effect.tryPromise({
-    try: async () => {
-      let current = dirname(
-        fileURLToPath(import.meta.resolve("@earendil-works/pi-ai/providers/openai-codex")),
-      );
-      for (;;) {
-        const packagePath = join(current, "package.json");
-        try {
-          const metadata = JSON.parse(await readFile(packagePath, "utf8")) as {
-            readonly name?: unknown;
-            readonly version?: unknown;
-          };
-          if (metadata.name === "@earendil-works/pi-ai" && typeof metadata.version === "string") {
-            return metadata.version;
-          }
-        } catch (cause) {
-          if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause;
-        }
-        const parent = dirname(current);
-        if (parent === current) throw new Error("could not locate installed Pi package metadata");
-        current = parent;
-      }
-    },
     catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
   });
 
@@ -346,7 +320,7 @@ const program = (): Effect.Effect<void, unknown> =>
           mode: flags.mode,
           protocolVersion: PROTOCOL_VERSION,
           gitSha: yield* gitSha(),
-          piVersion: yield* installedPiVersion(),
+          providerVersion: PROVIDER_VERSION,
           modelId: flags.model,
           promptHash: yield* Effect.promise(() => digestSha256(decisionSystemPrompt("blue"))),
         });

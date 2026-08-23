@@ -20,9 +20,9 @@ describe("Maskirovka gateway dashboard shell", () => {
     expect(dashboard).toContain('className="maskirovka-gateway-content"');
   });
 
-  it("keeps credential controls labelled and errors announced", () => {
-    expect(dashboard).toContain('label="Token"');
-    expect(dashboard).toContain('title="Credential update failed"');
-    expect(dashboard).toContain('type="password"');
+  it("keeps credential values out of browser controls", () => {
+    expect(dashboard).toContain("Named accounts are provisioned by the Stavka CLI");
+    expect(dashboard).toContain("stavka auth push");
+    expect(dashboard).not.toContain('type="password"');
   });
 });

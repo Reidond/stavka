@@ -37,7 +37,9 @@ export interface StudyManifest {
   readonly protocolVersion: string;
   readonly evidenceSchemaVersion: number;
   readonly gitSha: string;
-  readonly piVersion: string;
+  readonly providerVersion?: string | undefined;
+  /** Legacy protocol-v2 manifests used Pi before the first-party provider. */
+  readonly piVersion?: string | undefined;
   readonly modelId: string;
   readonly promptHash: string;
   readonly seeds: readonly number[];
@@ -65,7 +67,8 @@ export const StudyManifestSchema = Schema.Struct({
   protocolVersion: Schema.String,
   evidenceSchemaVersion: Schema.Number,
   gitSha: Schema.String,
-  piVersion: Schema.String,
+  providerVersion: Schema.optional(Schema.String),
+  piVersion: Schema.optional(Schema.String),
   modelId: Schema.String,
   promptHash: Schema.String,
   seeds: Schema.Array(Schema.Number),
@@ -165,7 +168,7 @@ export interface CreateStudyInput {
   readonly mode: "smoke" | "full";
   readonly protocolVersion: string;
   readonly gitSha: string;
-  readonly piVersion: string;
+  readonly providerVersion: string;
   readonly modelId: string;
   readonly promptHash: string;
   readonly seeds?: readonly number[];
@@ -188,7 +191,7 @@ export const createStudyInputToManifest = (input: CreateStudyInput): StudyManife
   protocolVersion: input.protocolVersion,
   evidenceSchemaVersion: currentEvidenceSchemaVersion,
   gitSha: input.gitSha,
-  piVersion: input.piVersion,
+  providerVersion: input.providerVersion,
   modelId: input.modelId,
   promptHash: input.promptHash,
   seeds: input.mode === "smoke" ? smokeSeeds : (input.seeds ?? fullStudySeeds),

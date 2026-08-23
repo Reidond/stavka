@@ -1,0 +1,32 @@
+{
+  "name": "@stavka/stavka-cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "stavka": "./dist/cli.cjs"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/cli.ts",
+      "import": "./src/cli.ts"
+    }
+  },
+  "scripts": {
+    "stavka": "tsx src/bin.ts",
+    "build": "esbuild src/bin.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/cli.cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@stavka/provider-auth": "workspace:*",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "esbuild": "0.28.1",
+    "tsx": "^4.20.5",
+    "vitest": "4.1.10"
+  }
+}

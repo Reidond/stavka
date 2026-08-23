@@ -19,10 +19,11 @@ export interface GatewayAlias {
 
 export interface GatewayEnvSecrets {
   readonly MASKIROVKA_GATEWAY_KEY?: string;
-  readonly CLAUDE_CODE_OAUTH_TOKEN?: string;
-  readonly CODEX_ACCESS_TOKEN?: string;
+  readonly STAVKA_PROVIDER_VAULT_KEY?: string;
   readonly ACCESS_TEAM_DOMAIN?: string;
   readonly ACCESS_AUD?: string;
+  readonly ACCESS_OWNER_SUBJECTS?: string;
+  readonly ACCESS_OPERATOR_SUBJECTS?: string;
   readonly DEV_ACCESS_EMAIL?: string;
 }
 
@@ -78,6 +79,14 @@ const DEFAULT_ALIASES: readonly GatewayAlias[] = [
 const parseNumber = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const accessSubjects = (value: string | undefined): readonly string[] | undefined => {
+  const subjects = value
+    ?.split(",")
+    .map((subject) => subject.trim())
+    .filter(Boolean);
+  return subjects?.length ? subjects : undefined;
 };
 
 const parseAliases = (value: string): readonly GatewayAlias[] => {
@@ -150,19 +159,19 @@ export const readGatewayConfig = (env: GatewayEnv): GatewayRuntimeConfig => ({
   codexWindowHours: Math.max(1, parseNumber(env.MASKIROVKA_CODEX_WINDOW_HOURS, 5)),
 });
 
-export const hostedAccessConfig = (env: GatewayEnv): AccessConfig => ({
-  environment:
-    env.ENVIRONMENT === "local" || env.ENVIRONMENT === "preview" ? env.ENVIRONMENT : "production",
-  teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
-  audience: env.ACCESS_AUD ?? "",
-  automationPermissions: ["read"],
-  ...(env.ENVIRONMENT === "local" && env.DEV_ACCESS_EMAIL
-    ? { devEmail: env.DEV_ACCESS_EMAIL }
-    : {}),
-});
-
-export const bootstrapCredential = (
-  env: GatewayEnv,
-  provider: GatewayProvider,
-): string | undefined =>
-  provider === "claude" ? env.CLAUDE_CODE_OAUTH_TOKEN : env.CODEX_ACCESS_TOKEN;
+export const hostedAccessConfig = (env: GatewayEnv): AccessConfig => {
+  const ownerSubjects = accessSubjects(env.ACCESS_OWNER_SUBJECTS);
+  const operatorSubjects = accessSubjects(env.ACCESS_OPERATOR_SUBJECTS);
+  return {
+    environment:
+      env.ENVIRONMENT === "local" || env.ENVIRONMENT === "preview" ? env.ENVIRONMENT : "production",
+    teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
+    audience: env.ACCESS_AUD ?? "",
+    automationPermissions: ["read"],
+    ...(ownerSubjects ? { ownerSubjects } : {}),
+    ...(operatorSubjects ? { operatorSubjects } : {}),
+    ...(env.ENVIRONMENT === "local" && env.DEV_ACCESS_EMAIL
+      ? { devEmail: env.DEV_ACCESS_EMAIL }
+      : {}),
+  };
+};

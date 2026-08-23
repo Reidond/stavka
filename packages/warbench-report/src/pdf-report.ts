@@ -36,7 +36,7 @@ export const studyEvidenceReportLines = (evidence: StudyEvidenceObject): string[
     `Git commit: ${manifest.gitSha}`,
     `Protocol version: ${manifest.protocolVersion}`,
     `Evidence schema version: ${manifest.evidenceSchemaVersion}`,
-    `Pi version: ${manifest.piVersion}`,
+    `Provider version: ${manifest.providerVersion ?? `pi/${manifest.piVersion ?? "unknown"}`}`,
     `Exact model ID: ${manifest.modelId}`,
     `Prompt SHA-256: ${manifest.promptHash}`,
     `Created: ${manifest.createdAt}`,

@@ -1,5 +1,9 @@
 import { Schema } from "effect";
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import {
+  ProviderAccountNameSchema,
+  ProvisionProviderAccountPayloadSchema,
+} from "@stavka/provider-auth";
 
 import { gatewayProviders, gatewaySeats, gatewayTiers } from "./config";
 
@@ -7,11 +11,8 @@ export const ProviderSchema = Schema.Literals(gatewayProviders);
 export const TierSchema = Schema.Literals(gatewayTiers);
 export const SeatSchema = Schema.Literals(gatewaySeats);
 
-export const AuthPayloadSchema = Schema.Struct({
-  token: Schema.String.pipe(
-    Schema.check(Schema.isTrimmed(), Schema.isNonEmpty(), Schema.isMaxLength(12_000)),
-  ),
-});
+export { ProvisionProviderAccountPayloadSchema };
+export const AccountNameSchema = ProviderAccountNameSchema;
 
 export const AliasPayloadSchema = Schema.Struct({
   seat: SeatSchema,
@@ -36,16 +37,34 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
   }),
   HttpApiEndpoint.get("adminAliases", "/admin/aliases", { success: AnyResponse }),
   HttpApiEndpoint.put("remapAlias", "/admin/aliases/:tier", {
-    params: { tier: Schema.String },
+    params: { tier: TierSchema },
+    payload: AliasPayloadSchema,
     success: AnyResponse,
   }),
-  HttpApiEndpoint.post("killSwitch", "/admin/kill-switch", { success: AnyResponse }),
-  HttpApiEndpoint.put("putAuth", "/admin/auth/:provider", {
-    params: { provider: Schema.String },
+  HttpApiEndpoint.post("killSwitch", "/admin/kill-switch", {
+    payload: KillSwitchPayloadSchema,
     success: AnyResponse,
   }),
-  HttpApiEndpoint.delete("deleteAuth", "/admin/auth/:provider", {
-    params: { provider: Schema.String },
+  HttpApiEndpoint.get("providerAccounts", "/admin/provider-accounts", { success: AnyResponse }),
+  HttpApiEndpoint.put("putProviderAccount", "/admin/provider-accounts/:provider/:name", {
+    params: { provider: ProviderSchema, name: AccountNameSchema },
+    payload: ProvisionProviderAccountPayloadSchema,
+    success: AnyResponse,
+  }),
+  HttpApiEndpoint.delete("deleteProviderAccount", "/admin/provider-accounts/:provider/:name", {
+    params: { provider: ProviderSchema, name: AccountNameSchema },
+    success: AnyResponse,
+  }),
+  HttpApiEndpoint.post(
+    "activateProviderAccount",
+    "/admin/provider-accounts/:provider/:name/activate",
+    {
+      params: { provider: ProviderSchema, name: AccountNameSchema },
+      success: AnyResponse,
+    },
+  ),
+  HttpApiEndpoint.post("testProviderAccount", "/admin/provider-accounts/:provider/:name/test", {
+    params: { provider: ProviderSchema, name: AccountNameSchema },
     success: AnyResponse,
   }),
   HttpApiEndpoint.get("dashboardIndex", "/_", { success: AnyResponse }),

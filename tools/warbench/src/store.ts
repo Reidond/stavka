@@ -99,6 +99,7 @@ const frozenManifestParameters = (manifest: StudyManifest): string =>
     protocolVersion: manifest.protocolVersion,
     evidenceSchemaVersion: manifest.evidenceSchemaVersion,
     gitSha: manifest.gitSha,
+    providerVersion: manifest.providerVersion,
     piVersion: manifest.piVersion,
     modelId: manifest.modelId,
     promptHash: manifest.promptHash,

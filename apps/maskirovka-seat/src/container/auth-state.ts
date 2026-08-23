@@ -1,20 +1,22 @@
+import {
+  ProviderCredentialSchema,
+  refreshCodexCredential,
+  type ProviderCredential,
+} from "@stavka/provider-auth";
 import { Effect, Ref, Schema } from "effect";
 
 import { authTokenFingerprint, type AuthCheckpoint } from "../auth-checkpoint";
 import { decodeBase64Url } from "../base64";
 import type { SeatProvider } from "../config";
 
-const SHA256_HEX = /^[a-f0-9]{64}$/;
-
-const providerTokenName = (
-  provider: SeatProvider,
-): "CLAUDE_CODE_OAUTH_TOKEN" | "CODEX_ACCESS_TOKEN" =>
-  provider === "claude" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CODEX_ACCESS_TOKEN";
+const SHA256_HEX = /^[a-f0-9]{64}$/u;
 
 const removeMeteredCredentials = (): void => {
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENAI_API_KEY;
   delete process.env.CODEX_API_KEY;
+  delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete process.env.CODEX_ACCESS_TOKEN;
 };
 
 export class SubscriptionAuthStateError extends Schema.TaggedErrorClass<SubscriptionAuthStateError>(
@@ -23,6 +25,27 @@ export class SubscriptionAuthStateError extends Schema.TaggedErrorClass<Subscrip
   message: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {}
+
+const assertCredential = (provider: SeatProvider, input: unknown): ProviderCredential => {
+  const credential = Schema.decodeUnknownSync(ProviderCredentialSchema)(input);
+  if (
+    (provider === "codex" && credential.kind !== "codex-chatgpt-oauth") ||
+    (provider === "claude" &&
+      credential.kind !== "claude-subscription" &&
+      credential.kind !== "api-key")
+  )
+    throw new Error(`Credential kind does not match ${provider} seat`);
+  return credential;
+};
+
+const encodeCredential = (credential: ProviderCredential): string =>
+  Buffer.from(JSON.stringify(credential), "utf8").toString("base64url");
+
+const decodeCredential = (provider: SeatProvider, encoded: string): ProviderCredential =>
+  assertCredential(
+    provider,
+    JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as unknown,
+  );
 
 export interface SubscriptionAuthState {
   readonly configured: Effect.Effect<boolean>;
@@ -38,49 +61,42 @@ export const restoreSubscriptionAuth = (
     yield* Effect.sync(removeMeteredCredentials);
     const encoded = process.env.MASKIROVKA_AUTH_STATE_B64;
     if (encoded) {
-      const decoded = yield* Effect.try({
-        try: () => JSON.parse(decodeBase64Url(encoded)) as unknown,
+      const checkpoint = yield* Effect.try({
+        try: () => {
+          const decoded = JSON.parse(decodeBase64Url(encoded)) as AuthCheckpoint;
+          if (decoded.version !== 2) {
+            throw new Error("Unsupported provider account checkpoint version");
+          }
+          if (decoded.provider !== provider) {
+            throw new Error("Credential checkpoint does not match this seat");
+          }
+          return { ...decoded, credential: assertCredential(provider, decoded.credential) };
+        },
         catch: (cause) =>
           new SubscriptionAuthStateError({
-            message: "MASKIROVKA_AUTH_STATE_B64 is not a valid credential checkpoint",
+            message:
+              cause instanceof Error && cause.message.includes("does not match this seat")
+                ? cause.message
+                : "MASKIROVKA_AUTH_STATE_B64 is not a valid provider account checkpoint",
             cause,
           }),
       });
-      if (
-        typeof decoded !== "object" ||
-        decoded === null ||
-        !("version" in decoded) ||
-        decoded.version !== 1 ||
-        !("provider" in decoded) ||
-        decoded.provider !== provider ||
-        !("token" in decoded) ||
-        typeof decoded.token !== "string" ||
-        decoded.token.length === 0
-      ) {
-        return yield* Effect.fail(
-          new SubscriptionAuthStateError({
-            message: "MASKIROVKA_AUTH_STATE_B64 does not match this seat",
-          }),
-        );
-      }
-      const token = decoded.token;
       yield* Effect.sync(() => {
-        process.env[providerTokenName(provider)] = token;
+        process.env.STAVKA_PROVIDER_ACCOUNT_B64 = encodeCredential(checkpoint.credential);
       });
     }
 
-    const tokenName = providerTokenName(provider);
-    const initialToken = yield* Effect.sync(() => process.env[tokenName]);
-    const initialFingerprint = initialToken ? yield* authTokenFingerprint(initialToken) : undefined;
+    const initial = yield* Effect.sync(() => process.env.STAVKA_PROVIDER_ACCOUNT_B64);
+    const initialFingerprint = initial ? yield* authTokenFingerprint(initial) : undefined;
     const acknowledgedFingerprint = yield* Ref.make(initialFingerprint);
     return {
-      configured: Effect.sync(() => Boolean(process.env[tokenName])),
+      configured: Effect.sync(() => Boolean(process.env.STAVKA_PROVIDER_ACCOUNT_B64)),
       checkpointAfterRotation: (baseFingerprint) => {
         if (!baseFingerprint || !SHA256_HEX.test(baseFingerprint)) return Effect.succeed(undefined);
         return Effect.gen(function* () {
-          const token = yield* Effect.sync(() => process.env[tokenName]);
-          if (!token) return undefined;
-          const currentFingerprint = yield* authTokenFingerprint(token);
+          const current = yield* Effect.sync(() => process.env.STAVKA_PROVIDER_ACCOUNT_B64);
+          if (!current) return undefined;
+          const currentFingerprint = yield* authTokenFingerprint(current);
           if (currentFingerprint === baseFingerprint) {
             yield* Ref.set(acknowledgedFingerprint, baseFingerprint);
             return undefined;
@@ -88,9 +104,9 @@ export const restoreSubscriptionAuth = (
           const acknowledged = yield* Ref.get(acknowledgedFingerprint);
           if (baseFingerprint !== acknowledged) return undefined;
           return {
-            version: 1 as const,
+            version: 2 as const,
             provider,
-            token,
+            credential: decodeCredential(provider, current),
             base_fingerprint: baseFingerprint,
             observed_at: Date.now(),
           };
@@ -99,26 +115,32 @@ export const restoreSubscriptionAuth = (
     };
   });
 
-export const subscriptionEnvironment = (
+export const subscriptionCredential = (
   provider: SeatProvider,
-): Effect.Effect<Record<string, string>> =>
-  Effect.sync(() => {
-    removeMeteredCredentials();
-    const allowed = [
-      "PATH",
-      "HOME",
-      "CODEX_HOME",
-      "LANG",
-      "LC_ALL",
-      "SHELL",
-      "USER",
-      "TMPDIR",
-      providerTokenName(provider),
-    ];
-    const environment: Record<string, string> = {};
-    for (const name of allowed) {
-      const value = process.env[name];
-      if (value) environment[name] = value;
+): Effect.Effect<ProviderCredential, SubscriptionAuthStateError> =>
+  Effect.gen(function* () {
+    yield* Effect.sync(removeMeteredCredentials);
+    const encoded = yield* Effect.sync(() => process.env.STAVKA_PROVIDER_ACCOUNT_B64);
+    if (!encoded)
+      return yield* Effect.fail(
+        new SubscriptionAuthStateError({ message: `No ${provider} account is configured` }),
+      );
+    let credential = yield* Effect.try({
+      try: () =>
+        assertCredential(provider, JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"))),
+      catch: (cause) =>
+        new SubscriptionAuthStateError({ message: "Provider account is invalid", cause }),
+    });
+    if (credential.kind === "codex-chatgpt-oauth" && credential.expiresAt <= Date.now() + 300_000) {
+      credential = yield* refreshCodexCredential(credential).pipe(
+        Effect.mapError(
+          (cause) => new SubscriptionAuthStateError({ message: cause.message, cause }),
+        ),
+      );
+      const refreshed = credential;
+      yield* Effect.sync(() => {
+        process.env.STAVKA_PROVIDER_ACCOUNT_B64 = encodeCredential(refreshed);
+      });
     }
-    return environment;
+    return credential;
   });

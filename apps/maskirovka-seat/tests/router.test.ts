@@ -53,6 +53,29 @@ const fakeStub = (
   listRecentRequests: vi.fn(async () => []),
   remapAlias: vi.fn(async () => operationsStatus(provider)),
   setKillSwitch: vi.fn(async () => operationsStatus(provider)),
+  listProviderAccounts: vi.fn(async () => []),
+  putProviderAccount: vi.fn(async (accountProvider, name, payload) => ({
+    provider: accountProvider,
+    name,
+    label: payload.label,
+    authKind: payload.authKind,
+    active: true,
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  })),
+  testProviderAccount: vi.fn(async (accountProvider, name) => ({
+    provider: accountProvider,
+    name,
+    label: name,
+    authKind:
+      accountProvider === "codex" ? ("chatgpt-oauth" as const) : ("claude-subscription" as const),
+    active: true,
+    revision: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  })),
+  deleteProviderAccount: vi.fn(async () => undefined),
   fetch: vi.fn(async (request) => {
     onFetch?.(request);
     return Response.json({ proxied: true, model: request.headers.get("x-maskirovka-model") });
@@ -524,6 +547,60 @@ describe("hosted seat Worker router", () => {
     expect(killed.status).toBe(200);
     expect(stub.setKillSwitch).toHaveBeenCalledWith(true);
     expect(stub.fetch).not.toHaveBeenCalled();
+  });
+
+  it("provisions the fixed leaf provider through the shared named-account API", async () => {
+    const stub = fakeStub("codex");
+    const env = {
+      ...environment(),
+      ENVIRONMENT: "local",
+      DEV_ACCESS_EMAIL: "owner@example.test",
+    };
+    const credential = {
+      kind: "codex-chatgpt-oauth",
+      accessToken: "access-secret",
+      refreshToken: "refresh-secret",
+      expiresAt: Date.now() + 60_000,
+      accountId: "account-1",
+    };
+    const put = await request(
+      "/admin/provider-accounts/codex/work",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          label: "Work",
+          authKind: "chatgpt-oauth",
+          credential,
+          activate: true,
+        }),
+      },
+      env,
+      stub,
+    );
+    const wrongProvider = await request(
+      "/admin/provider-accounts/claude/work",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          label: "Work",
+          authKind: "claude-subscription",
+          credential: { kind: "claude-subscription", oauthToken: "oauth-secret" },
+        }),
+      },
+      env,
+      stub,
+    );
+
+    expect(put.status).toBe(200);
+    expect(stub.putProviderAccount).toHaveBeenCalledWith(
+      "codex",
+      "work",
+      expect.objectContaining({ credential }),
+    );
+    expect(wrongProvider.status).toBe(400);
+    expect(stub.putProviderAccount).toHaveBeenCalledTimes(1);
   });
 
   it("propagates client aborts to the container request", async () => {

@@ -1,3 +1,4 @@
+import { sanitizeClaudeSubscriptionEnvironment } from "@stavka/model-provider-claude";
 import { Effect, Fiber } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -7,22 +8,25 @@ import type {
   ProbeResult,
 } from "../src/repositories/cli-probe-repository";
 import type { DevVarsRepositoryService } from "../src/repositories/dev-vars-repository";
-import { sanitizeCodexSubscriptionEnvironment } from "../src/seats/codex-seat";
 import { DoctorService } from "../src/services/doctor-service";
 import { FairGovernor } from "../src/services/fair-governor";
 
 const nextTurn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-describe("codex subscription environment guardrails", () => {
-  it("strips both Codex API key variables without dropping ordinary environment values", () => {
+describe("Claude subscription environment guardrails", () => {
+  it("strips API key variables and installs only the selected subscription token", () => {
     expect(
-      sanitizeCodexSubscriptionEnvironment({
-        CODEX_API_KEY: "codex-secret",
-        OPENAI_API_KEY: "openai-secret",
-        PATH: "/usr/bin",
-        UNDEFINED_VALUE: undefined,
-      }),
-    ).toEqual({ PATH: "/usr/bin" });
+      sanitizeClaudeSubscriptionEnvironment(
+        {
+          CODEX_API_KEY: "codex-secret",
+          OPENAI_API_KEY: "openai-secret",
+          ANTHROPIC_API_KEY: "anthropic-secret",
+          PATH: "/usr/bin",
+          UNDEFINED_VALUE: undefined,
+        },
+        "subscription-token",
+      ),
+    ).toEqual({ PATH: "/usr/bin", CLAUDE_CODE_OAUTH_TOKEN: "subscription-token" });
   });
 });
 
@@ -120,6 +124,7 @@ describe("doctor guardrails", () => {
         Effect.sync(() => {
           order.push(`ping:${seat}`);
         }),
+      () => true,
       {
         OPENAI_API_KEY: "openai-secret-value",
         CODEX_API_KEY: "codex-secret-value",
@@ -129,23 +134,15 @@ describe("doctor guardrails", () => {
     const report = await Effect.runPromise(doctor.run({ live: true, write: true }));
     expect(report.ok).toBe(true);
     expect(report.checks.map((check) => check.id)).toEqual([
-      "codex-installed",
-      "claude-installed",
-      "codex-login",
-      "claude-login",
+      "claude-runtime",
+      "codex-account",
+      "claude-account",
       "api-key-override",
       "codex-ping",
       "claude-ping",
       "dev-vars",
     ]);
-    expect(order).toEqual([
-      "codex:--version",
-      "claude:--version",
-      "codex:login status",
-      "claude:auth status",
-      "ping:codex",
-      "ping:claude",
-    ]);
+    expect(order).toEqual(["claude:--version", "ping:codex", "ping:claude"]);
     expect(writes).toEqual([
       "/repo/.dev.vars",
       "/repo/services/commander/.dev.vars",
@@ -184,6 +181,7 @@ describe("doctor guardrails", () => {
         Effect.sync(() => {
           pings += 1;
         }),
+      () => true,
       {},
     );
     const report = await Effect.runPromise(doctor.run({ live: false, write: false }));

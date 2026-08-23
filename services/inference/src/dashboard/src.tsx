@@ -1,10 +1,8 @@
-import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Banner } from "@cloudflare/kumo/components/banner";
-import { Button } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
-import { StrictMode, useState } from "react";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
@@ -16,12 +14,23 @@ type AuthStatus = {
   persisted: boolean;
   revision: number;
   updated_at?: number;
+  activeAccount?: string;
+};
+type ProviderAccount = {
+  provider: Provider;
+  name: string;
+  label: string;
+  authKind: string;
+  active: boolean;
+  revision: number;
+  updatedAt: number;
 };
 type GatewayStatus = {
   ok: boolean;
   killed: boolean;
   container: { status: string; last_change: number };
   auth: Record<Provider, AuthStatus>;
+  providerAccounts: readonly ProviderAccount[];
   aliases: readonly { tier: string; seat: string; model: string }[];
   requests: { retained: number; limit: number; metadata_only: true };
 };
@@ -41,88 +50,42 @@ const requestJson = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-function ProviderAuthPanel({ provider, status }: { provider: Provider; status?: AuthStatus }) {
-  const [token, setToken] = useState("");
-  const save = useMutation({
-    mutationFn: () =>
-      requestJson<AuthStatus>(`/admin/auth/${provider}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token }),
-      }),
-    onSuccess: async () => {
-      setToken("");
-      await queryClient.invalidateQueries({ queryKey: ["gateway-status"] });
-    },
-  });
-  const clear = useMutation({
-    mutationFn: () => requestJson<AuthStatus>(`/admin/auth/${provider}`, { method: "DELETE" }),
-    onSuccess: async () => {
-      setToken("");
-      await queryClient.invalidateQueries({ queryKey: ["gateway-status"] });
-    },
-  });
-
+function ProviderAccountsPanel({
+  provider,
+  status,
+  accounts,
+}: {
+  provider: Provider;
+  status?: AuthStatus;
+  accounts: readonly ProviderAccount[];
+}) {
   return (
     <LayerCard className="space-y-4 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="m-0 text-lg uppercase">{provider} subscription auth</h3>
+        <h3 className="m-0 text-lg uppercase">{provider} accounts</h3>
         <Badge variant={status?.configured ? "success" : "error"}>
           {status?.configured ? "Configured" : "Not configured"}
         </Badge>
       </div>
       <p className="text-sm text-kumo-subtle">
-        Paste a subscription token. It is written to the gateway Durable Object and is never shown
-        again after save.
+        Named accounts are provisioned by the Stavka CLI and encrypted in the gateway vault. Secret
+        values are never accepted or rendered by this dashboard.
       </p>
-      <Input
-        id={`${provider}-token`}
-        label="Token"
-        type="password"
-        autoComplete="new-password"
-        value={token}
-        onChange={(event) => setToken(event.target.value)}
-        placeholder="Paste token; it clears after save"
-        passwordManagerIgnore
-      />
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          disabled={!token.trim() || save.isPending}
-          onClick={() => save.mutate()}
-        >
-          Save token
-        </Button>
-        <Button
-          variant="destructive"
-          disabled={!status?.configured || clear.isPending}
-          onClick={() => clear.mutate()}
-        >
-          Clear token
-        </Button>
-      </div>
-      <p className="mt-3 text-xs text-kumo-subtle">
-        {provider === "claude" ? (
-          <a
-            href="https://docs.anthropic.com/en/docs/claude-code/setup"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Create with <code>claude setup-token</code>
-          </a>
+      <ul className="space-y-2 text-sm">
+        {accounts.length ? (
+          accounts.map((account) => (
+            <li key={`${account.provider}/${account.name}`}>
+              <strong>{account.name}</strong> · {account.label} · {account.authKind}
+              {account.active ? " · active" : ""}
+            </li>
+          ))
         ) : (
-          <a href="https://platform.openai.com/docs/codex/auth" target="_blank" rel="noreferrer">
-            See Codex subscription token setup
-          </a>
+          <li>No {provider} accounts provisioned.</li>
         )}
-      </p>
-      {save.error || clear.error ? (
-        <Banner
-          variant="error"
-          title="Credential update failed"
-          description={(save.error ?? clear.error)?.message}
-        />
-      ) : null}
+      </ul>
+      <code className="block overflow-x-auto text-xs">
+        stavka auth push --cloudflare &lt;profile&gt; --account {provider}/&lt;name&gt;
+      </code>
     </LayerCard>
   );
 }
@@ -158,13 +121,19 @@ function Dashboard() {
           <Banner variant="error" title="Gateway unavailable" description={status.error.message} />
         ) : null}
         <section className="mb-6 grid gap-4 md:grid-cols-2">
-          <ProviderAuthPanel
+          <ProviderAccountsPanel
             provider="claude"
             {...(snapshot?.auth.claude ? { status: snapshot.auth.claude } : {})}
+            accounts={(snapshot?.providerAccounts ?? []).filter(
+              (account) => account.provider === "claude",
+            )}
           />
-          <ProviderAuthPanel
+          <ProviderAccountsPanel
             provider="codex"
             {...(snapshot?.auth.codex ? { status: snapshot.auth.codex } : {})}
+            accounts={(snapshot?.providerAccounts ?? []).filter(
+              (account) => account.provider === "codex",
+            )}
           />
         </section>
         <LayerCard className="p-4">

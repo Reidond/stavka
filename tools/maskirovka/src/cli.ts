@@ -3,6 +3,8 @@ import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeRuntime } from "@effect/platform-node";
+import { ClaudeAgentProvider, ClaudeApiProvider } from "@stavka/model-provider-claude";
+import { CodexProvider } from "@stavka/model-provider-codex";
 import { Console, Effect } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 
@@ -19,7 +21,6 @@ import { ProcessCliProbeRepository } from "./repositories/cli-probe-repository";
 import { MemoryGatewayConfigRepository } from "./repositories/config-repository";
 import { FileDevVarsRepository } from "./repositories/dev-vars-repository";
 import { MemoryRequestLogRepository } from "./repositories/request-log-repository";
-import { FileRuntimeDirectoryRepository } from "./repositories/runtime-directory-repository";
 import { FileWindowTrackerRepository } from "./repositories/window-tracker-repository";
 import { createMaskirovkaApp } from "./router";
 import { createGatewayService } from "./runtime";
@@ -27,6 +28,7 @@ import { ClaudeSeat } from "./seats/claude-seat";
 import { CodexSeat } from "./seats/codex-seat";
 import { MockSeat } from "./seats/mock-seat";
 import type { SeatAdapter } from "./seats/seat-adapter";
+import { loadProviderCredential } from "./provider-account";
 import { serveMaskirovka } from "./server";
 import { DoctorService } from "./services/doctor-service";
 import { GatewayService } from "./services/gateway-service";
@@ -128,13 +130,42 @@ const memoryService = (
     return service;
   });
 
+const subscriptionAdapter = (
+  provider: "claude" | "codex",
+): Effect.Effect<SeatAdapter, GatewayError> =>
+  loadProviderCredential(provider).pipe(
+    Effect.mapError(
+      (error: Error) => new GatewayError(500, "PROVIDER_ACCOUNT_INVALID", error.message),
+    ),
+    Effect.flatMap((credential): Effect.Effect<SeatAdapter, GatewayError> => {
+      if (provider === "claude" && credential?.kind === "claude-subscription") {
+        return Effect.succeed<SeatAdapter>(new ClaudeSeat(new ClaudeAgentProvider({ credential })));
+      }
+      if (provider === "claude" && credential?.kind === "api-key") {
+        return Effect.succeed<SeatAdapter>(new ClaudeSeat(new ClaudeApiProvider({ credential })));
+      }
+      if (provider === "codex" && credential?.kind === "codex-chatgpt-oauth") {
+        return Effect.succeed<SeatAdapter>(new CodexSeat(new CodexProvider({ credential })));
+      }
+      return Effect.fail(
+        new GatewayError(503, "PROVIDER_ACCOUNT_MISSING", `No active ${provider} provider account`),
+      );
+    }),
+  );
+
 const printDoctor = (
   config: MaskirovkaConfig,
   write = true,
 ): Effect.Effect<boolean, GatewayError> =>
   Effect.gen(function* () {
-    const codexWorkspace = join(config.stateDirectory, "codex-workspace");
-    yield* new FileRuntimeDirectoryRepository().ensure([codexWorkspace]);
+    const adapters = yield* Effect.all({
+      claude: subscriptionAdapter("claude").pipe(
+        Effect.match({ onFailure: () => undefined, onSuccess: (adapter) => adapter }),
+      ),
+      codex: subscriptionAdapter("codex").pipe(
+        Effect.match({ onFailure: () => undefined, onSuccess: (adapter) => adapter }),
+      ),
+    });
     const pingRequest = (seat: "claude" | "codex"): SeatInvocation => ({
       dialect: seat === "claude" ? "anthropic-messages" : "openai-responses",
       tier: "stavka/sergeant",
@@ -147,10 +178,15 @@ const printDoctor = (
       new ProcessCliProbeRepository(),
       new FileDevVarsRepository(),
       repositoryRoot,
-      (seat) =>
-        seat === "claude"
-          ? new ClaudeSeat().invoke(pingRequest(seat)).pipe(Effect.asVoid)
-          : new CodexSeat(codexWorkspace).invoke(pingRequest(seat)).pipe(Effect.asVoid),
+      (seat) => {
+        const adapter = adapters[seat];
+        return adapter
+          ? adapter.invoke(pingRequest(seat)).pipe(Effect.asVoid)
+          : Effect.fail(
+              new GatewayError(503, "PROVIDER_ACCOUNT_MISSING", `No active ${seat} account`),
+            );
+      },
+      (seat) => adapters[seat] !== undefined,
     );
     const report = yield* doctor.run({ live: hasFlag("--live"), write });
     yield* Console.log(JSON.stringify(report, null, 2));
@@ -228,49 +264,49 @@ const runContributor = (
         new Error("--seat-id must be a valid contributor protocol seat id"),
       );
     }
-    const codexWorkspace = join(config.stateDirectory, "codex-workspace");
-    if (configured.some(({ provider }) => provider === "codex")) {
-      yield* new FileRuntimeDirectoryRepository().ensure([codexWorkspace]);
-    }
     yield* Console.log(
       `Registering contributor seat(s): ${configured.map(({ provider }) => provider).join(", ")}`,
     );
-    const programs = configured.map(({ provider, seat }) => {
-      const id = explicitSeatId ?? contributorSeatId(provider);
-      const configuredModel = (tier: "stavka/commander" | "stavka/sergeant" | "stavka/heavy") =>
-        config.aliases.find((alias) => alias.seat === provider && alias.tier === tier)?.model ??
-        contributorModelDefaults[provider][tier];
-      return runContributorSeat({
-        endpoint: parsedEndpoint.toString(),
-        token,
-        id,
-        name: `${hostname()} ${provider} subscription seat`.slice(0, 160),
-        provider,
-        models: ["stavka/commander", "stavka/sergeant", "stavka/heavy"],
-        monthlyBudgetUsd: seat.monthlyBudgetUsd,
-        priority: seat.priority,
-        modelByTier: {
-          "stavka/commander": configuredModel("stavka/commander"),
-          "stavka/sergeant": configuredModel("stavka/sergeant"),
-          "stavka/heavy": configuredModel("stavka/heavy"),
-        },
-        adapter: provider === "claude" ? new ClaudeSeat() : new CodexSeat(codexWorkspace),
-        codexWindowCallLimit: config.codexWindowCallLimit,
-        codexWindowTokenLimit: config.codexWindowTokenLimit,
-        codexWindowHours: config.codexWindowHours,
-        tracker: new WindowTracker(
-          {
-            claudeMonthlyCreditUsd: provider === "claude" ? config.claudeMonthlyCreditUsd : 0,
-            codexWindowCalls: config.codexWindowCallLimit,
-            codexWindowTokens: config.codexWindowTokenLimit,
-            codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
-          },
-          new FileWindowTrackerRepository(
-            join(config.stateDirectory, `contributor-${id}-usage.json`),
-          ),
-        ),
-      });
-    });
+    const programs = yield* Effect.forEach(configured, ({ provider, seat }) =>
+      subscriptionAdapter(provider).pipe(
+        Effect.map((adapter) => {
+          const id = explicitSeatId ?? contributorSeatId(provider);
+          const configuredModel = (tier: "stavka/commander" | "stavka/sergeant" | "stavka/heavy") =>
+            config.aliases.find((alias) => alias.seat === provider && alias.tier === tier)?.model ??
+            contributorModelDefaults[provider][tier];
+          return runContributorSeat({
+            endpoint: parsedEndpoint.toString(),
+            token,
+            id,
+            name: `${hostname()} ${provider} subscription seat`.slice(0, 160),
+            provider,
+            models: ["stavka/commander", "stavka/sergeant", "stavka/heavy"],
+            monthlyBudgetUsd: seat.monthlyBudgetUsd,
+            priority: seat.priority,
+            modelByTier: {
+              "stavka/commander": configuredModel("stavka/commander"),
+              "stavka/sergeant": configuredModel("stavka/sergeant"),
+              "stavka/heavy": configuredModel("stavka/heavy"),
+            },
+            adapter,
+            codexWindowCallLimit: config.codexWindowCallLimit,
+            codexWindowTokenLimit: config.codexWindowTokenLimit,
+            codexWindowHours: config.codexWindowHours,
+            tracker: new WindowTracker(
+              {
+                claudeMonthlyCreditUsd: provider === "claude" ? config.claudeMonthlyCreditUsd : 0,
+                codexWindowCalls: config.codexWindowCallLimit,
+                codexWindowTokens: config.codexWindowTokenLimit,
+                codexWindowMs: config.codexWindowHours * 60 * 60 * 1_000,
+              },
+              new FileWindowTrackerRepository(
+                join(config.stateDirectory, `contributor-${id}-usage.json`),
+              ),
+            ),
+          });
+        }),
+      ),
+    );
     yield* Effect.all(programs, { concurrency: "unbounded", discard: true });
     return yield* Effect.never;
   });

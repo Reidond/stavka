@@ -1,83 +1,74 @@
+import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Effect } from "effect";
 import { authTokenFingerprint } from "../src/auth-checkpoint";
-import { restoreSubscriptionAuth, subscriptionEnvironment } from "../src/container/auth-state";
 import { encodeBase64Url } from "../src/base64";
+import { restoreSubscriptionAuth, subscriptionCredential } from "../src/container/auth-state";
 
 const originalEnvironment = { ...process.env };
+const codexCredential = (accessToken: string) => ({
+  kind: "codex-chatgpt-oauth" as const,
+  accessToken,
+  refreshToken: "refresh-token",
+  expiresAt: Date.now() + 60 * 60_000,
+  accountId: "account-1",
+});
+const encodedCredential = (accessToken: string): string =>
+  Buffer.from(JSON.stringify(codexCredential(accessToken)), "utf8").toString("base64url");
 
 afterEach(() => {
   for (const name of Object.keys(process.env)) delete process.env[name];
   Object.assign(process.env, originalEnvironment);
 });
 
-describe("container subscription auth", () => {
-  it("restores injected auth but checkpoints only a post-bootstrap rotation", async () => {
+describe("container subscription account state", () => {
+  it("restores an account checkpoint and reports only post-bootstrap rotation", async () => {
+    const initial = encodedCredential("initial-access");
     process.env.ANTHROPIC_API_KEY = "metered-anthropic";
-    process.env.OPENAI_API_KEY = "metered-openai";
-    process.env.CODEX_API_KEY = "metered-codex";
     process.env.MASKIROVKA_AUTH_STATE_B64 = encodeBase64Url(
       JSON.stringify({
-        version: 1,
+        version: 2,
         provider: "codex",
-        token: "subscription-token",
+        credential: codexCredential("initial-access"),
+        base_fingerprint: "a".repeat(64),
         observed_at: 1,
       }),
     );
 
     const authState = await Effect.runPromise(restoreSubscriptionAuth("codex"));
-    const baseFingerprint = await Effect.runPromise(authTokenFingerprint("subscription-token"));
+    const baseFingerprint = await Effect.runPromise(authTokenFingerprint(initial));
 
-    expect(process.env.CODEX_ACCESS_TOKEN).toBe("subscription-token");
+    expect(process.env.STAVKA_PROVIDER_ACCOUNT_B64).toBe(initial);
     expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
-    expect(process.env.OPENAI_API_KEY).toBeUndefined();
-    expect(process.env.CODEX_API_KEY).toBeUndefined();
-    expect(Effect.runSync(subscriptionEnvironment("codex"))).toMatchObject({
-      CODEX_ACCESS_TOKEN: "subscription-token",
+    await expect(Effect.runPromise(subscriptionCredential("codex"))).resolves.toMatchObject({
+      accessToken: "initial-access",
     });
-    expect(
-      await Effect.runPromise(authState.checkpointAfterRotation(baseFingerprint)),
-    ).toBeUndefined();
-
-    process.env.CODEX_ACCESS_TOKEN = "rotated-subscription-token";
+    await expect(authState.configured.pipe(Effect.runPromise)).resolves.toBe(true);
     await expect(
-      Effect.runPromise(authState.checkpointAfterRotation("b".repeat(64))),
+      Effect.runPromise(authState.checkpointAfterRotation(baseFingerprint)),
     ).resolves.toBeUndefined();
+
+    process.env.STAVKA_PROVIDER_ACCOUNT_B64 = encodedCredential("rotated-access");
     await expect(
       Effect.runPromise(authState.checkpointAfterRotation(baseFingerprint)),
     ).resolves.toMatchObject({
-      version: 1,
+      version: 2,
       provider: "codex",
-      token: "rotated-subscription-token",
+      credential: { accessToken: "rotated-access" },
       base_fingerprint: baseFingerprint,
-    });
-
-    const rotatedFingerprint = await Effect.runPromise(
-      authTokenFingerprint("rotated-subscription-token"),
-    );
-    await expect(
-      Effect.runPromise(authState.checkpointAfterRotation(rotatedFingerprint)),
-    ).resolves.toBeUndefined();
-    process.env.CODEX_ACCESS_TOKEN = "second-rotation";
-    await expect(
-      Effect.runPromise(authState.checkpointAfterRotation(rotatedFingerprint)),
-    ).resolves.toMatchObject({
-      token: "second-rotation",
-      base_fingerprint: rotatedFingerprint,
     });
   });
 
   it("rejects a checkpoint intended for another provider", async () => {
     process.env.MASKIROVKA_AUTH_STATE_B64 = encodeBase64Url(
       JSON.stringify({
-        version: 1,
+        version: 2,
         provider: "claude",
-        token: "oauth",
+        credential: { kind: "claude-subscription", oauthToken: "oauth" },
+        base_fingerprint: "a".repeat(64),
         observed_at: 1,
       }),
     );
-
     await expect(Effect.runPromise(restoreSubscriptionAuth("codex"))).rejects.toThrow(
       "does not match this seat",
     );

@@ -64,7 +64,7 @@ const evidence: StudyEvidenceObject = {
     protocolVersion: "2",
     evidenceSchemaVersion: currentEvidenceSchemaVersion,
     gitSha: "abcdef1234567890",
-    piVersion: "0.84.2",
+    providerVersion: "stavka-codex/1.0.0",
     modelId: "gpt-5.1-codex-mini",
     promptHash: "f".repeat(64),
     seeds: Array.from({ length: 10 }, (_, index) => 1_000 + index),

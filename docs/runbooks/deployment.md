@@ -24,17 +24,23 @@ Commander and inference reachable only through Cloudflare service bindings.
      as Worker secrets/vars on `apps/stavka`.
 3. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
    service tokens via `authorizeMachine`, not Access sessions.
+4. **Provider account control plane**: the unified app forwards only
+   `/admin/provider-accounts` and its child routes to the private inference
+   Worker through `INFERENCE_SERVICE`. Attach both the human allow policy and
+   the read-only automation service-token policy to this single Access app.
 
 ## Deploy
 
-Deployment is an explicit operator action:
+Deployment follows a successful `verify` job on a `main` push or a manual
+dispatch of `.github/workflows/ci.yml` from `main`:
 
 ```sh
 pnpm run deploy:production
 ```
 
-Order (handled by the task plan): inference → commander → unified app.
-The hosted Maskirovka seat is not deployed to production.
+Order (handled by the task plan): inference → hosted seat → commander → unified
+app. The hosted seat, commander, and inference have no public workers.dev or
+preview origin.
 
 After deploy, record each service's version ID from the wrangler output in
 the change log entry.

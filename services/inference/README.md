@@ -12,14 +12,14 @@ leaf is not the PRODUCT production path.
 
 ```sh
 # From the repository root
-cp apps/maskirovka-gateway/.dev.vars.example apps/maskirovka-gateway/.dev.vars
-# Edit .dev.vars: set MASKIROVKA_GATEWAY_KEY and DEV_ACCESS_EMAIL for local Access.
+cp services/inference/.dev.vars.example services/inference/.dev.vars
+# Set MASKIROVKA_GATEWAY_KEY, STAVKA_PROVIDER_VAULT_KEY, and DEV_ACCESS_EMAIL.
 
-pnpm --filter @stavka/maskirovka-gateway build:dashboard
-pnpm --filter @stavka/maskirovka-gateway types   # after wrangler.jsonc changes
-pnpm --filter @stavka/maskirovka-gateway typecheck
-pnpm --filter @stavka/maskirovka-gateway test
-pnpm --filter @stavka/maskirovka-gateway dev
+pnpm --filter @stavka/inference build:dashboard
+pnpm --filter @stavka/inference types   # after wrangler.jsonc changes
+pnpm --filter @stavka/inference typecheck
+pnpm --filter @stavka/inference test
+pnpm --filter @stavka/inference dev
 ```
 
 Package scripts are single-command aliases (no `&&` / `||`). Build the dashboard
@@ -29,29 +29,41 @@ Machine routes (`/healthz`, `/v1/models`, `/v1/responses`, `/v1/messages`) requi
 `Authorization: Bearer <MASKIROVKA_GATEWAY_KEY>`. Human ops (`/_`, `/admin/*`)
 require Cloudflare Access (local mode: `ENVIRONMENT=local` + `DEV_ACCESS_EMAIL`).
 
-## Browser credential store
+## Named provider accounts
 
-Access admins paste Claude / Codex subscription tokens at `/_/` (Provider auth
-panel) or via `PUT /admin/auth/:provider` with `{ "token": "..." }`. Tokens are
-stored in Durable Object SQLite, injected into the Container as
-`MASKIROVKA_AUTH_STATE_B64`, and never echoed in admin JSON or the dashboard.
-`DELETE /admin/auth/:provider` clears a provider. Optional Wrangler secrets
-(`CLAUDE_CODE_OAUTH_TOKEN`, `CODEX_ACCESS_TOKEN`) remain a recovery bootstrap.
+Provider credentials never pass through the browser or ordinary Wrangler
+environment variables. The `stavka` CLI owns local Codex OAuth, Claude
+subscription/API-key input, named Cloudflare Access profiles, and remote
+provisioning. Remote credentials are AES-GCM encrypted in Durable Object SQLite;
+admin JSON and `/_/` expose metadata only.
+
+```sh
+pnpm stavka -- codex login work
+claude setup-token | pnpm stavka -- claude login max --token-stdin
+pnpm stavka -- cloudflare local dev --url http://127.0.0.1:8787
+pnpm stavka -- auth push --account codex/work --cloudflare dev
+pnpm stavka -- auth push --account claude/max --cloudflare dev
+pnpm stavka -- auth list --cloudflare dev
+```
+
+For production, point both profile kinds at `https://stavka.sands.red`: use
+`cloudflare login` for interactive Access or `cloudflare service-token` for
+read-only automation. The unified app forwards the provider-account API to
+this private Worker through `INFERENCE_SERVICE`. Configure the signed-in human's
+Access `sub` or email in comma-separated `ACCESS_OWNER_SUBJECTS`; otherwise
+admin operations fail closed. The same `/admin/provider-accounts` API supports
+list, put, test, activate, and delete.
 
 ## Deploy
 
 ```sh
-pnpm --filter @stavka/maskirovka-gateway build:dashboard
-pnpm --filter @stavka/maskirovka-gateway run deploy
+pnpm --filter @stavka/inference build:dashboard
+pnpm --filter @stavka/inference run deploy
 ```
 
-Expected workers.dev origin (this account):
+After the single `Stavka` Access application protects `stavka.sands.red`:
 
-`https://stavka-maskirovka-gateway.andrii-shafar.workers.dev`
-
-After Access is configured and public workers.dev routing works:
-
-1. Open `/_/` and store Claude + Codex subscription tokens.
+1. Create a production Access profile and push the named Claude/Codex accounts.
 2. `curl -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" …/healthz`
 3. `curl -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" …/v1/models`
 

@@ -24,7 +24,7 @@ flowchart LR
   PA -->|"protocol v1 + machine bearer"| C["Commander<br/>Effect HttpApi + durable agents"]
   C --> D["Commander and Sergeant state<br/>SQLite logs/archive + R2 export layer"]
   C -->|"Bearer GATEWAY_KEY"| MG["Maskirovka gateway<br/>Worker + Container"]
-  MG --> CL["Claude + Codex CLIs<br/>in-process seats"]
+  MG --> CL["Claude Agent SDK + Stavka Codex<br/>in-process seats"]
   C -.->|"optional experiment"| MH["Hosted leaf<br/>apps/maskirovka-seat"]
   H["Human operator"] -->|"Cloudflare Access"| PA
   H -->|"Cloudflare Access"| C
@@ -128,10 +128,22 @@ pnpm --filter @stavka/commander dev
 pnpm --filter @stavka/poligon dev
 ```
 
-Gateway dashboard credentials: open `/_/` (Access-gated), use Provider auth to
-paste Claude (`claude setup-token`) and Codex subscription tokens. Tokens stay
-in Durable Object auth state and are never echoed. Optional Wrangler secrets
-`CLAUDE_CODE_OAUTH_TOKEN` / `CODEX_ACCESS_TOKEN` are recovery-only.
+Provision named accounts with the secret-safe CLI; `/_/` shows metadata only:
+
+```bash
+pnpm stavka -- codex login work
+claude setup-token | pnpm stavka -- claude login max --token-stdin
+pnpm stavka -- cloudflare local dev --url http://127.0.0.1:8787
+pnpm stavka -- auth push --account codex/work --cloudflare dev
+pnpm stavka -- auth push --account claude/max --cloudflare dev
+pnpm stavka -- auth activate --account codex/work --cloudflare dev
+```
+
+Production profiles use `cloudflare login` or `cloudflare service-token`.
+Credentials are encrypted with `STAVKA_PROVIDER_VAULT_KEY` in Durable Object
+SQLite and are never provider-token Wrangler secrets. Set comma-separated
+`ACCESS_OWNER_SUBJECTS` (Access `sub` values or verified emails) for humans who
+may provision accounts; unlisted humans and service tokens are read-only.
 
 ### Account bindings already created
 
@@ -507,6 +519,7 @@ Human routes are different:
 | `GET /admin/requests?limit=…` | read              | Up to 200 metadata-only request rows                                 |
 | `PUT /admin/aliases/:alias`   | admin             | Remap an already configured alias to a concrete model on this leaf   |
 | `POST /admin/kill-switch`     | admin             | Persistently stop/restore new traffic on this leaf                   |
+| `/admin/provider-accounts/*`  | admin             | Provision/test/delete the leaf's one named provider account          |
 
 Service-token automation is read-only. The request log stores generated ID,
 timestamp, dialect, alias/model, status, latency, and queue depth—never prompt,
@@ -514,19 +527,18 @@ body, caller auth, or provider error text. Registry management, cross-seat
 routing/fallback, and shared budget controls remain orchestration-gateway
 responsibilities and are truthfully absent from the leaf UI.
 
-Configure exactly one provider credential per deployment:
+Configure machine and vault secrets per deployment:
 
 ```bash
 pnpm --filter @stavka/maskirovka-seat exec wrangler secret put MASKIROVKA_SEAT_KEY
-pnpm --filter @stavka/maskirovka-seat exec wrangler secret put CODEX_ACCESS_TOKEN
+pnpm --filter @stavka/maskirovka-seat exec wrangler secret put STAVKA_PROVIDER_VAULT_KEY
 ```
 
-Use `CLAUDE_CODE_OAUTH_TOKEN` instead for a Claude deployment. Do not set
-`OPENAI_API_KEY`, `CODEX_API_KEY`, or `ANTHROPIC_API_KEY` on a subscription
-seat; those variables can silently change the billing/auth posture. The
-checkpoint code persists only observed post-bootstrap credential rotation and
-binds it to the injected-secret fingerprint; actual SDK token-rotation behavior
-still needs live external observation.
+Push the provider account through an Access profile whose URL is the leaf
+origin. Do not set provider tokens, `OPENAI_API_KEY`, `CODEX_API_KEY`, or
+`ANTHROPIC_API_KEY` on a subscription seat. Refresh checkpoints are bound to the
+injected encrypted-account revision; actual live provider rotation still needs
+operator verification.
 
 ## Workspace commands
 

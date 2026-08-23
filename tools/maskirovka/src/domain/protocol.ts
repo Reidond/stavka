@@ -105,7 +105,7 @@ export const normalizeRequest = (dialect: Dialect, value: unknown): NormalizedRe
       throw new GatewayError(
         400,
         "UNSUPPORTED_PARAMETER",
-        "The Codex Agent SDK does not expose max_output_tokens",
+        "The ChatGPT Codex subscription transport does not accept max_output_tokens",
         ["param=max_output_tokens"],
       );
     }
