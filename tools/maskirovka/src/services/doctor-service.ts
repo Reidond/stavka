@@ -20,6 +20,7 @@ export class DoctorService {
     private readonly devVars: DevVarsRepositoryService,
     private readonly repositoryRoot: string,
     private readonly pingSeat: (seat: SubscriptionSeat) => Effect.Effect<void, GatewayError>,
+    private readonly accountAvailable: (seat: SubscriptionSeat) => boolean,
     private readonly environment: NodeJS.ProcessEnv = process.env,
   ) {}
 
@@ -27,28 +28,19 @@ export class DoctorService {
     return Effect.gen({ self: this }, function* () {
       const checks: DoctorCheck[] = [];
 
-      const codexInstalled = yield* this.probes.run("codex", ["--version"]);
       const claudeInstalled = yield* this.probes.run("claude", ["--version"]);
       checks.push(
-        this.toolCheck("codex-installed", "Codex CLI", codexInstalled.ok, codexInstalled.output),
-      );
-      checks.push(
         this.toolCheck(
-          "claude-installed",
-          "Claude CLI",
+          "claude-runtime",
+          "Claude Agent SDK runtime",
           claudeInstalled.ok,
           claudeInstalled.output,
         ),
       );
-
-      const codexLogin = codexInstalled.ok
-        ? yield* this.probes.run("codex", ["login", "status"])
-        : { ok: false, output: "Codex CLI is not installed", exitCode: null };
-      const claudeLogin = claudeInstalled.ok
-        ? yield* this.probes.run("claude", ["auth", "status"])
-        : { ok: false, output: "Claude CLI is not installed", exitCode: null };
-      checks.push(this.loginCheck("codex-login", "Codex", codexLogin.ok, codexLogin.output));
-      checks.push(this.loginCheck("claude-login", "Claude", claudeLogin.ok, claudeLogin.output));
+      const codexAvailable = this.accountAvailable("codex");
+      const claudeAvailable = this.accountAvailable("claude") && claudeInstalled.ok;
+      checks.push(this.accountCheck("codex-account", "Codex", codexAvailable));
+      checks.push(this.accountCheck("claude-account", "Claude", claudeAvailable));
 
       const overrides = ["OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY"].filter((key) =>
         Boolean(this.environment[key]),
@@ -68,8 +60,8 @@ export class DoctorService {
       );
 
       for (const [seat, loggedIn] of [
-        ["codex", codexLogin.ok],
-        ["claude", claudeLogin.ok],
+        ["codex", codexAvailable],
+        ["claude", claudeAvailable],
       ] as const) {
         if (!options.live) {
           checks.push({
@@ -95,7 +87,7 @@ export class DoctorService {
               ? {
                   id: `${seat}-ping`,
                   status: "pass",
-                  message: `${seat} SDK one-turn ping succeeded`,
+                  message: `${seat} provider one-turn ping succeeded`,
                 }
               : {
                   id: `${seat}-ping`,
@@ -212,13 +204,13 @@ export class DoctorService {
         };
   }
 
-  private loginCheck(id: string, name: string, ok: boolean, output: string): DoctorCheck {
+  private accountCheck(id: string, name: string, ok: boolean): DoctorCheck {
     return ok
-      ? { id, status: "pass", message: `${name} subscription login is available` }
+      ? { id, status: "pass", message: `${name} named provider account is available` }
       : {
           id,
           status: "warn",
-          message: `${name} subscription login unavailable${output ? `: ${output.split("\n")[0]}` : ""}`,
+          message: `${name} named provider account is unavailable; run stavka ${name.toLowerCase()} login`,
         };
   }
 }

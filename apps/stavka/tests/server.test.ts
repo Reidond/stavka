@@ -67,6 +67,55 @@ describe("Poligon HTTP routing", () => {
     expect(mocks.tanStackFetch).not.toHaveBeenCalled();
   });
 
+  it("forwards provider-account operations to private inference after Access", async () => {
+    const inferenceFetch = vi.fn<Fetcher["fetch"]>(async () =>
+      Response.json({ accounts: [{ provider: "codex", name: "production" }] }),
+    );
+    const response = await handleRequest(
+      new Request("http://127.0.0.1/admin/provider-accounts", {
+        headers: { "x-request-marker": "provider-control" },
+      }),
+      makeEnv({
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "operator@example.test",
+        INFERENCE_SERVICE: { fetch: inferenceFetch },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      accounts: [{ provider: "codex", name: "production" }],
+    });
+    expect(inferenceFetch).toHaveBeenCalledOnce();
+    const forwarded = inferenceFetch.mock.calls[0]?.[0];
+    expect(forwarded).toBeInstanceOf(Request);
+    if (!(forwarded instanceof Request)) throw new Error("Expected a forwarded Request");
+    expect(forwarded.url).toBe("http://127.0.0.1/admin/provider-accounts");
+    expect(forwarded.headers.get("x-request-marker")).toBe("provider-control");
+    expect(mocks.tanStackFetch).not.toHaveBeenCalled();
+  });
+
+  it("fails provider-account operations closed when inference is not bound", async () => {
+    const response = await handleRequest(
+      new Request("http://127.0.0.1/admin/provider-accounts/codex/production/test", {
+        method: "POST",
+      }),
+      makeEnv({
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "operator@example.test",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "INFERENCE_UNAVAILABLE",
+        message: "Provider account service is unavailable",
+      },
+    });
+    expect(mocks.tanStackFetch).not.toHaveBeenCalled();
+  });
+
   it("does not enable synthetic Access when ENVIRONMENT is missing", async () => {
     const response = await handleRequest(
       new Request("https://poligon.test/operations"),

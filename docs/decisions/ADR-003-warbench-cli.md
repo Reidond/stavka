@@ -18,7 +18,7 @@ to authenticate, render, and maintain.
 Warbench ships as a CLI (`pnpm warbench`, package `@stavka/warbench-cli`):
 
 ```sh
-pnpm warbench models                        # exact ids from pinned Pi
+pnpm warbench models                        # exact first-party Codex ids
 pnpm warbench calibrate                     # 100 non-holdout seeds/family
 pnpm warbench connect                       # Codex device authorization (local)
 pnpm warbench probe --model <exact-id>       # full validation path
@@ -32,9 +32,10 @@ pnpm warbench verify-evidence study-v2       # recompute frozen digest
 
 - Study data lives in an operator-chosen directory outside the repository by
   default (`$XDG_STATE_HOME/stavka/warbench-v2`, falling back to
-  `~/.local/state/stavka/warbench-v2`). Credentials live beside it with
-  owner-only directory/file permissions (`0700`/`0600`), are never migrated
-  from the standalone repository, and are never copied into Cloudflare.
+  `~/.local/state/stavka/warbench-v2`). A named `warbench` Codex account lives
+  beside it in the owner-only local profile store (`0700` directory / `0600`
+  file); credentials are never migrated from the standalone repository or
+  copied remotely by a study run.
 - The CLI shares `@stavka/warbench-core` orchestration with the server-side
   `WarbenchStudyStore` Durable Object, so file-backed and DO-backed evidence
   enforce identical immutability rules.

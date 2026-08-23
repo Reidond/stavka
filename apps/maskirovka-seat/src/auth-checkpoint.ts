@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { ProviderCredentialSchema, type ProviderCredential } from "@stavka/provider-auth";
 
 import { decodeBase64Url, encodeBase64Url } from "./base64";
 import type { SeatProvider } from "./config";
@@ -9,17 +10,17 @@ const MAX_CHECKPOINT_HEADER_BYTES = 16_384;
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 
 const AuthCheckpointSchema = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   provider: Schema.Literals(["claude", "codex"]),
-  token: Schema.String,
+  credential: ProviderCredentialSchema,
   base_fingerprint: Schema.String,
   observed_at: Schema.Number,
 });
 
 export interface AuthCheckpoint {
-  readonly version: 1;
+  readonly version: 2;
   readonly provider: SeatProvider;
-  readonly token: string;
+  readonly credential: ProviderCredential;
   readonly base_fingerprint: string;
   readonly observed_at: number;
 }
@@ -41,9 +42,6 @@ export const decodeAuthCheckpoint = (header: string): AuthCheckpoint => {
   if (header.length > MAX_CHECKPOINT_HEADER_BYTES)
     throw new Error("Auth checkpoint header is too large");
   const decoded = decodeCheckpoint(JSON.parse(decodeBase64Url(header)) as unknown);
-  if (decoded.token.length === 0 || decoded.token.length > 12_000) {
-    throw new Error("Auth checkpoint token has an invalid length");
-  }
   if (!SHA256_HEX.test(decoded.base_fingerprint)) {
     throw new Error("Auth checkpoint base fingerprint is invalid");
   }

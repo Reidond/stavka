@@ -40,6 +40,7 @@ const runDoctor = async (root: string, repository: FileDevVarsRepository) => {
     repository,
     root,
     () => Effect.void,
+    () => false,
     {},
   );
   return Effect.runPromise(doctor.run({ live: false, write: true }));

@@ -14,10 +14,11 @@ import {
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import {
-  AuthPayloadSchema,
+  AccountNameSchema,
   AliasPayloadSchema,
   KillSwitchPayloadSchema,
   MaskirovkaGatewayApi,
+  ProvisionProviderAccountPayloadSchema,
   ProviderSchema,
   TierSchema,
 } from "./http-contract";
@@ -25,15 +26,15 @@ import {
   gatewaySeats,
   hostedAccessConfig,
   type GatewayEnv,
-  type GatewayProvider,
   type GatewaySeat,
   type GatewayTier,
 } from "./config";
+import type { GatewayModelsResponse, GatewayStatus } from "./gateway-container";
 import type {
-  GatewayAdminAuthResult,
-  GatewayModelsResponse,
-  GatewayStatus,
-} from "./gateway-container";
+  ProviderAccountPublic,
+  ProviderId,
+  ProvisionProviderAccountPayload,
+} from "@stavka/provider-auth";
 
 export interface GatewayStub {
   readonly fetch: (request: Request) => Promise<Response>;
@@ -46,8 +47,21 @@ export interface GatewayStub {
     model: string,
   ) => Promise<GatewayStatus>;
   readonly setKillSwitch: (enabled: boolean) => Promise<GatewayStatus>;
-  readonly putAuth: (provider: GatewayProvider, token: string) => Promise<GatewayAdminAuthResult>;
-  readonly deleteAuth: (provider: GatewayProvider) => Promise<GatewayAdminAuthResult>;
+  readonly listProviderAccounts: () => Promise<readonly ProviderAccountPublic[]>;
+  readonly putProviderAccount: (
+    provider: ProviderId,
+    name: string,
+    payload: ProvisionProviderAccountPayload,
+  ) => Promise<ProviderAccountPublic>;
+  readonly activateProviderAccount: (
+    provider: ProviderId,
+    name: string,
+  ) => Promise<ProviderAccountPublic>;
+  readonly deleteProviderAccount: (provider: ProviderId, name: string) => Promise<void>;
+  readonly testProviderAccount: (
+    provider: ProviderId,
+    name: string,
+  ) => Promise<ProviderAccountPublic>;
 }
 
 export interface GatewayRouterDependencies {
@@ -185,6 +199,44 @@ const decodeJson = <A>(
 
 const gatewayFor = (runtime: GatewayRuntimeShape): GatewayStub =>
   runtime.resolveGateway(runtime.env);
+
+const decodeProviderAccountParams = (params: {
+  readonly provider: string;
+  readonly name: string;
+}): Effect.Effect<{ readonly provider: ProviderId; readonly name: string }, WorkerHttpError> =>
+  Effect.all({
+    provider: Schema.decodeUnknownEffect(ProviderSchema)(params.provider).pipe(
+      Effect.mapError(
+        () => new WorkerHttpError(404, "UNKNOWN_PROVIDER", "Provider must be claude or codex"),
+      ),
+    ),
+    name: Schema.decodeUnknownEffect(AccountNameSchema)(params.name).pipe(
+      Effect.mapError(
+        () => new WorkerHttpError(400, "INVALID_ACCOUNT_NAME", "Provider account name is invalid"),
+      ),
+    ),
+  });
+
+const validateProvision = (
+  provider: ProviderId,
+  payload: ProvisionProviderAccountPayload,
+): Effect.Effect<ProvisionProviderAccountPayload, WorkerHttpError> => {
+  const valid =
+    provider === "codex"
+      ? payload.authKind === "chatgpt-oauth" && payload.credential.kind === "codex-chatgpt-oauth"
+      : (payload.authKind === "claude-subscription" &&
+          payload.credential.kind === "claude-subscription") ||
+        (payload.authKind === "anthropic-api-key" && payload.credential.kind === "api-key");
+  return valid
+    ? Effect.succeed(payload)
+    : Effect.fail(
+        new WorkerHttpError(
+          400,
+          "CREDENTIAL_KIND_MISMATCH",
+          `Credential kind does not match the ${provider} account`,
+        ),
+      );
+};
 
 const proxy = (
   request: HttpServerRequest.HttpServerRequest,
@@ -368,53 +420,99 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         }),
       ),
     )
-    .handleRaw("putAuth", ({ request, params }) =>
+    .handleRaw("providerAccounts", ({ request }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          yield* requireAccess(webRequest, runtime.env, "read");
+          const accounts = yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).listProviderAccounts(),
+            catch: () =>
+              new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Provider accounts are unavailable"),
+          });
+          return json({ accounts });
+        }),
+      ),
+    )
+    .handleRaw("putProviderAccount", ({ request, params }) =>
       safe(
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
           yield* requireAccess(webRequest, runtime.env, "admin");
-          const provider = yield* Schema.decodeUnknownEffect(ProviderSchema)(params.provider).pipe(
-            Effect.mapError(
-              () =>
-                new WorkerHttpError(404, "UNKNOWN_PROVIDER", "Provider must be claude or codex"),
-            ),
-          );
-          const payload = yield* decodeJson(
+          const { provider, name } = yield* decodeProviderAccountParams(params);
+          const decoded = yield* decodeJson(
             webRequest,
-            Schema.decodeUnknownEffect(AuthPayloadSchema),
+            Schema.decodeUnknownEffect(ProvisionProviderAccountPayloadSchema),
           );
+          const payload = yield* validateProvision(provider, decoded);
           const result = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).putAuth(provider, payload.token),
+            try: () => gatewayFor(runtime).putProviderAccount(provider, name, payload),
             catch: (cause) =>
               new WorkerHttpError(
                 503,
                 "GATEWAY_UNAVAILABLE",
-                cause instanceof Error ? cause.message : "Gateway auth state is unavailable",
+                cause instanceof Error ? cause.message : "Provider account is unavailable",
               ),
           });
           return json(result);
         }),
       ),
     )
-    .handleRaw("deleteAuth", ({ request, params }) =>
+    .handleRaw("activateProviderAccount", ({ request, params }) =>
       safe(
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
           yield* requireAccess(webRequest, runtime.env, "admin");
-          const provider = yield* Schema.decodeUnknownEffect(ProviderSchema)(params.provider).pipe(
-            Effect.mapError(
-              () =>
-                new WorkerHttpError(404, "UNKNOWN_PROVIDER", "Provider must be claude or codex"),
-            ),
-          );
+          const { provider, name } = yield* decodeProviderAccountParams(params);
           const result = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).deleteAuth(provider),
-            catch: () =>
-              new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Gateway auth state is unavailable"),
+            try: () => gatewayFor(runtime).activateProviderAccount(provider, name),
+            catch: (cause) =>
+              new WorkerHttpError(
+                503,
+                "GATEWAY_UNAVAILABLE",
+                cause instanceof Error ? cause.message : "Provider account is unavailable",
+              ),
           });
           return json(result);
+        }),
+      ),
+    )
+    .handleRaw("testProviderAccount", ({ request, params }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          yield* requireAccess(webRequest, runtime.env, "admin");
+          const { provider, name } = yield* decodeProviderAccountParams(params);
+          const result = yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).testProviderAccount(provider, name),
+            catch: (cause) =>
+              new WorkerHttpError(
+                503,
+                "PROVIDER_ACCOUNT_TEST_FAILED",
+                cause instanceof Error ? cause.message : "Provider account test failed",
+              ),
+          });
+          return json({ ...result, test: "credential-decrypted" });
+        }),
+      ),
+    )
+    .handleRaw("deleteProviderAccount", ({ request, params }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          yield* requireAccess(webRequest, runtime.env, "admin");
+          const { provider, name } = yield* decodeProviderAccountParams(params);
+          yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).deleteProviderAccount(provider, name),
+            catch: () =>
+              new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Provider account is unavailable"),
+          });
+          return json({ provider, name, deleted: true });
         }),
       ),
     )

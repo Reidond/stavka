@@ -8,8 +8,6 @@ minimumReleaseAgeExclude:
   - "@cloudflare/kumo@2.9.2"
 
 allowBuilds:
-  # Transitive via @earendil-works/pi-ai; both build scripts are no-ops.
-  "@google/genai": false
   "@parcel/watcher": true
   core-js-pure: true
   esbuild: true

@@ -6,12 +6,11 @@ MASKIROVKA_SEAT_KEY=sk-stavka-replace-me
 DEV_ACCESS_EMAIL=developer@localhost
 ACCESS_TEAM_DOMAIN=
 ACCESS_AUD=
+ACCESS_OWNER_SUBJECTS=
+ACCESS_OPERATOR_SUBJECTS=
 
-# Set exactly the subscription credential matching SEAT_PROVIDER.
-# Never set ANTHROPIC_API_KEY, OPENAI_API_KEY, or CODEX_API_KEY here: those
-# switch the CLIs away from subscription authentication.
-CLAUDE_CODE_OAUTH_TOKEN=
-CODEX_ACCESS_TOKEN=
+# Generate with: openssl rand -base64 32
+STAVKA_PROVIDER_VAULT_KEY=
 
 ENVIRONMENT=local
 SEAT_ID=local-codex-seat

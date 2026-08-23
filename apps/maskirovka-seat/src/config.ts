@@ -7,11 +7,12 @@ export type SeatProvider = "claude" | "codex";
 /** Direct Worker secrets are not represented by wrangler's generated bindings. */
 interface SeatSecretBindings {
   readonly MASKIROVKA_SEAT_KEY?: string;
-  readonly CLAUDE_CODE_OAUTH_TOKEN?: string;
-  readonly CODEX_ACCESS_TOKEN?: string;
+  readonly STAVKA_PROVIDER_VAULT_KEY?: string;
   readonly DEV_ACCESS_EMAIL?: string;
   readonly ACCESS_TEAM_DOMAIN?: string;
   readonly ACCESS_AUD?: string;
+  readonly ACCESS_OWNER_SUBJECTS?: string;
+  readonly ACCESS_OPERATOR_SUBJECTS?: string;
   readonly ASSETS?: Fetcher;
 }
 
@@ -75,16 +76,27 @@ export const readSeatConfig = (env: SeatEnv): SeatConfig => ({
   sleepAfter: env.CONTAINER_SLEEP_AFTER,
 });
 
-export const credentialForProvider = (env: SeatEnv, provider: SeatProvider): string | undefined =>
-  provider === "claude" ? env.CLAUDE_CODE_OAUTH_TOKEN : env.CODEX_ACCESS_TOKEN;
+const accessSubjects = (value: string | undefined): readonly string[] | undefined => {
+  const subjects = value
+    ?.split(",")
+    .map((subject) => subject.trim())
+    .filter(Boolean);
+  return subjects?.length ? subjects : undefined;
+};
 
-export const hostedAccessConfig = (env: SeatEnv): AccessConfig => ({
-  environment:
-    env.ENVIRONMENT === "local" || env.ENVIRONMENT === "preview" ? env.ENVIRONMENT : "production",
-  teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
-  audience: env.ACCESS_AUD ?? "",
-  automationPermissions: ["read"],
-  ...(env.ENVIRONMENT === "local" && env.DEV_ACCESS_EMAIL
-    ? { devEmail: env.DEV_ACCESS_EMAIL }
-    : {}),
-});
+export const hostedAccessConfig = (env: SeatEnv): AccessConfig => {
+  const ownerSubjects = accessSubjects(env.ACCESS_OWNER_SUBJECTS);
+  const operatorSubjects = accessSubjects(env.ACCESS_OPERATOR_SUBJECTS);
+  return {
+    environment:
+      env.ENVIRONMENT === "local" || env.ENVIRONMENT === "preview" ? env.ENVIRONMENT : "production",
+    teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
+    audience: env.ACCESS_AUD ?? "",
+    automationPermissions: ["read"],
+    ...(ownerSubjects ? { ownerSubjects } : {}),
+    ...(operatorSubjects ? { operatorSubjects } : {}),
+    ...(env.ENVIRONMENT === "local" && env.DEV_ACCESS_EMAIL
+      ? { devEmail: env.DEV_ACCESS_EMAIL }
+      : {}),
+  };
+};

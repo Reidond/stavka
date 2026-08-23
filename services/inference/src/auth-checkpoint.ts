@@ -1,16 +1,18 @@
 import { Effect, Schema } from "effect";
 
 import { encodeBase64Url } from "./base64";
+import { ProviderCredentialSchema } from "@stavka/provider-auth";
 import { gatewayProviders, type GatewayProvider } from "./config";
 
-const Fingerprint = Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-f0-9]{64}$/u)));
 const AuthProviderCheckpoint = Schema.Struct({
-  token: Schema.String,
-  fingerprint: Fingerprint,
+  name: Schema.String,
+  auth_kind: Schema.String,
+  credential: ProviderCredentialSchema,
+  revision: Schema.Number,
 });
 
 const AuthCheckpointSchema = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   providers: Schema.Struct({
     claude: Schema.optional(AuthProviderCheckpoint),
     codex: Schema.optional(AuthProviderCheckpoint),
@@ -31,14 +33,10 @@ export const authTokenFingerprint = (token: string): Effect.Effect<string, Error
     catch: (cause) => (cause instanceof Error ? cause : new Error("Unable to fingerprint auth")),
   });
 
-export const encodeAuthCheckpoint = (
-  providers: Partial<
-    Record<GatewayProvider, { readonly token: string; readonly fingerprint: string }>
-  >,
-): string =>
+export const encodeAuthCheckpoint = (providers: GatewayAuthCheckpoint["providers"]): string =>
   encodeBase64Url(
     JSON.stringify({
-      version: 1,
+      version: 2,
       providers,
       observed_at: Date.now(),
     } satisfies GatewayAuthCheckpoint),

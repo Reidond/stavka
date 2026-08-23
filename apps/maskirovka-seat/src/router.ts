@@ -1,4 +1,5 @@
 import { can, verifyAccessRequest, type AccessIdentity } from "@stavka/access-auth";
+import type { ProviderId, ProvisionProviderAccountPayload } from "@stavka/provider-auth";
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import {
   HttpRouter,
@@ -183,6 +184,33 @@ const resolveModel = (
           "MODEL_NOT_FOUND",
           `Model alias ${requested} is not served by this ${provider} seat`,
           "model",
+        ),
+      );
+};
+
+const validateProviderAccount = (
+  configuredProvider: SeatProvider,
+  provider: ProviderId,
+  payload: ProvisionProviderAccountPayload,
+): Effect.Effect<void, BadRequestError> => {
+  const credentialMatches =
+    provider === "codex"
+      ? payload.authKind === "chatgpt-oauth" && payload.credential.kind === "codex-chatgpt-oauth"
+      : (payload.authKind === "claude-subscription" &&
+          payload.credential.kind === "claude-subscription") ||
+        (payload.authKind === "anthropic-api-key" && payload.credential.kind === "api-key");
+  if (provider !== configuredProvider) {
+    return Effect.fail(
+      badRequest("PROVIDER_MISMATCH", `This leaf serves ${configuredProvider} only`, "provider"),
+    );
+  }
+  return credentialMatches
+    ? Effect.void
+    : Effect.fail(
+        badRequest(
+          "CREDENTIAL_KIND_MISMATCH",
+          `Credential kind does not match the ${provider} account`,
+          "credential",
         ),
       );
 };
@@ -474,6 +502,62 @@ const HostedAdminGroupLive = HttpApiBuilder.group(HostedSeatApi, "admin", (handl
           runtime.resolveSeat(runtime.env).setKillSwitch(payload.enabled),
         );
         return adminStatus(status, identity);
+      }),
+    )
+    .handle("providerAccounts", () =>
+      Effect.gen(function* () {
+        const runtime = yield* HostedSeatRuntime;
+        yield* requireHuman("read");
+        return {
+          accounts: yield* seatOperation("provider account list", () =>
+            runtime.resolveSeat(runtime.env).listProviderAccounts(),
+          ),
+        };
+      }),
+    )
+    .handle("putProviderAccount", ({ params, payload }) =>
+      Effect.gen(function* () {
+        const runtime = yield* HostedSeatRuntime;
+        yield* requireHuman("admin");
+        const config = readSeatConfig(runtime.env);
+        yield* validateProviderAccount(config.provider, params.provider, payload);
+        return yield* seatOperation("provider account write", () =>
+          runtime
+            .resolveSeat(runtime.env)
+            .putProviderAccount(params.provider, params.name, payload),
+        );
+      }),
+    )
+    .handle("testProviderAccount", ({ params }) =>
+      Effect.gen(function* () {
+        const runtime = yield* HostedSeatRuntime;
+        yield* requireHuman("admin");
+        const config = readSeatConfig(runtime.env);
+        if (params.provider !== config.provider) {
+          return yield* Effect.fail(
+            badRequest("PROVIDER_MISMATCH", `This leaf serves ${config.provider} only`, "provider"),
+          );
+        }
+        const account = yield* seatOperation("provider account test", () =>
+          runtime.resolveSeat(runtime.env).testProviderAccount(params.provider, params.name),
+        );
+        return { ...account, test: "credential-decrypted" };
+      }),
+    )
+    .handle("deleteProviderAccount", ({ params }) =>
+      Effect.gen(function* () {
+        const runtime = yield* HostedSeatRuntime;
+        yield* requireHuman("admin");
+        const config = readSeatConfig(runtime.env);
+        if (params.provider !== config.provider) {
+          return yield* Effect.fail(
+            badRequest("PROVIDER_MISMATCH", `This leaf serves ${config.provider} only`, "provider"),
+          );
+        }
+        yield* seatOperation("provider account delete", () =>
+          runtime.resolveSeat(runtime.env).deleteProviderAccount(params.provider, params.name),
+        );
+        return { deleted: true };
       }),
     ),
 );

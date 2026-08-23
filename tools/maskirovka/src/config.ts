@@ -168,7 +168,7 @@ export const readConfig = (
       },
       {
         id: "codex",
-        name: "Codex SDK",
+        name: "Stavka Codex",
         mode: "local",
         models: modelsBySeat("codex"),
         monthlyBudgetUsd: Math.max(0, envNumber(env.MASKIROVKA_CODEX_BUDGET_USD, 0)),

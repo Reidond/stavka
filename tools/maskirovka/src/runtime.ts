@@ -1,16 +1,15 @@
 import { join } from "node:path";
+import { ClaudeAgentProvider, ClaudeApiProvider } from "@stavka/model-provider-claude";
+import { CodexProvider } from "@stavka/model-provider-codex";
 import { Effect, Layer } from "effect";
 
 import type { MaskirovkaConfig } from "./config";
+import { GatewayError } from "./domain/types";
 import { FileCacheRepository, type CacheRepositoryService } from "./repositories/cache-repository";
 import {
   FileGatewayConfigRepository,
   type GatewayConfigRepositoryService,
 } from "./repositories/config-repository";
-import {
-  ProcessCliProbeRepository,
-  type CliProbeRepositoryService,
-} from "./repositories/cli-probe-repository";
 import {
   FileRequestLogRepository,
   type RequestLogRepositoryService,
@@ -25,6 +24,7 @@ import { ClaudeSeat } from "./seats/claude-seat";
 import { CodexSeat } from "./seats/codex-seat";
 import { MockSeat } from "./seats/mock-seat";
 import type { SeatAdapter } from "./seats/seat-adapter";
+import { loadProviderCredential } from "./provider-account";
 import { Gateway, GatewayService } from "./services/gateway-service";
 import { SeatRegistry } from "./services/seat-registry";
 import { WindowTracker } from "./services/window-tracker";
@@ -35,28 +35,22 @@ export interface RuntimeOverrides {
   readonly gatewayConfig?: GatewayConfigRepositoryService;
   readonly windowTracker?: WindowTrackerRepositoryService;
   readonly adapters?: readonly SeatAdapter[];
-  readonly probes?: CliProbeRepositoryService;
 }
 
-const withCheckedSeatHealth = (
+const withProviderHealth = (
   config: MaskirovkaConfig,
-  probes: CliProbeRepositoryService,
-): Effect.Effect<MaskirovkaConfig, import("./domain/types").GatewayError> =>
-  Effect.gen(function* () {
-    const [claude, codex] = yield* Effect.all(
-      [probes.run("claude", ["auth", "status"]), probes.run("codex", ["login", "status"])],
-      { concurrency: "unbounded" },
-    );
-    return {
-      ...config,
-      seats: config.seats.map((seat) =>
-        seat.id === "claude"
-          ? { ...seat, status: claude.ok ? ("healthy" as const) : ("unavailable" as const) }
-          : seat.id === "codex"
-            ? { ...seat, status: codex.ok ? ("healthy" as const) : ("unavailable" as const) }
-            : seat,
-      ),
-    };
+  claudeAvailable: boolean,
+  codexAvailable: boolean,
+): Effect.Effect<MaskirovkaConfig> =>
+  Effect.succeed({
+    ...config,
+    seats: config.seats.map((seat) =>
+      seat.id === "claude"
+        ? { ...seat, status: claudeAvailable ? ("healthy" as const) : ("unavailable" as const) }
+        : seat.id === "codex"
+          ? { ...seat, status: codexAvailable ? ("healthy" as const) : ("unavailable" as const) }
+          : seat,
+    ),
   });
 
 export const createGatewayService = (
@@ -64,15 +58,19 @@ export const createGatewayService = (
   overrides: RuntimeOverrides = {},
 ): Effect.Effect<GatewayService, import("./domain/types").GatewayError> =>
   Effect.gen(function* () {
-    const checkedConfig = yield* withCheckedSeatHealth(
-      config,
-      overrides.probes ?? new ProcessCliProbeRepository(),
+    const [claudeCredential, codexCredential] = yield* Effect.all(
+      [loadProviderCredential("claude"), loadProviderCredential("codex")],
+      { concurrency: "unbounded" },
+    ).pipe(
+      Effect.mapError((error) => new GatewayError(500, "PROVIDER_ACCOUNT_INVALID", error.message)),
     );
-    const codexWorkspace = join(config.stateDirectory, "codex-workspace");
+    const claudeAvailable =
+      claudeCredential?.kind === "claude-subscription" || claudeCredential?.kind === "api-key";
+    const codexAvailable = codexCredential?.kind === "codex-chatgpt-oauth";
+    const checkedConfig = yield* withProviderHealth(config, claudeAvailable, codexAvailable);
     yield* new FileRuntimeDirectoryRepository().ensure([
       config.cacheDirectory,
       config.stateDirectory,
-      codexWorkspace,
     ]);
     const repository =
       overrides.gatewayConfig ??
@@ -91,8 +89,14 @@ export const createGatewayService = (
         new FileRequestLogRepository(join(config.stateDirectory, "requests.ndjson")),
       overrides.adapters ?? [
         new MockSeat(),
-        new ClaudeSeat(),
-        new CodexSeat(codexWorkspace),
+        ...(claudeCredential?.kind === "claude-subscription"
+          ? [new ClaudeSeat(new ClaudeAgentProvider({ credential: claudeCredential }))]
+          : claudeCredential?.kind === "api-key"
+            ? [new ClaudeSeat(new ClaudeApiProvider({ credential: claudeCredential }))]
+            : []),
+        ...(codexCredential?.kind === "codex-chatgpt-oauth"
+          ? [new CodexSeat(new CodexProvider({ credential: codexCredential }))]
+          : []),
         new ApiSeat(config.openAiApiKey, config.anthropicApiKey),
       ],
       new WindowTracker(

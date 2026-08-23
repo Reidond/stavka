@@ -2,6 +2,7 @@
 .omc/
 node_modules/
 dist/
+/out/
 coverage/
 /out/
 .vite/

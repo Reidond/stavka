@@ -13,6 +13,8 @@ export interface Env {
   readonly COMMANDER_API_KEY?: string;
   /** Private service binding to Commander; replaces the public URL in production. */
   readonly COMMANDER_SERVICE?: Fetcher;
+  /** Private service binding for the owner-only provider-account control plane. */
+  readonly INFERENCE_SERVICE?: { readonly fetch: Fetcher["fetch"] };
 }
 
 export const accessConfig = (env: Env): AccessConfig => ({

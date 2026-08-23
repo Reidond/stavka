@@ -112,7 +112,7 @@ export const decodeOpenAIResponsesRequest = (
       if (request.max_output_tokens !== undefined) {
         return Effect.fail(
           invalidDialect(
-            "The Codex Agent SDK does not expose max_output_tokens",
+            "The ChatGPT Codex subscription transport does not accept max_output_tokens",
             "max_output_tokens",
           ),
         );

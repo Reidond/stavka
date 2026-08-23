@@ -112,9 +112,9 @@ so:
    endpoints. It speaks both dialects (`/v1/messages` and
    `/v1/chat/completions` · `/v1/responses`), so the commander's `@effect/ai`
    layers point at it with nothing but a base-URL override.
-2. **Two live seats, both official**: `claude` via the Claude Agent SDK on the
-   plan's monthly Agent SDK credit; `codex` via the Codex SDK on ChatGPT
-   sign-in (which serves exactly our alt tiers, `gpt-5.6-terra` / `-luna`).
+2. **Two live subscription seats**: `claude` via the Claude Agent SDK on the
+   plan's monthly Agent SDK credit; `codex` via Stavka's direct Responses/SSE
+   transport and ChatGPT OAuth (serving `gpt-5.6-terra` / `-luna`).
    Plus an `api` passthrough seat and a `mock` seat.
 3. **Record / replay cache** — content-addressed responses make Poligon's
    seeded eval scenarios free and deterministic; CI runs in `replay` mode and
@@ -180,11 +180,11 @@ real machine — so the Hetzner box runs exactly one thing: the game plus its
 mod. Nothing else lives on a box.
 
 1. **Maskirovka's hosted posture becomes a Cloudflare Container per seat.** The
-   image bundles the gateway plus the Claude Code and Codex CLIs; the
+   image bundles the gateway plus the Claude Agent runtime and Stavka Codex transport; the
    `Container` class extends `DurableObject`, so each seat's own DO handles
-   routing and lifecycle. Credentials arrive as Worker secrets at start (a
-   `claude setup-token` OAuth token; a Codex access token), and rotated auth
-   state persists in the DO's SQLite — restarts re-inject fresh tokens.
+   routing and lifecycle. Named accounts arrive through an Access-admin API,
+   stay AES-GCM encrypted in DO SQLite, and refreshed auth state is checkpointed
+   there — restarts re-inject current credentials.
    `sleepAfter` gives scale-to-zero between play sessions.
 2. **The Hetzner co-location posture is retired.** The outbound home-seat
    dial-in survives only as a privacy alternative for anyone who'd rather keep
@@ -1565,8 +1565,8 @@ Commander (wrangler dev)                    MASKIROVKA (localhost:4141)
 
 | Seat | Mechanism | Billing | Notes |
 |---|---|---|---|
-| `claude` | **Claude Agent SDK** `query()` — tools disallowed, `maxTurns: 1`, system prompt passthrough; auth from `claude` login / `CLAUDE_CODE_OAUTH_TOKEN` | The plan's **monthly Agent SDK credit** ($20 Pro · $100 Max 5x · $200 Max 20x, at API rates, no rollover) | Officially supported subscription path since 2026-06-15; serves the plan's Claude models |
-| `codex` | **Codex SDK** thread run — headless JSON event stream; auth from `codex login` (ChatGPT sign-in state) | ChatGPT plan's included Codex usage (5-hour windows) | Serves **`gpt-5.6-terra` / `gpt-5.6-luna`** — exactly the alt tiers this spec names |
+| `claude` | **Claude Agent SDK** `query()` — tools disallowed, `maxTurns: 1`, system prompt passthrough; named subscription account from `claude setup-token` | The plan's **monthly Agent SDK credit** ($20 Pro · $100 Max 5x · $200 Max 20x, at API rates, no rollover) | Subscription auth is accepted only through the Agent SDK runtime; API keys remain a distinct metered credential type |
+| `codex` | **Stavka Codex** — direct ChatGPT Responses/SSE, cancellation, structured output, usage and diagnostics; named ChatGPT OAuth account | ChatGPT plan's included Codex usage (5-hour windows) | No Pi, Fold, Codex SDK, or Codex CLI runtime dependency |
 | `api` | Plain passthrough with real keys | Metered | Parity / A-B checks and pre-prod smoke |
 | `mock` | Deterministic scripted commander (rule-based, seed-aware) | $0 | Poligon CI default; no network |
 
@@ -1585,12 +1585,12 @@ fallback.
 Registered seats are a first-class deployment option, not a dev trick:
 
 - **Posture A — Cloudflare Container (default).** `maskirovka deploy-seat`
-  ships the gateway image — Node plus the Claude Code and Codex CLIs — as a
+  ships the gateway image — Node plus the Claude Agent runtime and Stavka Codex — as a
   per-seat Container. `Container` extends `DurableObject`, so the seat's own DO
-  handles routing and lifecycle; credentials are injected as Worker secrets at
-  start (a `claude setup-token` OAuth token, a Codex access token), and rotated
-  auth state is persisted in the DO's SQLite so restarts re-inject fresh
-  tokens. `sleepAfter` gives scale-to-zero between play sessions. The game box
+  handles routing and lifecycle; the CLI pushes named accounts through
+  Cloudflare Access and credentials stay encrypted in DO SQLite. Refreshed auth
+  is checkpointed so restarts re-inject current credentials. `sleepAfter` gives
+  scale-to-zero between play sessions. The game box
   runs the game — nothing else.
 - **Posture B — contributor seat (outbound-only).** `maskirovka serve --register
   wss://<commander>/seats --token <reg-token>` — the seat dials the commander
@@ -1655,8 +1655,8 @@ remaining plan headroom and the console shows a running
 
 ### Doctor & Guardrails
 
-`maskirovka doctor` checks, in order: CLIs installed → login state
-(`codex login status`, Claude auth probe) → **the silent-override trap** (a set
+`maskirovka doctor` checks, in order: Claude Agent runtime → named provider
+accounts → **the silent-override trap** (a set
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` beats OAuth and quietly moves billing to
 the metered account — doctor warns loudly) → 1-token seat pings → writes
 `.dev.vars` for `wrangler dev` (`STAVKA_AI_BASE_URL`, tier aliases). Guardrails:
@@ -1859,7 +1859,7 @@ primitive. Every human surface keeps its Cloudflare Access gate.
 
 ### Phase 2 — LLM Integration
 - [ ] `@effect/ai` provider layers (`-anthropic`, `-openai`) behind one language-model service
-- [ ] **Maskirovka** live seats: `claude` (Agent SDK · subscription credit) + `codex` (Codex SDK · ChatGPT sign-in) + `api` passthrough — doctor, burst governor, savings meter, `AGENTS.md`/`CLAUDE.md` contract; **production seat registry** (push/pull registration, budget-aware API fallback); Container-hosted seat image (`maskirovka deploy-seat`)
+- [ ] **Maskirovka** live seats: `claude` (Agent SDK · subscription credit) + `codex` (Stavka direct Responses · ChatGPT OAuth) + `api` passthrough — named accounts, doctor, burst governor, savings meter, `AGENTS.md`/`CLAUDE.md` contract; **production seat registry** (push/pull registration, budget-aware API fallback); Container-hosted seat image (`maskirovka deploy-seat`)
 - [ ] Commander prompt engineering (system prompt, state context formatting, response schema)
 - [ ] LLM decision parsing and validation (Effect Schema)
 - [ ] Tick-based decision loop (hybrid: scheduled + event-driven)

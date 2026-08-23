@@ -20,9 +20,10 @@ afterEach(async () => {
 });
 
 const credentials = {
-  access: "local-access-token",
-  refresh: "local-refresh-token",
-  expires: 123_456,
+  kind: "codex-chatgpt-oauth",
+  accessToken: "local-access-token",
+  refreshToken: "local-refresh-token",
+  expiresAt: 123_456,
   accountId: "account-local",
 } as const;
 
@@ -35,13 +36,13 @@ describe("operator-local Codex credentials", () => {
     await Effect.runPromise(writeCodexCredentials(dataDir, credentials));
 
     expect(await permissionBits(dataDir)).toBe(0o700);
-    expect(await permissionBits(join(dataDir, "codex-credentials.json"))).toBe(0o600);
+    expect(await permissionBits(join(dataDir, "profiles.json"))).toBe(0o600);
     await expect(Effect.runPromise(readCodexCredentials(dataDir))).resolves.toEqual(credentials);
   });
 
   it("repairs permissive permissions before refreshing credential contents", async () => {
     const dataDir = await newDataDir();
-    const path = join(dataDir, "codex-credentials.json");
+    const path = join(dataDir, "profiles.json");
     await Effect.runPromise(writeCodexCredentials(dataDir, credentials));
     await chmod(dataDir, 0o755);
     await chmod(path, 0o644);
@@ -49,7 +50,7 @@ describe("operator-local Codex credentials", () => {
     await Effect.runPromise(
       writeCodexCredentials(dataDir, {
         ...credentials,
-        access: "refreshed-local-access-token",
+        accessToken: "refreshed-local-access-token",
       }),
     );
 

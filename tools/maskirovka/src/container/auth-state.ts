@@ -1,14 +1,17 @@
+import { ProviderCredentialSchema } from "@stavka/provider-auth";
 import { Effect, Schema } from "effect";
 
 import { decodeBase64Url } from "./base64";
 
 const ProviderState = Schema.Struct({
-  token: Schema.String,
-  fingerprint: Schema.optional(Schema.String),
+  name: Schema.String,
+  auth_kind: Schema.String,
+  credential: ProviderCredentialSchema,
+  revision: Schema.Number,
 });
 
 const GatewayAuthCheckpointSchema = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   providers: Schema.Struct({
     claude: Schema.optional(ProviderState),
     codex: Schema.optional(ProviderState),
@@ -18,10 +21,10 @@ const GatewayAuthCheckpointSchema = Schema.Struct({
 
 export type GatewayAuthCheckpoint = Schema.Schema.Type<typeof GatewayAuthCheckpointSchema>;
 
-const providerTokenName = (
+const providerAccountName = (
   provider: "claude" | "codex",
-): "CLAUDE_CODE_OAUTH_TOKEN" | "CODEX_ACCESS_TOKEN" =>
-  provider === "claude" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CODEX_ACCESS_TOKEN";
+): "STAVKA_CLAUDE_ACCOUNT_B64" | "STAVKA_CODEX_ACCOUNT_B64" =>
+  provider === "claude" ? "STAVKA_CLAUDE_ACCOUNT_B64" : "STAVKA_CODEX_ACCOUNT_B64";
 
 const removeMeteredCredentials = (): void => {
   delete process.env.ANTHROPIC_API_KEY;
@@ -38,12 +41,6 @@ const checkpointFromEnvironment = (): Effect.Effect<GatewayAuthCheckpoint | unde
         const decoded = Schema.decodeUnknownSync(GatewayAuthCheckpointSchema)(
           JSON.parse(decodeBase64Url(encoded)) as unknown,
         );
-        for (const provider of ["claude", "codex"] as const) {
-          const state = decoded.providers[provider];
-          if (state && (state.token.length === 0 || state.token.length > 12_000)) {
-            throw new Error(`${provider} auth token has an invalid length`);
-          }
-        }
         return decoded;
       },
       catch: (cause) =>
@@ -55,7 +52,7 @@ const checkpointFromEnvironment = (): Effect.Effect<GatewayAuthCheckpoint | unde
     });
   });
 
-/** Restore both subscription credentials before any provider SDK is imported. */
+/** Restore both named accounts before any provider implementation is imported. */
 export const restoreGatewaySubscriptionAuth = (): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     yield* Effect.sync(removeMeteredCredentials);
@@ -63,6 +60,11 @@ export const restoreGatewaySubscriptionAuth = (): Effect.Effect<void, Error> =>
     if (!checkpoint) return;
     for (const provider of ["claude", "codex"] as const) {
       const state = checkpoint.providers[provider];
-      if (state) process.env[providerTokenName(provider)] = state.token;
+      if (state) {
+        process.env[providerAccountName(provider)] = Buffer.from(
+          JSON.stringify(state),
+          "utf8",
+        ).toString("base64url");
+      }
     }
   });

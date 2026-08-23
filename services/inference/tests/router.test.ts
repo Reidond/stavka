@@ -49,6 +49,7 @@ const status = () => ({
     },
     codex: { provider: "codex" as const, configured: false, persisted: false, revision: 0 },
   },
+  providerAccounts: [],
   config: { revision: 1, updated_at: 1 },
   window: {
     durable: true as const,
@@ -74,18 +75,37 @@ const fakeStub = (): GatewayStub => ({
   listRecentRequests: vi.fn(async () => []),
   remapAlias: vi.fn(async () => status()),
   setKillSwitch: vi.fn(async () => status()),
-  putAuth: vi.fn(async (provider: GatewayProvider) => ({
+  listProviderAccounts: vi.fn(async () => []),
+  putProviderAccount: vi.fn(async (provider: GatewayProvider, name: string, payload) => ({
     provider,
-    configured: true,
-    persisted: true,
+    name,
+    label: payload.label,
+    authKind: payload.authKind,
+    active: payload.activate ?? false,
     revision: 3,
-    updated_at: 9,
+    createdAt: 8,
+    updatedAt: 9,
   })),
-  deleteAuth: vi.fn(async (provider: GatewayProvider) => ({
+  activateProviderAccount: vi.fn(async (provider: GatewayProvider, name: string) => ({
     provider,
-    configured: false,
-    persisted: false,
-    revision: 0,
+    name,
+    label: name,
+    authKind: provider === "codex" ? ("chatgpt-oauth" as const) : ("claude-subscription" as const),
+    active: true,
+    revision: 3,
+    createdAt: 8,
+    updatedAt: 9,
+  })),
+  deleteProviderAccount: vi.fn(async () => undefined),
+  testProviderAccount: vi.fn(async (provider: GatewayProvider, name: string) => ({
+    provider,
+    name,
+    label: name,
+    authKind: provider === "codex" ? ("chatgpt-oauth" as const) : ("claude-subscription" as const),
+    active: false,
+    revision: 3,
+    createdAt: 8,
+    updatedAt: 9,
   })),
   fetch: vi.fn(async () => Response.json({ proxied: true })),
 });
@@ -143,7 +163,7 @@ describe("hosted gateway Worker router", () => {
     expect(stub.fetch).not.toHaveBeenCalled();
   });
 
-  it("never echoes subscription tokens from put or delete auth admin routes", async () => {
+  it("never echoes credentials from named-account put or delete routes", async () => {
     const stub = fakeStub();
     const env = {
       ...environment(),
@@ -153,23 +173,37 @@ describe("hosted gateway Worker router", () => {
     const secret = "subscription-token-must-not-leak";
 
     const put = await request(
-      "/admin/auth/claude",
+      "/admin/provider-accounts/claude/personal",
       {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: secret }),
+        body: JSON.stringify({
+          label: "Personal",
+          authKind: "claude-subscription",
+          credential: { kind: "claude-subscription", oauthToken: secret },
+          activate: true,
+        }),
       },
       env,
       stub,
     );
-    const del = await request("/admin/auth/codex", { method: "DELETE" }, env, stub);
+    const del = await request(
+      "/admin/provider-accounts/codex/personal",
+      { method: "DELETE" },
+      env,
+      stub,
+    );
     const admin = await request("/admin/status", undefined, env, stub);
 
     expect(put.status).toBe(200);
     expect(del.status).toBe(200);
     expect(admin.status).toBe(200);
-    expect(stub.putAuth).toHaveBeenCalledWith("claude", secret);
-    expect(stub.deleteAuth).toHaveBeenCalledWith("codex");
+    expect(stub.putProviderAccount).toHaveBeenCalledWith(
+      "claude",
+      "personal",
+      expect.objectContaining({ credential: { kind: "claude-subscription", oauthToken: secret } }),
+    );
+    expect(stub.deleteProviderAccount).toHaveBeenCalledWith("codex", "personal");
 
     const putBody = await put.text();
     const delBody = await del.text();
@@ -179,8 +213,7 @@ describe("hosted gateway Worker router", () => {
     expect(adminBody).not.toContain(secret);
     expect(JSON.parse(putBody)).toMatchObject({
       provider: "claude",
-      configured: true,
-      persisted: true,
+      name: "personal",
       revision: 3,
     });
     expect(JSON.parse(putBody)).not.toHaveProperty("token");
@@ -190,18 +223,22 @@ describe("hosted gateway Worker router", () => {
   it("requires Access admin for credential mutation and rejects service-token writes", async () => {
     const stub = fakeStub();
     const unauthenticated = await request(
-      "/admin/auth/claude",
+      "/admin/provider-accounts/claude/personal",
       {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: "x".repeat(32) }),
+        body: JSON.stringify({
+          label: "Personal",
+          authKind: "claude-subscription",
+          credential: { kind: "claude-subscription", oauthToken: "x".repeat(32) },
+        }),
       },
       environment(),
       stub,
     );
 
     expect(unauthenticated.status).toBe(401);
-    expect(stub.putAuth).not.toHaveBeenCalled();
+    expect(stub.putProviderAccount).not.toHaveBeenCalled();
   });
 
   it("forwards machine traffic with generated correlation ids and stripped credentials", async () => {

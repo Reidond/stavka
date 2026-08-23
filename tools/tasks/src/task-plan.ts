@@ -5,6 +5,7 @@ export interface TaskCommand {
 }
 
 const gatewayFilter = "@stavka/inference";
+const seatFilter = "@stavka/maskirovka-seat";
 const commanderFilter = "@stavka/commander";
 const appFilter = "@stavka/stavka";
 
@@ -34,11 +35,17 @@ export const maskirovkaGatewayBuildTask: ReadonlyArray<TaskCommand> = [
 
 export const productionDeployTask: ReadonlyArray<TaskCommand> = [
   filterScript(gatewayFilter, "build:dashboard"),
+  filterScript(seatFilter, "build:dashboard"),
   filterScript(appFilter, "build"),
   {
     label: "Deploy inference (private)",
     executable: "pnpm",
     arguments: ["--filter", gatewayFilter, "exec", "wrangler", "deploy"],
+  },
+  {
+    label: "Deploy hosted seat (private)",
+    executable: "pnpm",
+    arguments: ["--filter", seatFilter, "exec", "wrangler", "deploy"],
   },
   {
     label: "Deploy Commander (private)",

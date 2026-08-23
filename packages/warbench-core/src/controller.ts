@@ -104,8 +104,8 @@ export interface JsonCompletionResult {
 
 /**
  * The narrow provider seam: anything that can return strict JSON text for a
- * prompt together with the resolved model id and latency. Providers such as
- * Pi/Codex implement this; warbench-core owns validation of their output.
+ * prompt together with the resolved model id and latency. Provider adapters
+ * implement this; warbench-core owns validation of their output.
  */
 export type JsonCompleter = (
   request: JsonCompletionRequest,

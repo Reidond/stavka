@@ -86,6 +86,16 @@ const agentNotFound = HttpServerResponse.schemaJson(AgentNotFoundResponse)(
   { status: 404 },
 );
 
+const inferenceUnavailable = HttpServerResponse.jsonUnsafe(
+  {
+    error: {
+      code: "INFERENCE_UNAVAILABLE",
+      message: "Provider account service is unavailable",
+    },
+  },
+  { status: 503, headers: { "cache-control": "no-store" } },
+);
+
 const withAccess = <E, R>(
   request: HttpServerRequest.HttpServerRequest,
   handle: (
@@ -121,13 +131,59 @@ const AgentsRoute = HttpRouter.route("*", "/agents/*", (request) =>
   ),
 );
 
+const inferenceAdmin = (request: HttpServerRequest.HttpServerRequest) =>
+  withAccess(request, (webRequest, env) => {
+    const service = env.INFERENCE_SERVICE;
+    if (!service) return Effect.succeed(inferenceUnavailable);
+    return Effect.tryPromise({
+      try: () => service.fetch(webRequest),
+      catch: () => undefined,
+    }).pipe(
+      Effect.match({
+        onFailure: () => inferenceUnavailable,
+        onSuccess: HttpServerResponse.fromWeb,
+      }),
+    );
+  });
+
+const ProviderAccountsRootRoute = HttpRouter.route(
+  "GET",
+  "/admin/provider-accounts",
+  inferenceAdmin,
+);
+
+const PutProviderAccountRoute = HttpRouter.route(
+  "PUT",
+  "/admin/provider-accounts/*",
+  inferenceAdmin,
+);
+
+const PostProviderAccountRoute = HttpRouter.route(
+  "POST",
+  "/admin/provider-accounts/*",
+  inferenceAdmin,
+);
+
+const DeleteProviderAccountRoute = HttpRouter.route(
+  "DELETE",
+  "/admin/provider-accounts/*",
+  inferenceAdmin,
+);
+
 const TanStackRoute = HttpRouter.route("*", "/*", (request) =>
   withAccess(request, () =>
     HttpEffect.fromWebHandler((webRequest) => Promise.resolve(handler.fetch(webRequest))),
   ),
 );
 
-const RawRoutesLive = HttpRouter.addAll([AgentsRoute, TanStackRoute]);
+const RawRoutesLive = HttpRouter.addAll([
+  AgentsRoute,
+  ProviderAccountsRootRoute,
+  PutProviderAccountRoute,
+  PostProviderAccountRoute,
+  DeleteProviderAccountRoute,
+  TanStackRoute,
+]);
 
 const PoligonLive = Layer.mergeAll(HttpApiLive, RawRoutesLive).pipe(
   Layer.provide(HttpServer.layerServices),

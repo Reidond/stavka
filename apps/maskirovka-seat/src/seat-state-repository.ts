@@ -1,14 +1,30 @@
 import { Effect, Schema } from "effect";
+import type {
+  ProviderAccountPublic,
+  ProviderId,
+  ProvisionProviderAccountPayload,
+} from "@stavka/provider-auth";
 
 import type { SeatProvider } from "./config";
 import type { HostedSeatRequestLog } from "./hosted-seat-runtime";
 
 interface AuthRow extends Record<string, SqlStorageValue> {
   readonly provider: string;
-  readonly token: string;
+  readonly ciphertext: string;
+  readonly iv: string;
   readonly bootstrap_fingerprint: string;
   readonly revision: number;
   readonly updated_at: number;
+}
+
+interface AccountMetadataRow extends Record<string, SqlStorageValue> {
+  readonly provider: string;
+  readonly name: string;
+  readonly label: string;
+  readonly auth_kind: string;
+  readonly remote_account_id: string | null;
+  readonly remote_workspace_id: string | null;
+  readonly created_at: number;
 }
 
 interface LifecycleRow extends Record<string, SqlStorageValue> {
@@ -97,17 +113,60 @@ const repositoryEffect = <A>(operation: string, evaluate: () => A) =>
     catch: (cause) => new SeatStateRepositoryError({ operation, cause }),
   });
 
+const fromBase64 = (value: string): ArrayBuffer => {
+  const bytes = Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+  return bytes.buffer as ArrayBuffer;
+};
+
+const toBase64 = (value: ArrayBuffer): string => {
+  const bytes = new Uint8Array(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
+const vaultOperation = <A>(operation: string, evaluate: () => PromiseLike<A>) =>
+  Effect.tryPromise({
+    try: evaluate,
+    catch: (cause) => new SeatStateRepositoryError({ operation, cause }),
+  });
+
 /** The only hosted-seat module allowed to know the Durable Object SQL schema. */
 export class SeatStateRepository {
-  constructor(private readonly sql: SqlStorage) {}
+  constructor(
+    private readonly sql: SqlStorage,
+    private readonly vaultKey: string | undefined,
+  ) {}
+
+  private key(): Effect.Effect<CryptoKey, SeatStateRepositoryError> {
+    return vaultOperation("auth.key", async () => {
+      if (!this.vaultKey) throw new Error("STAVKA_PROVIDER_VAULT_KEY is not configured");
+      const raw = fromBase64(this.vaultKey.replace(/-/gu, "+").replace(/_/gu, "/").padEnd(44, "="));
+      if (raw.byteLength !== 32) throw new Error("STAVKA_PROVIDER_VAULT_KEY must encode 32 bytes");
+      return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, [
+        "encrypt",
+        "decrypt",
+      ]);
+    });
+  }
 
   readonly initialize = repositoryEffect("initialize", () => {
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS seat_auth_state (
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS seat_provider_account (
       provider TEXT PRIMARY KEY,
-      token TEXT NOT NULL,
+      ciphertext TEXT NOT NULL,
+      iv TEXT NOT NULL,
       bootstrap_fingerprint TEXT NOT NULL,
       revision INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    )`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS seat_provider_account_metadata (
+      provider TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      label TEXT NOT NULL,
+      auth_kind TEXT NOT NULL,
+      remote_account_id TEXT,
+      remote_workspace_id TEXT,
+      created_at INTEGER NOT NULL
     )`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS seat_lifecycle (
       singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -144,18 +203,35 @@ export class SeatStateRepository {
   readAuth(
     provider: SeatProvider,
   ): Effect.Effect<PersistedAuthState | undefined, SeatStateRepositoryError> {
-    return repositoryEffect("readAuth", () => {
-      const row = this.sql
-        .exec<AuthRow>(
-          `SELECT provider, token, bootstrap_fingerprint, revision, updated_at
-         FROM seat_auth_state WHERE provider = ? LIMIT 1`,
-          provider,
-        )
-        .toArray()[0];
+    return Effect.gen({ self: this }, function* () {
+      const row = yield* repositoryEffect(
+        "readAuth",
+        () =>
+          this.sql
+            .exec<AuthRow>(
+              `SELECT provider, ciphertext, iv, bootstrap_fingerprint, revision, updated_at
+         FROM seat_provider_account WHERE provider = ? LIMIT 1`,
+              provider,
+            )
+            .toArray()[0],
+      );
       if (!row) return undefined;
+      const key = yield* this.key();
+      const token = yield* vaultOperation("auth.decrypt", async () => {
+        const plaintext = await crypto.subtle.decrypt(
+          {
+            name: "AES-GCM",
+            iv: fromBase64(row.iv),
+            additionalData: new TextEncoder().encode(`stavka-hosted-seat:v1:${provider}`),
+          },
+          key,
+          fromBase64(row.ciphertext),
+        );
+        return new TextDecoder().decode(plaintext);
+      });
       return {
         provider: row.provider as SeatProvider,
-        token: row.token,
+        token,
         bootstrapFingerprint: row.bootstrap_fingerprint,
         revision: row.revision,
         updatedAt: row.updated_at,
@@ -170,17 +246,33 @@ export class SeatStateRepository {
     updatedAt: number,
   ): Effect.Effect<PersistedAuthState, SeatStateRepositoryError> {
     return Effect.gen({ self: this }, function* () {
+      const key = yield* this.key();
+      const encrypted = yield* vaultOperation("auth.encrypt", async () => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ciphertext = await crypto.subtle.encrypt(
+          {
+            name: "AES-GCM",
+            iv: iv.buffer as ArrayBuffer,
+            additionalData: new TextEncoder().encode(`stavka-hosted-seat:v1:${provider}`),
+          },
+          key,
+          new TextEncoder().encode(token),
+        );
+        return { ciphertext: toBase64(ciphertext), iv: toBase64(iv.buffer as ArrayBuffer) };
+      });
       yield* repositoryEffect("replaceAuth", () => {
         this.sql.exec(
-          `INSERT INTO seat_auth_state (provider, token, bootstrap_fingerprint, revision, updated_at)
-           VALUES (?, ?, ?, 1, ?)
+          `INSERT INTO seat_provider_account (provider, ciphertext, iv, bootstrap_fingerprint, revision, updated_at)
+           VALUES (?, ?, ?, ?, 1, ?)
            ON CONFLICT(provider) DO UPDATE SET
-             token = excluded.token,
+             ciphertext = excluded.ciphertext,
+             iv = excluded.iv,
              bootstrap_fingerprint = excluded.bootstrap_fingerprint,
-             revision = seat_auth_state.revision + 1,
+             revision = seat_provider_account.revision + 1,
              updated_at = excluded.updated_at`,
           provider,
-          token,
+          encrypted.ciphertext,
+          encrypted.iv,
           bootstrapFingerprint,
           updatedAt,
         );
@@ -215,6 +307,111 @@ export class SeatStateRepository {
       }
       if (existing.token === token) return existing;
       return yield* this.replaceAuth(provider, token, existing.bootstrapFingerprint, updatedAt);
+    });
+  }
+
+  putProviderAccount(
+    provider: ProviderId,
+    name: string,
+    payload: ProvisionProviderAccountPayload,
+    encodedCredential: string,
+    credentialFingerprint: string,
+    updatedAt: number,
+  ): Effect.Effect<ProviderAccountPublic, SeatStateRepositoryError> {
+    return Effect.gen({ self: this }, function* () {
+      const existing = yield* repositoryEffect(
+        "providerAccount.metadata.read",
+        () =>
+          this.sql
+            .exec<AccountMetadataRow>(
+              `SELECT provider, name, label, auth_kind, remote_account_id,
+                    remote_workspace_id, created_at
+             FROM seat_provider_account_metadata WHERE provider = ? LIMIT 1`,
+              provider,
+            )
+            .toArray()[0],
+      );
+      const auth = yield* this.replaceAuth(
+        provider as SeatProvider,
+        encodedCredential,
+        credentialFingerprint,
+        updatedAt,
+      );
+      const createdAt = existing?.created_at ?? updatedAt;
+      yield* repositoryEffect("providerAccount.metadata.write", () => {
+        this.sql.exec(
+          `INSERT INTO seat_provider_account_metadata (
+             provider, name, label, auth_kind, remote_account_id,
+             remote_workspace_id, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(provider) DO UPDATE SET
+             name = excluded.name,
+             label = excluded.label,
+             auth_kind = excluded.auth_kind,
+             remote_account_id = excluded.remote_account_id,
+             remote_workspace_id = excluded.remote_workspace_id`,
+          provider,
+          name,
+          payload.label,
+          payload.authKind,
+          payload.remoteAccountId ?? null,
+          payload.remoteWorkspaceId ?? null,
+          createdAt,
+        );
+        // The former plaintext bootstrap table is no longer part of the runtime contract.
+        this.sql.exec(`DROP TABLE IF EXISTS seat_auth_state`);
+      });
+      return {
+        provider,
+        name,
+        label: payload.label,
+        authKind: payload.authKind,
+        ...(payload.remoteAccountId ? { remoteAccountId: payload.remoteAccountId } : {}),
+        ...(payload.remoteWorkspaceId ? { remoteWorkspaceId: payload.remoteWorkspaceId } : {}),
+        active: true,
+        revision: auth.revision,
+        createdAt,
+        updatedAt: auth.updatedAt,
+      };
+    });
+  }
+
+  listProviderAccounts(): Effect.Effect<
+    readonly ProviderAccountPublic[],
+    SeatStateRepositoryError
+  > {
+    return Effect.gen({ self: this }, function* () {
+      const rows = yield* repositoryEffect("providerAccount.list", () =>
+        this.sql
+          .exec<AccountMetadataRow & Pick<AuthRow, "revision" | "updated_at">>(
+            `SELECT metadata.provider, metadata.name, metadata.label, metadata.auth_kind,
+                    metadata.remote_account_id, metadata.remote_workspace_id,
+                    metadata.created_at, account.revision, account.updated_at
+             FROM seat_provider_account_metadata metadata
+             INNER JOIN seat_provider_account account ON account.provider = metadata.provider
+             ORDER BY metadata.provider, metadata.name`,
+          )
+          .toArray(),
+      );
+      return rows.map((row) => ({
+        provider: row.provider as ProviderId,
+        name: row.name,
+        label: row.label,
+        authKind: row.auth_kind as ProviderAccountPublic["authKind"],
+        ...(row.remote_account_id ? { remoteAccountId: row.remote_account_id } : {}),
+        ...(row.remote_workspace_id ? { remoteWorkspaceId: row.remote_workspace_id } : {}),
+        active: true,
+        revision: row.revision,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    });
+  }
+
+  deleteProviderAccount(provider: ProviderId): Effect.Effect<void, SeatStateRepositoryError> {
+    return repositoryEffect("providerAccount.delete", () => {
+      this.sql.exec(`DELETE FROM seat_provider_account_metadata WHERE provider = ?`, provider);
+      this.sql.exec(`DELETE FROM seat_provider_account WHERE provider = ?`, provider);
     });
   }
 

@@ -250,8 +250,8 @@ function Dashboard() {
                       type: "select",
                       options: [
                         { value: "mock", label: "Mock" },
-                        { value: "claude", label: "Claude SDK" },
-                        { value: "codex", label: "Codex SDK" },
+                        { value: "claude", label: "Claude Agent SDK" },
+                        { value: "codex", label: "Stavka Codex" },
                         { value: "api", label: "Metered API" },
                       ],
                     },

@@ -35,7 +35,7 @@ const manifestFor = (id: string) =>
     mode: "smoke",
     protocolVersion: "2",
     gitSha: "testsha",
-    piVersion: "0.84.2",
+    providerVersion: "stavka-codex/1",
     modelId: "gpt-5.1-codex-mini",
     promptHash: "hash",
   });

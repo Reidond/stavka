@@ -1,5 +1,9 @@
 import { Schema } from "effect";
 import {
+  ProviderAccountNameSchema,
+  ProvisionProviderAccountPayloadSchema,
+} from "@stavka/provider-auth";
+import {
   HttpApi,
   HttpApiEndpoint,
   HttpApiGroup,
@@ -366,6 +370,26 @@ const HostedAdminGroup = HttpApiGroup.make("admin")
     HttpApiEndpoint.post("killSwitch", "/admin/kill-switch", {
       payload: HostedKillSwitchRequestSchema,
       success: HostedSeatAdminStatusSchema,
+      error: HumanErrors,
+    }),
+    HttpApiEndpoint.get("providerAccounts", "/admin/provider-accounts", {
+      success: Schema.Unknown,
+      error: HumanErrors,
+    }),
+    HttpApiEndpoint.put("putProviderAccount", "/admin/provider-accounts/:provider/:name", {
+      params: { provider: ProviderSchema, name: ProviderAccountNameSchema },
+      payload: ProvisionProviderAccountPayloadSchema,
+      success: Schema.Unknown,
+      error: HumanErrors,
+    }),
+    HttpApiEndpoint.post("testProviderAccount", "/admin/provider-accounts/:provider/:name/test", {
+      params: { provider: ProviderSchema, name: ProviderAccountNameSchema },
+      success: Schema.Unknown,
+      error: HumanErrors,
+    }),
+    HttpApiEndpoint.delete("deleteProviderAccount", "/admin/provider-accounts/:provider/:name", {
+      params: { provider: ProviderSchema, name: ProviderAccountNameSchema },
+      success: Schema.Unknown,
       error: HumanErrors,
     }),
   )

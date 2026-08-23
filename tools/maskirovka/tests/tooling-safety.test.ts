@@ -23,13 +23,13 @@ describe("Maskirovka workflow safety", () => {
     }
   });
 
-  it("keeps verification and deployment in separate gated workflows", async () => {
+  it("keeps verification and deployment in one gated workflow", async () => {
     const workflowDirectory = resolve(repositoryRoot, ".github/workflows");
     expect(
       readdirSync(workflowDirectory)
         .filter((name) => name.endsWith(".yml"))
         .sort(),
-    ).toEqual(["ci.yml", "deploy.yml"]);
+    ).toEqual(["ci.yml"]);
 
     const workflow = await readFile(resolve(workflowDirectory, "ci.yml"), "utf8");
     expect(workflow).toContain("pull_request:");
@@ -56,20 +56,16 @@ describe("Maskirovka workflow safety", () => {
     ]) {
       expect(workflow).toContain(gate);
     }
-    // Verification never deploys or touches Cloudflare credentials.
-    expect(workflow).not.toContain("deploy:production");
-    expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN");
-
-    const deploy = await readFile(resolve(workflowDirectory, "deploy.yml"), "utf8");
-    expect(deploy).toContain("workflow_dispatch:");
-    expect(deploy).not.toContain("push:");
-    expect(deploy).toContain("github.ref == 'refs/heads/main'");
-    expect(deploy).toContain("environment: production");
-    expect(deploy).toContain("group: cloudflare-production");
-    expect(deploy).toContain("cancel-in-progress: false");
-    expect(deploy).toContain("CLOUDFLARE_API_TOKEN");
-    expect(deploy).toContain("CLOUDFLARE_ACCOUNT_ID");
-    expect(deploy).toContain("pnpm run deploy:production");
+    expect(workflow).toContain("needs: verify");
+    expect(workflow).toContain("github.ref == 'refs/heads/main'");
+    expect(workflow).toContain("github.event_name == 'push'");
+    expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
+    expect(workflow).toContain("environment: production");
+    expect(workflow).toContain("group: cloudflare-production");
+    expect(workflow).toContain("cancel-in-progress: false");
+    expect(workflow).toContain("CLOUDFLARE_API_TOKEN");
+    expect(workflow).toContain("CLOUDFLARE_ACCOUNT_ID");
+    expect(workflow).toContain("pnpm run deploy:production");
   });
 
   it("keeps both Container builds pinned and frozen", async () => {
@@ -101,7 +97,8 @@ describe("Maskirovka workflow safety", () => {
       "utf8",
     );
     expect(gatewayDockerfile).toContain("@anthropic-ai/claude-code@2.1.226");
-    expect(gatewayDockerfile).toContain("@openai/codex@0.146.0");
+    expect(gatewayDockerfile).not.toContain("@openai/codex@");
+    expect(gatewayDockerfile).toContain("packages/model-provider-codex/src");
   });
 
   it("bundles first-party gateway code and smoke-tests the pruned runtime tree", async () => {
@@ -148,11 +145,11 @@ describe("Maskirovka workflow safety", () => {
     expect(packageJson.dependencies).toMatchObject({
       "@effect/platform-node": "4.0.0-beta.102",
       "@anthropic-ai/claude-agent-sdk": "0.3.220",
-      "@openai/codex-sdk": "0.146.0",
       effect: "4.0.0-beta.102",
       jose: "6.2.7",
       ws: "8.21.1",
     });
+    expect(packageJson.dependencies).not.toHaveProperty("@openai/codex-sdk");
     expect(packageJson.dependencies.jose).toBe("6.2.7");
     expect(workspace.match(/^\s+-\s+.+$/gmu)).toEqual(['  - "."']);
     expect(lockfile).not.toMatch(/(?:link:packages\/|file:tools\/maskirovka)/u);

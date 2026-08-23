@@ -1,9 +1,14 @@
 import { Container, type StopParams } from "@cloudflare/containers";
+import {
+  refreshCodexCredential,
+  type ProviderAccountPublic,
+  type ProviderId,
+  type ProvisionProviderAccountPayload,
+} from "@stavka/provider-auth";
 import { Effect, Semaphore } from "effect";
 
-import { authTokenFingerprint, type GatewayAuthCheckpoint } from "./auth-checkpoint";
+import type { GatewayAuthCheckpoint } from "./auth-checkpoint";
 import {
-  bootstrapCredential,
   gatewayProviders,
   type GatewayAlias,
   type GatewayEnv,
@@ -13,11 +18,6 @@ import {
   gatewayTiers,
   readGatewayConfig,
 } from "./config";
-import {
-  DurableAuthStateRepository,
-  type GatewayAuthMetadata,
-  type PersistedGatewayAuth,
-} from "./auth-state-repository";
 import {
   DurableGatewayConfigRepository,
   type GatewayConfigRepositoryService,
@@ -32,6 +32,10 @@ import {
   initialGatewayWindowSnapshot,
 } from "./window-tracker-repository";
 import { encodeBase64Url } from "./base64";
+import {
+  DurableProviderAccountRepository,
+  type PersistedProviderAccount,
+} from "./provider-account-repository";
 
 export interface GatewayModelsResponse {
   readonly object: "list";
@@ -52,6 +56,7 @@ export interface GatewayStatus {
   readonly aliases: readonly GatewayAlias[];
   readonly container: { readonly status: string; readonly last_change: number };
   readonly auth: Readonly<Record<GatewayProvider, GatewayAuthMetadata>>;
+  readonly providerAccounts: readonly ProviderAccountPublic[];
   readonly config: { readonly revision: number; readonly updated_at: number };
   readonly window: {
     readonly durable: true;
@@ -66,17 +71,19 @@ export interface GatewayStatus {
   };
 }
 
-export interface GatewayAdminAuthResult extends GatewayAuthMetadata {
+export interface GatewayAuthMetadata {
+  readonly provider: GatewayProvider;
+  readonly configured: boolean;
   readonly persisted: boolean;
+  readonly activeAccount?: string;
+  readonly revision: number;
+  readonly updated_at?: number;
 }
 
 const isRunning = (status: string): boolean => status === "running" || status === "healthy";
 
 const errorResponse = (code: string, message: string, status = 503): Response =>
   Response.json({ error: { code, message } }, { status, headers: { "cache-control": "no-store" } });
-
-const providerTokenFor = (auth: readonly PersistedGatewayAuth[], provider: GatewayProvider) =>
-  auth.find((entry) => entry.provider === provider);
 
 export class MaskirovkaGateway extends Container<GatewayEnv> {
   override defaultPort = 4141;
@@ -86,7 +93,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   override pingEndpoint = "/healthz";
   override envVars = { NODE_ENV: "production", PORT: "4141" };
 
-  private readonly auth: DurableAuthStateRepository;
+  private readonly providerAccounts: DurableProviderAccountRepository;
   private readonly config: GatewayConfigRepositoryService;
   private readonly requests: DurableRequestMetadataRepository;
   private readonly window: DurableWindowTrackerRepository;
@@ -94,13 +101,16 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
   constructor(ctx: DurableObjectState<{}>, env: GatewayEnv) {
     super(ctx, env);
-    this.auth = new DurableAuthStateRepository(ctx.storage.sql);
+    this.providerAccounts = new DurableProviderAccountRepository(
+      ctx.storage.sql,
+      env.STAVKA_PROVIDER_VAULT_KEY,
+    );
     this.config = new DurableGatewayConfigRepository(ctx.storage.sql);
     this.requests = new DurableRequestMetadataRepository(ctx.storage.sql);
     this.window = new DurableWindowTrackerRepository(ctx.storage.sql);
     Effect.runSync(
       Effect.all([
-        this.auth.initialize,
+        this.providerAccounts.initialize,
         this.config.initialize,
         this.requests.initialize,
         this.window.initialize,
@@ -170,29 +180,57 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     );
   }
 
-  async putAuth(provider: GatewayProvider, token: string): Promise<GatewayAdminAuthResult> {
+  async listProviderAccounts(): Promise<readonly ProviderAccountPublic[]> {
+    return Effect.runPromise(this.providerAccounts.list);
+  }
+
+  async putProviderAccount(
+    provider: ProviderId,
+    name: string,
+    payload: ProvisionProviderAccountPayload,
+  ): Promise<ProviderAccountPublic> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        const normalized = token.trim();
-        if (normalized.length === 0 || normalized.length > 12_000) {
-          return yield* Effect.fail(new Error("Auth token must be between 1 and 12000 characters"));
-        }
-        const fingerprint = yield* authTokenFingerprint(normalized);
-        const persisted = yield* this.auth.replace(provider, normalized, fingerprint, Date.now());
+        const persisted = yield* this.providerAccounts.put(provider, name, payload);
         yield* this.restartForConfiguration();
-        return metadataFromAuth(persisted);
+        return persisted;
       }),
     );
   }
 
-  async deleteAuth(provider: GatewayProvider): Promise<GatewayAdminAuthResult> {
+  async activateProviderAccount(
+    provider: ProviderId,
+    name: string,
+  ): Promise<ProviderAccountPublic> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        yield* this.auth.clear(provider);
+        const persisted = yield* this.providerAccounts.activate(provider, name);
         yield* this.restartForConfiguration();
-        const persisted = yield* this.auth.read(provider);
-        return persisted ? metadataFromAuth(persisted) : emptyMetadata(provider);
+        return persisted;
       }),
+    );
+  }
+
+  async deleteProviderAccount(provider: ProviderId, name: string): Promise<void> {
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        yield* this.providerAccounts.delete(provider, name);
+        yield* this.restartForConfiguration();
+      }),
+    );
+  }
+
+  async testProviderAccount(provider: ProviderId, name: string): Promise<ProviderAccountPublic> {
+    return Effect.runPromise(
+      this.providerAccounts
+        .read(provider, name)
+        .pipe(
+          Effect.flatMap((account) =>
+            account
+              ? Effect.succeed(publicAccount(account))
+              : Effect.fail(new Error(`Unknown provider account ${provider}/${name}`)),
+          ),
+        ),
     );
   }
 
@@ -259,27 +297,43 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     });
   }
 
-  private syncBootstrapAuth(): Effect.Effect<readonly PersistedGatewayAuth[], unknown> {
+  private activeProviderAccounts(): Effect.Effect<readonly PersistedProviderAccount[], unknown> {
     return Effect.gen({ self: this }, function* () {
+      const accounts: PersistedProviderAccount[] = [];
       for (const provider of gatewayProviders) {
-        const bootstrap = bootstrapCredential(this.env, provider);
-        if (!bootstrap) continue;
-        const fingerprint = yield* authTokenFingerprint(bootstrap);
-        const existing = yield* this.auth.read(provider);
-        if (!existing || existing.fingerprint !== fingerprint) {
-          yield* this.auth.replace(provider, bootstrap, fingerprint, Date.now());
+        let account = yield* this.providerAccounts.active(provider);
+        if (!account) continue;
+        if (
+          provider === "codex" &&
+          account.credential.kind === "codex-chatgpt-oauth" &&
+          account.credential.expiresAt <= Date.now() + 300_000
+        ) {
+          const refreshed = yield* refreshCodexCredential(account.credential).pipe(
+            Effect.mapError((error) => new Error(error.message)),
+          );
+          yield* this.providerAccounts.put(provider, account.name, {
+            label: account.label,
+            authKind: account.authKind,
+            credential: refreshed,
+            ...(account.remoteAccountId ? { remoteAccountId: account.remoteAccountId } : {}),
+            ...(account.remoteWorkspaceId ? { remoteWorkspaceId: account.remoteWorkspaceId } : {}),
+            activate: true,
+          });
+          account = yield* this.providerAccounts.active(provider);
         }
+        if (account) accounts.push(account);
       }
-      return yield* this.auth.list;
+      return accounts;
     });
   }
 
   private statusEffect(): Effect.Effect<GatewayStatus, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const [config, auth, runtime, snapshot, count, state] = yield* Effect.all(
+      const [config, accounts, activeAccounts, runtime, snapshot, count, state] = yield* Effect.all(
         [
           this.readConfig(),
-          this.syncBootstrapAuth(),
+          this.providerAccounts.list,
+          this.activeProviderAccounts(),
           this.config.runtime,
           this.window.read,
           this.requests.count,
@@ -292,8 +346,8 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
       );
       const authMetadata = Object.fromEntries(
         gatewayProviders.map((provider) => {
-          const persisted = providerTokenFor(auth, provider);
-          return [provider, persisted ? metadataFromAuth(persisted) : emptyMetadata(provider)];
+          const persisted = activeAccounts.find((entry) => entry.provider === provider);
+          return [provider, persisted ? metadataFromAccount(persisted) : emptyMetadata(provider)];
         }),
       ) as Record<GatewayProvider, GatewayAuthMetadata>;
       const configured = gatewayProviders.some((provider) => authMetadata[provider].configured);
@@ -309,6 +363,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
           last_change: state.lastChange || runtime.lastChange,
         },
         auth: authMetadata,
+        providerAccounts: accounts,
         config: { revision: config.revision, updated_at: config.updatedAt },
         window: {
           durable: true as const,
@@ -325,10 +380,12 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     return Effect.gen({ self: this }, function* () {
       const config = yield* this.readConfig().pipe(Effect.catch(() => Effect.succeed(undefined)));
       if (config?.killed) return errorResponse("GATEWAY_KILLED", "Gateway traffic is disabled");
-      const auth = yield* this.syncBootstrapAuth().pipe(Effect.catch(() => Effect.succeed([])));
-      if (auth.length === 0)
+      const accounts = yield* this.activeProviderAccounts().pipe(
+        Effect.catch(() => Effect.succeed([])),
+      );
+      if (accounts.length === 0)
         return errorResponse("GATEWAY_AUTH_MISSING", "No subscription credential is configured");
-      yield* this.ensureContainerReady(auth);
+      yield* this.ensureContainerReady(accounts);
       const headers = new Headers(request.headers);
       // Routing metadata is decided by the inference service, never by the
       // caller: strip every inbound x-maskirovka-* header before forwarding.
@@ -433,11 +490,11 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   }
 
   private ensureContainerReady(
-    auth: readonly PersistedGatewayAuth[],
+    accounts: readonly PersistedProviderAccount[],
   ): Effect.Effect<void, unknown> {
     return this.startLock.withPermit(
       Effect.gen({ self: this }, function* () {
-        const fingerprint = yield* this.combinedFingerprint(auth);
+        const fingerprint = yield* this.combinedFingerprint(accounts);
         const [state, runtime] = yield* Effect.all(
           [
             Effect.tryPromise({ try: () => this.getState(), catch: (cause) => cause }),
@@ -448,13 +505,13 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         if (isRunning(state.status) && runtime.fingerprint === fingerprint) return;
         if (isRunning(state.status))
           yield* Effect.tryPromise({ try: () => this.stop("SIGTERM"), catch: (cause) => cause });
-        yield* this.startContainer(auth, fingerprint);
+        yield* this.startContainer(accounts, fingerprint);
       }),
     );
   }
 
   private startContainer(
-    auth: readonly PersistedGatewayAuth[],
+    accounts: readonly PersistedProviderAccount[],
     fingerprint: string,
   ): Effect.Effect<void, unknown> {
     return Effect.gen({ self: this }, function* () {
@@ -462,11 +519,16 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
       const env = this.env;
       const byTier = new Map(config.aliases.map((alias) => [alias.tier, alias]));
       const checkpoint: GatewayAuthCheckpoint = {
-        version: 1,
+        version: 2,
         providers: Object.fromEntries(
-          auth.map((entry) => [
+          accounts.map((entry) => [
             entry.provider,
-            { token: entry.token, fingerprint: entry.fingerprint },
+            {
+              name: entry.name,
+              auth_kind: entry.authKind,
+              credential: entry.credential,
+              revision: entry.revision,
+            },
           ]),
         ) as GatewayAuthCheckpoint["providers"],
         observed_at: Date.now(),
@@ -529,19 +591,21 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     );
   }
 
-  private combinedFingerprintSync(auth: readonly PersistedGatewayAuth[]): string {
-    return auth
-      .map((entry) => `${entry.provider}:${entry.fingerprint}`)
+  private combinedFingerprintSync(accounts: readonly PersistedProviderAccount[]): string {
+    return accounts
+      .map((entry) => `${entry.provider}:${entry.name}:${entry.revision}`)
       .sort()
       .join("|");
   }
 
-  private combinedFingerprint(auth: readonly PersistedGatewayAuth[]): Effect.Effect<string, Error> {
+  private combinedFingerprint(
+    accounts: readonly PersistedProviderAccount[],
+  ): Effect.Effect<string, Error> {
     return Effect.tryPromise({
       try: async () => {
         const digest = await crypto.subtle.digest(
           "SHA-256",
-          new TextEncoder().encode(this.combinedFingerprintSync(auth)),
+          new TextEncoder().encode(this.combinedFingerprintSync(accounts)),
         );
         return Array.from(new Uint8Array(digest), (byte) =>
           byte.toString(16).padStart(2, "0"),
@@ -594,17 +658,23 @@ export const limitStreamBytes = (
 const withDefined = <T, R>(value: T | undefined, project: (defined: T) => R): Partial<R> =>
   value === undefined ? {} : project(value);
 
-const metadataFromAuth = (persisted: PersistedGatewayAuth): GatewayAdminAuthResult => ({
+const metadataFromAccount = (persisted: PersistedProviderAccount): GatewayAuthMetadata => ({
   provider: persisted.provider,
   configured: true,
   persisted: true,
+  activeAccount: persisted.name,
   revision: persisted.revision,
   updated_at: persisted.updatedAt,
 });
 
-const emptyMetadata = (provider: GatewayProvider): GatewayAdminAuthResult => ({
+const emptyMetadata = (provider: GatewayProvider): GatewayAuthMetadata => ({
   provider,
   configured: false,
   persisted: false,
   revision: 0,
 });
+
+const publicAccount = (account: PersistedProviderAccount): ProviderAccountPublic => {
+  const { credential: _credential, ...metadata } = account;
+  return metadata;
+};

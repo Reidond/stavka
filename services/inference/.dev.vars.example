@@ -5,6 +5,7 @@ MASKIROVKA_GATEWAY_KEY=local-machine-key
 DEV_ACCESS_EMAIL=operator@example.test
 ACCESS_TEAM_DOMAIN=
 ACCESS_AUD=
-# Optional bootstrap credentials; normal administration uses /admin/auth/:provider.
-CLAUDE_CODE_OAUTH_TOKEN=
-CODEX_ACCESS_TOKEN=
+ACCESS_OWNER_SUBJECTS=
+ACCESS_OPERATOR_SUBJECTS=
+# Base64/base64url encoded 32-byte AES-GCM key for the local named-account vault.
+STAVKA_PROVIDER_VAULT_KEY=

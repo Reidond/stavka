@@ -93,23 +93,26 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 
 ## Repository map
 
-| Path                         | Responsibility                                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol`          | Strict Effect Schemas for protocol v1, full/delta state, config updates, map briefings, LLM frames, and replay exports |
-| `packages/access-auth`       | Constant-time machine bearer auth and Cloudflare Access verification                                                   |
-| `packages/doctrine`          | Typed Commander doctrine presets                                                                                       |
-| `packages/sim-core`          | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
-| `packages/sim-link`          | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
-| `packages/warbench-core`     | Provider-independent deterministic simulator, immutable studies, calibration, gates, and paired analysis               |
-| `packages/model-provider-pi` | Pinned Pi/Codex provider and device-authorization adapter                                                              |
-| `packages/warbench-report`   | Deterministic PDF evidence rendering from the canonical study object                                                   |
-| `tools/warbench`             | Operator-local immutable-study CLI and owner-only file store                                                           |
-| `tools/tasks`                | Effect-first repository task orchestration behind short package-script aliases                                         |
-| `services/commander`         | Private Effect HttpApi Worker, durable Commander/Sergeants, accounting, logs, and replay exports                       |
-| `services/inference`         | Private Maskirovka gateway Worker/Container and operations dashboard                                                   |
-| `apps/stavka`                | Unified Access-protected dashboard, simulation, replay, model, usage, and system routes                                |
-| `apps/maskirovka-seat`       | Optional hosted single-seat Worker/Container; not part of the production deploy plan                                   |
-| `mods/StavkaTest`            | Preserved historical Workbench research harness; not the production mod                                                |
+| Path                             | Responsibility                                                                                                         |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol`              | Strict Effect Schemas for protocol v1, full/delta state, config updates, map briefings, LLM frames, and replay exports |
+| `packages/access-auth`           | Constant-time machine bearer auth and Cloudflare Access verification                                                   |
+| `packages/doctrine`              | Typed Commander doctrine presets                                                                                       |
+| `packages/sim-core`              | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
+| `packages/sim-link`              | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
+| `packages/warbench-core`         | Provider-independent deterministic simulator, immutable studies, calibration, gates, and paired analysis               |
+| `packages/model-provider-codex`  | First-party Codex Responses/SSE provider adapter                                                                       |
+| `packages/model-provider-claude` | Claude Agent SDK subscription and API-key provider adapter                                                             |
+| `packages/provider-auth`         | Named Codex and Claude account credentials, OAuth refresh, and owner-only local storage                                |
+| `packages/warbench-report`       | Deterministic PDF evidence rendering from the canonical study object                                                   |
+| `tools/warbench`                 | Operator-local immutable-study CLI and owner-only file store                                                           |
+| `tools/stavka-cli`               | Cloudflare profile selection plus provider account provisioning and activation                                         |
+| `tools/tasks`                    | Effect-first repository task orchestration behind short package-script aliases                                         |
+| `services/commander`             | Private Effect HttpApi Worker, durable Commander/Sergeants, accounting, logs, and replay exports                       |
+| `services/inference`             | Private Maskirovka gateway Worker/Container and operations dashboard                                                   |
+| `apps/stavka`                    | Unified Access-protected dashboard, simulation, replay, model, usage, and system routes                                |
+| `apps/maskirovka-seat`           | Private hosted single-seat Worker/Container deployed as part of the production stack                                   |
+| `mods/StavkaTest`                | Preserved historical Workbench research harness; not the production mod                                                |
 
 ## Verification
 

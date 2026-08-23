@@ -29,8 +29,8 @@ duplicated auth, provider integrations, deployment pipelines, and dashboards.
 3. **Useful source moves into workspace packages**, per the migration map in the
    unification handoff: simulator/controllers/scoring into
    `@stavka/warbench-core`, PDF/JSON evidence into `@stavka/warbench-report`,
-   and Codex/Pi integration into `@stavka/model-provider` /
-   `@stavka/model-provider-pi`. Files are relocated with `git mv` so history
+   and provider-neutral contracts plus the first-party Codex transport into
+   `@stavka/model-provider` / `@stavka/model-provider-codex`. Files are relocated with `git mv` so history
    follows them; the temporary archive tree is deleted once all useful files
    have moved.
 4. **Independence is enforced by package boundaries, not repositories.**
@@ -40,16 +40,18 @@ duplicated auth, provider integrations, deployment pipelines, and dashboards.
    fails CI on violation.
 5. **Standalone credentials are not migrated.** The Warbench OAuth vault
    encryption key was exposed during development and must be treated as
-   compromised. As amended by ADR-003, the replacement Codex authorization is
-   operator-local only; the unified Cloudflare application stores no provider
-   credentials or replacement vault key.
+   compromised. As amended by ADR-003 and the named-account implementation,
+   replacement authorization lives in the owner-only local Stavka profile; an
+   operator may explicitly push that account into the encrypted gateway vault.
 
 ## Consequences
 
 - One lockfile, one toolchain, one CI pipeline, one Access login, one dashboard.
 - The standalone Worker, its custom domain (`warbench.sands.red`), Access
-  application, and deployment workflow are retired after cutover; the GitHub
-  repository is archived (not deleted) for audit purposes.
+  application, and deployment workflow are retired after cutover. The GitHub
+  repository is deleted only after its final commit is verified as an ancestor
+  of Stavka and durable `stavka-pre-unification` / `warbench-standalone-final`
+  tags are pushed to `Reidond/stavka`; audit history remains in this repository.
 - All existing standalone Warbench benchmark evidence is marked legacy and
   inconclusive. Final evidence comes exclusively from the immutable study store
   implemented for the unified feature.

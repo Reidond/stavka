@@ -1,4 +1,9 @@
 import { Context } from "effect";
+import type {
+  ProviderAccountPublic,
+  ProviderId,
+  ProvisionProviderAccountPayload,
+} from "@stavka/provider-auth";
 
 import type { SeatEnv, SeatProvider } from "./config";
 
@@ -58,6 +63,17 @@ export interface HostedSeatStub {
   readonly listRecentRequests: (limit: number) => Promise<readonly HostedSeatRequestLog[]>;
   readonly remapAlias: (alias: string, model: string) => Promise<HostedSeatOperationsStatus>;
   readonly setKillSwitch: (enabled: boolean) => Promise<HostedSeatOperationsStatus>;
+  readonly listProviderAccounts: () => Promise<readonly ProviderAccountPublic[]>;
+  readonly putProviderAccount: (
+    provider: ProviderId,
+    name: string,
+    payload: ProvisionProviderAccountPayload,
+  ) => Promise<ProviderAccountPublic>;
+  readonly testProviderAccount: (
+    provider: ProviderId,
+    name: string,
+  ) => Promise<ProviderAccountPublic>;
+  readonly deleteProviderAccount: (provider: ProviderId, name: string) => Promise<void>;
 }
 
 export interface HostedSeatRuntimeShape {

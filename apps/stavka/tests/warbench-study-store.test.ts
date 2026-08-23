@@ -37,7 +37,7 @@ const manifest: StudyManifest = {
   protocolVersion: "1",
   evidenceSchemaVersion: 2,
   gitSha: "2be74c7098f750a0b1b946b77c80c89e2891c0b6",
-  piVersion: "0.84.2",
+  providerVersion: "stavka-codex/1",
   modelId: "gpt-5.1-codex-mini",
   promptHash: "abc123",
   seeds: [1, 2],

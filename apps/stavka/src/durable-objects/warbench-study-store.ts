@@ -17,7 +17,7 @@ export interface StudyManifest {
   readonly protocolVersion: string;
   readonly evidenceSchemaVersion: number;
   readonly gitSha: string;
-  readonly piVersion: string;
+  readonly providerVersion: string;
   readonly modelId: string;
   readonly promptHash: string;
   readonly seeds: readonly number[];

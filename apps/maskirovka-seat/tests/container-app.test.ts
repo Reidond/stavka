@@ -80,9 +80,15 @@ describe("container Effect HttpApi gateway", () => {
           Effect.succeed(
             fingerprint === baseFingerprint
               ? {
-                  version: 1,
+                  version: 2,
                   provider: "codex",
-                  token: "rotated",
+                  credential: {
+                    kind: "codex-chatgpt-oauth",
+                    accessToken: "rotated",
+                    refreshToken: "refresh",
+                    expiresAt: 42,
+                    accountId: "account-1",
+                  },
                   base_fingerprint: baseFingerprint,
                   observed_at: 42,
                 }
@@ -109,9 +115,15 @@ describe("container Effect HttpApi gateway", () => {
     const checkpoint = response.headers.get(AUTH_CHECKPOINT_HEADER);
     expect(checkpoint).not.toBeNull();
     expect(decodeAuthCheckpoint(checkpoint ?? "")).toEqual({
-      version: 1,
+      version: 2,
       provider: "codex",
-      token: "rotated",
+      credential: {
+        kind: "codex-chatgpt-oauth",
+        accessToken: "rotated",
+        refreshToken: "refresh",
+        expiresAt: 42,
+        accountId: "account-1",
+      },
       base_fingerprint: baseFingerprint,
       observed_at: 42,
     });
