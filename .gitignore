@@ -3,6 +3,7 @@
 node_modules/
 dist/
 coverage/
+/out/
 .vite/
 .vite-plus/
 .wrangler/
@@ -10,6 +11,7 @@ coverage/
 .output/
 .tanstack/
 .maskirovka/
+.warbench/
 test-server/settings.json
 test-server/profile/
 test-server/arma-server/

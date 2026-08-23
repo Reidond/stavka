@@ -109,12 +109,12 @@ const blockedProbeProvider = (): CandidateProvider => ({
 });
 
 describe("immutable study orchestration", () => {
-  it("smoke studies execute one deterministic rule slot and mark the study running", async () => {
+  it("smoke studies execute one calibration seed in every family and mark running", async () => {
     const store = new MemoryStore();
     await Effect.runPromise(store.createStudy(manifestFor("smoke-1", "smoke")));
 
     const results = await Effect.runPromise(runRuleArm(store, "smoke-1"));
-    expect(results).toHaveLength(1);
+    expect(results).toHaveLength(scenarioFamilies.length);
     expect(results[0]).toMatchObject({
       studyId: "smoke-1",
       attempt: 1,
@@ -127,13 +127,11 @@ describe("immutable study orchestration", () => {
     expect((await Effect.runPromise(store.getStudy("smoke-1"))).startedAt).toBeDefined();
   });
 
-  it("rejects reruns because slots are immutable", async () => {
+  it("resumes arms by skipping already recorded immutable slots", async () => {
     const store = new MemoryStore();
     await Effect.runPromise(store.createStudy(manifestFor("smoke-1", "smoke")));
     await Effect.runPromise(runRuleArm(store, "smoke-1"));
-    await expect(Effect.runPromise(runRuleArm(store, "smoke-1"))).rejects.toMatchObject({
-      _tag: "StudyConflict",
-    });
+    await expect(Effect.runPromise(runRuleArm(store, "smoke-1"))).resolves.toEqual([]);
   });
 
   it("refuses candidate execution while the provider probe has no real response", async () => {
@@ -157,7 +155,20 @@ describe("immutable study orchestration", () => {
 
     await expect(
       Effect.runPromise(runCandidateArm(store, "study-v1", liveProbeProvider())),
-    ).rejects.toMatchObject({ _tag: "StudyConflict" });
+    ).resolves.toEqual([]);
+  });
+
+  it("aborts a resolved-model mismatch before writing any candidate slot", async () => {
+    const store = new MemoryStore();
+    await Effect.runPromise(store.createStudy(manifestFor("study-v1", "full")));
+    const mismatched: CandidateProvider = {
+      probe: () => Effect.succeed({ model: "different-model" }),
+      controllerFor: () => Effect.die("controller must not be constructed after mismatch"),
+    };
+    await expect(
+      Effect.runPromise(runCandidateArm(store, "study-v1", mismatched)),
+    ).rejects.toMatchObject({ _tag: "ProviderFailure" });
+    expect(await Effect.runPromise(store.listResults("study-v1"))).toEqual([]);
   });
 });
 
@@ -165,8 +176,9 @@ describe("evidence assembly honesty", () => {
   it("reports INCONCLUSIVE below the minimum sample even with strong scores", async () => {
     const store = new MemoryStore();
     await Effect.runPromise(store.createStudy(manifestFor("study-v1", "full")));
-    await Effect.runPromise(store.recordResult(ruleResult("study-v1", 1)));
-    await Effect.runPromise(store.recordResult(codexResult("study-v1", 1, "balanced", 500)));
+    const seed = fullStudySeeds[0] ?? 1;
+    await Effect.runPromise(store.recordResult(ruleResult("study-v1", seed)));
+    await Effect.runPromise(store.recordResult(codexResult("study-v1", seed, "balanced", 500)));
 
     const evidence = await Effect.runPromise(assembleEvidence(store, "study-v1"));
     expect(evidence.hypothesis.sampleReady).toBe(false);
@@ -186,6 +198,15 @@ describe("evidence assembly honesty", () => {
     const evidence = await Effect.runPromise(assembleEvidence(store, "study-v1"));
     expect(evidence.results).toHaveLength(scenarioFamilies.length * fullStudySeeds.length * 2);
     expect(evidence.hypothesis.status).toBe("PASS");
+    expect(evidence.paired).toMatchObject({
+      pairs: scenarioFamilies.length * fullStudySeeds.length,
+      meanScoreDelta: 100,
+      medianScoreDelta: 100,
+      improved: scenarioFamilies.length * fullStudySeeds.length,
+      tied: 0,
+      regressed: 0,
+      confidence95: { lower: 100, upper: 100 },
+    });
     expect(evidence.digest).toMatch(/^[0-9a-f]{64}$/u);
 
     const again = await Effect.runPromise(assembleEvidence(store, "study-v1"));
@@ -205,7 +226,7 @@ const ruleResult = (
   seed: number,
   family: StudyResult["family"] = "balanced",
 ): StudyResult => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   studyId,
   attempt: 1,
   recordedAt: "2026-08-21T00:00:00.000Z",
@@ -234,4 +255,5 @@ const codexResult = (
   opponentScore: -100,
   won: scoreValue > 100,
   decisionLatenciesMs: [10],
+  model: "gpt-5.1-codex-mini",
 });

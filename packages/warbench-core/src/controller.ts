@@ -47,6 +47,7 @@ Public simulator rules:
 - The battlefield is a 100 x 100 plane.
 - A move order advances a unit at most 7 distance units per simulation tick toward its target.
 - An attack succeeds only when the target is within distance 22. A successful attack removes the attacker's attack value from target HP.
+- Movement resolves first; all valid attacks then apply damage simultaneously from the same post-movement snapshot.
 - An objective is controlled by the side with more living units within distance 12 of its center; ties preserve the previous owner.
 - Each match lasts 40 simulation ticks.
 - Strategic orders are refreshed every 5 simulation ticks and persist between decisions.

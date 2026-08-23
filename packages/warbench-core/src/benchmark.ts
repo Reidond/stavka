@@ -8,10 +8,10 @@ export const scenarioFamilies = ["balanced", "north-pressure", "south-pressure"]
 export type ScenarioFamily = (typeof scenarioFamilies)[number];
 export const minimumRunsPerFamily = 10;
 export const defaultDecisionEveryTicks = 5;
-export const currentEvidenceSchemaVersion = 2 as const;
+export const currentEvidenceSchemaVersion = 3 as const;
 
 export interface SeedResult {
-  readonly schemaVersion?: typeof currentEvidenceSchemaVersion;
+  readonly schemaVersion?: typeof currentEvidenceSchemaVersion | undefined;
   readonly seed: number;
   readonly family: ScenarioFamily;
   readonly controller: "rule" | "codex";
@@ -19,11 +19,11 @@ export interface SeedResult {
   readonly opponentScore: number;
   readonly won: boolean;
   readonly invalidDecisions: number;
-  readonly requestFailures?: number;
+  readonly requestFailures?: number | undefined;
   readonly decisionCount: number;
   readonly decisionLatenciesMs: readonly number[];
-  readonly failureMessages?: readonly string[];
-  readonly model?: string;
+  readonly failureMessages?: readonly string[] | undefined;
+  readonly model?: string | undefined;
 }
 
 export interface FamilySummary {

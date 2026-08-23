@@ -1,4 +1,4 @@
-import type { HypothesisResult } from "@stavka/warbench-core";
+import type { StudyEvidenceObject } from "@stavka/warbench-core";
 
 const escapePdf = (value: string): string =>
   value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -6,108 +6,157 @@ const escapePdf = (value: string): string =>
 const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
 const number = (value: number): string => (Number.isFinite(value) ? value.toFixed(2) : "n/a");
 
-const reportLines = (result: HypothesisResult): string[] => {
-  const lines = [
-    "Warbench - Independent LLM Commander Hypothesis Test",
-    `Generated: ${new Date().toISOString()}`,
-    `Conclusion: ${result.status}`,
-    `Minimum sample ready: ${result.sampleReady ? "yes" : "no"}`,
-    `Valid live-model evidence ready: ${result.evidenceReady ? "yes" : "no"}`,
-    "",
-    "Acceptance criteria",
-    `Mean score improvement >= 5%: ${result.gates.meanScoreImprovement ? "PASS" : "FAIL"}`,
-    `Win-rate improvement >= 5 percentage points: ${result.gates.winRateImprovement ? "PASS" : "FAIL"}`,
-    `Invalid model decisions <= 2%: ${result.gates.invalidDecisionRate ? "PASS" : "FAIL"}`,
-    `Provider request failures <= 2%: ${result.gates.requestReliability ? "PASS" : "FAIL"}`,
-    `Successful model-response latency p95 <= 5000 ms: ${result.gates.latency ? "PASS" : "FAIL"}`,
-    `No scenario family regression worse than 10%: ${result.gates.familyRegression ? "PASS" : "FAIL"}`,
-    "",
-    "Rule baseline",
-    `Runs: ${result.baseline.runs}`,
-    `Mean score: ${number(result.baseline.meanScore)}`,
-    `Win rate: ${percent(result.baseline.winRate)}`,
-  ];
-
-  if (result.candidate) {
-    lines.push(
-      "",
-      "Codex candidate",
-      `Runs: ${result.candidate.runs}`,
-      `Mean score: ${number(result.candidate.meanScore)}`,
-      `Win rate: ${percent(result.candidate.winRate)}`,
-      `Actual model responses: ${result.candidate.modelResponseCount}`,
-      `Invalid model decision rate: ${percent(result.candidate.invalidDecisionRate)}`,
-      `Provider request failure rate: ${percent(result.candidate.requestFailureRate)}`,
-      `Successful response latency p95: ${number(result.candidate.p95DecisionLatencyMs)} ms`,
-      `Legacy evidence rows: ${result.candidate.legacyRuns}`,
-      "",
-      "Scenario families",
-    );
-    for (const [family, candidate] of Object.entries(result.candidate.families)) {
-      const baseline = result.baseline.families[family as keyof typeof result.baseline.families];
-      lines.push(
-        `${family}: rule score ${number(baseline.meanScore)}, Codex score ${number(candidate.meanScore)}, rule wins ${percent(baseline.winRate)}, Codex wins ${percent(candidate.winRate)}, model responses ${candidate.modelResponses}, request failures ${candidate.requestFailures}`,
-      );
+const wrapLine = (line: string, width = 88): string[] => {
+  if (line.length <= width) return [line];
+  const words = line.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (!current) {
+      current = word;
+    } else if (`${current} ${word}`.length <= width) {
+      current = `${current} ${word}`;
+    } else {
+      lines.push(current);
+      current = `  ${word}`;
     }
-    if (result.candidate.failureMessages.length > 0) {
-      lines.push("", "Observed provider/model failures");
-      for (const message of result.candidate.failureMessages) lines.push(`- ${message}`);
-    }
-  } else {
-    lines.push("", "Codex candidate: no live results recorded.");
   }
-
-  lines.push("");
-  if (!result.evidenceReady) {
-    lines.push(
-      "This report is INCONCLUSIVE because it does not contain valid live-model evidence for every scenario family.",
-      "Clear legacy rows, pass the Codex connection probe, and rerun both study arms.",
-    );
-  } else if (result.status === "INCONCLUSIVE") {
-    lines.push("Complete the minimum required sample before interpreting the hypothesis.");
-  } else {
-    lines.push(
-      "This conclusion was computed mechanically from valid live-model evidence and the acceptance gates above.",
-    );
-  }
+  if (current) lines.push(current);
   return lines;
 };
 
-const pageContent = (lines: readonly string[]): string => {
-  const commands = ["BT", "/F1 10 Tf", "50 790 Td", "13 TL"];
-  for (const line of lines) {
-    commands.push(`(${escapePdf(line)}) Tj`, "T*");
+export const studyEvidenceReportLines = (evidence: StudyEvidenceObject): string[] => {
+  const { manifest, hypothesis, baseline, candidate, paired } = evidence;
+  const plannedSlots = manifest.families.length * manifest.seeds.length * 2;
+  const lines = [
+    "Warbench - Independent LLM Commander Hypothesis Test",
+    `Study ID: ${manifest.id}`,
+    `Study state: ${manifest.status}`,
+    `Mechanical verdict: ${hypothesis.status}`,
+    `Git commit: ${manifest.gitSha}`,
+    `Protocol version: ${manifest.protocolVersion}`,
+    `Evidence schema version: ${manifest.evidenceSchemaVersion}`,
+    `Pi version: ${manifest.piVersion}`,
+    `Exact model ID: ${manifest.modelId}`,
+    `Prompt SHA-256: ${manifest.promptHash}`,
+    `Created: ${manifest.createdAt}`,
+    `Started: ${manifest.startedAt ?? "not started"}`,
+    `Completed: ${manifest.completedAt ?? "not completed"}`,
+    `Study digest: ${evidence.digest}`,
+    `Planned slots: ${plannedSlots}`,
+    `Completed slots: ${evidence.results.length}`,
+    `Minimum sample ready: ${hypothesis.sampleReady ? "yes" : "no"}`,
+    `Valid live-model evidence ready: ${hypothesis.evidenceReady ? "yes" : "no"}`,
+    "",
+    "Acceptance gates",
+    `Mean score improvement >= 5%: ${hypothesis.gates.meanScoreImprovement ? "PASS" : "FAIL"}`,
+    `Win-rate improvement >= 5 percentage points: ${hypothesis.gates.winRateImprovement ? "PASS" : "FAIL"}`,
+    `Invalid model decisions <= 2%: ${hypothesis.gates.invalidDecisionRate ? "PASS" : "FAIL"}`,
+    `Provider request failures <= 2%: ${hypothesis.gates.requestReliability ? "PASS" : "FAIL"}`,
+    `Successful model-response latency p95 <= 5000 ms: ${hypothesis.gates.latency ? "PASS" : "FAIL"}`,
+    `No scenario-family regression worse than 10%: ${hypothesis.gates.familyRegression ? "PASS" : "FAIL"}`,
+    "",
+    "Rule baseline",
+    `Runs: ${baseline.runs}`,
+    `Mean score: ${number(baseline.meanScore)}`,
+    `Win rate: ${percent(baseline.winRate)}`,
+  ];
+
+  if (candidate) {
+    lines.push(
+      "",
+      "Codex candidate",
+      `Runs: ${candidate.runs}`,
+      `Mean score: ${number(candidate.meanScore)}`,
+      `Win rate: ${percent(candidate.winRate)}`,
+      `Actual model responses: ${candidate.modelResponseCount}`,
+      `Invalid model decision rate: ${percent(candidate.invalidDecisionRate)}`,
+      `Provider request failure rate: ${percent(candidate.requestFailureRate)}`,
+      `Successful response latency p95: ${number(candidate.p95DecisionLatencyMs)} ms`,
+      `Legacy evidence rows: ${candidate.legacyRuns}`,
+      "",
+      "Scenario families",
+    );
+    for (const [family, familyCandidate] of Object.entries(candidate.families)) {
+      const familyBaseline = baseline.families[family as keyof typeof baseline.families];
+      lines.push(
+        `${family}: rule score ${number(familyBaseline.meanScore)}, Codex score ${number(familyCandidate.meanScore)}, rule wins ${percent(familyBaseline.winRate)}, Codex wins ${percent(familyCandidate.winRate)}, model responses ${familyCandidate.modelResponses}, request failures ${familyCandidate.requestFailures}`,
+      );
+    }
+    if (candidate.failureMessages.length > 0) {
+      lines.push("", "Sanitized provider/model failures");
+      for (const message of candidate.failureMessages) lines.push(`- ${message}`);
+    }
+  } else {
+    lines.push("", "Codex candidate: no results recorded.");
   }
-  commands.push("ET");
+
+  lines.push(
+    "",
+    "Paired analysis (candidate score - baseline score)",
+    `Pairs: ${paired.pairs}`,
+    `Mean paired delta: ${number(paired.meanScoreDelta)}`,
+    `Median paired delta: ${number(paired.medianScoreDelta)}`,
+    `Improved / tied / regressed: ${paired.improved} / ${paired.tied} / ${paired.regressed}`,
+    `Deterministic 95% bootstrap CI: ${number(paired.confidence95.lower)} to ${number(paired.confidence95.upper)}`,
+  );
+  for (const [family, analysis] of Object.entries(paired.families)) {
+    lines.push(
+      `${family}: pairs ${analysis.pairs}, mean delta ${number(analysis.meanScoreDelta)}, median delta ${number(analysis.medianScoreDelta)}, improved/tied/regressed ${analysis.improved}/${analysis.tied}/${analysis.regressed}`,
+    );
+  }
+
+  lines.push(
+    "",
+    "Limitations",
+    "- This study tests one pinned model, prompt, simulator protocol, and deterministic scenario set.",
+    "- It does not test Arma Reforger integration, real-world tactics, or military competence.",
+    "- Provider failures and invalid outputs remain evidence and are not selectively retried.",
+  );
+  if (!hypothesis.evidenceReady) {
+    lines.push(
+      "- The result is INCONCLUSIVE because the minimum current-schema live-model evidence is incomplete.",
+    );
+  } else if (hypothesis.status === "PASS" && paired.confidence95.lower <= 0) {
+    lines.push("- Product gates passed, but the paired confidence interval crosses zero.");
+  }
+  return lines.flatMap((line) => wrapLine(line));
+};
+
+const pageContent = (lines: readonly string[], page: number, pages: number): string => {
+  const commands = ["BT", "/F1 9 Tf", "48 794 Td", "12 TL"];
+  for (const line of lines) commands.push(`(${escapePdf(line)}) Tj`, "T*");
+  commands.push("T*", `(Page ${page} of ${pages}) Tj`, "ET");
   return commands.join("\n");
 };
 
-export const renderHypothesisPdf = (result: HypothesisResult): Uint8Array => {
-  const lines = reportLines(result);
+export const renderStudyEvidencePdf = (evidence: StudyEvidenceObject): Uint8Array => {
+  const lines = studyEvidenceReportLines(evidence);
   const chunks: string[][] = [];
-  for (let index = 0; index < lines.length; index += 48)
-    chunks.push(lines.slice(index, index + 48));
+  for (let index = 0; index < lines.length; index += 54) {
+    chunks.push(lines.slice(index, index + 54));
+  }
 
   const objects: string[] = [];
   const add = (body: string): number => {
     objects.push(body);
     return objects.length;
   };
-
   const catalogId = add("");
   const pagesId = add("");
   const fontId = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   const pageIds: number[] = [];
 
-  for (const chunk of chunks) {
-    const content = pageContent(chunk);
+  for (const [index, chunk] of chunks.entries()) {
+    const content = pageContent(chunk, index + 1, chunks.length);
     const contentId = add(
       `<< /Length ${new TextEncoder().encode(content).byteLength} >>\nstream\n${content}\nendstream`,
     );
-    const pageId = add(
-      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+    pageIds.push(
+      add(
+        `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+      ),
     );
-    pageIds.push(pageId);
   }
 
   objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
@@ -116,9 +165,9 @@ export const renderHypothesisPdf = (result: HypothesisResult): Uint8Array => {
 
   let output = "%PDF-1.4\n";
   const offsets = [0];
-  for (let index = 0; index < objects.length; index += 1) {
+  for (const [index, object] of objects.entries()) {
     offsets.push(new TextEncoder().encode(output).byteLength);
-    output += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+    output += `${index + 1} 0 obj\n${object}\nendobj\n`;
   }
   const xrefOffset = new TextEncoder().encode(output).byteLength;
   output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;

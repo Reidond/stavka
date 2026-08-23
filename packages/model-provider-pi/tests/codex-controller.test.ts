@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { codexFailureMessage, makeCodexFetch, makePiAccountToken } from "../src/codex-controller";
+import {
+  codexFailureMessage,
+  listCodexModelIds,
+  makeCodexFetch,
+  makePiAccountToken,
+} from "../src/codex-controller";
 
 const accountClaim = "https://api.openai.com/auth";
 const credentials = {
@@ -14,6 +19,13 @@ afterEach(() => {
 });
 
 describe("Pi Codex Worker adapter", () => {
+  test("lists stable exact ids from the pinned installed provider", () => {
+    const models = listCodexModelIds();
+    expect(models.length).toBeGreaterThan(0);
+    expect(models).toEqual([...models].sort());
+    expect(models.every((model) => model.length > 0 && !model.includes("*"))).toBe(true);
+  });
+
   test("provides Pi with an atob-compatible account claim", () => {
     const token = makePiAccountToken(credentials.accountId);
     const payload = token.split(".")[1];

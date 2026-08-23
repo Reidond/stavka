@@ -18,21 +18,31 @@ to authenticate, render, and maintain.
 Warbench ships as a CLI (`pnpm warbench`, package `@stavka/warbench-cli`):
 
 ```sh
+pnpm warbench models                        # exact ids from pinned Pi
+pnpm warbench calibrate                     # 100 non-holdout seeds/family
 pnpm warbench connect                       # Codex device authorization (local)
-pnpm warbench create study-v1 --mode full   # freeze the manifest
-pnpm warbench run-rule study-v1             # deterministic baseline arm
-pnpm warbench run-candidate study-v1        # probe-gated model arm
-pnpm warbench complete study-v1             # terminal; digest frozen
-pnpm warbench evidence study-v1 --json out.json --pdf out.pdf
+pnpm warbench probe --model <exact-id>       # full validation path
+pnpm warbench create study-v2 --mode full --model <exact-id>
+pnpm warbench status study-v2               # counts/missing slots only
+pnpm warbench run-rule study-v2             # missing baseline slots only
+pnpm warbench run-candidate study-v2        # missing model slots only
+pnpm warbench complete study-v2             # complete grid; digest frozen
+pnpm warbench verify-evidence study-v2       # recompute frozen digest
 ```
 
-- Study data lives in an operator-chosen directory (default `.warbench/`),
-  never committed. Credentials live beside it with owner-only directory/file
-  permissions (`0700`/`0600`), are never migrated from the standalone
-  repository, and are never copied into Cloudflare.
+- Study data lives in an operator-chosen directory outside the repository by
+  default (`$XDG_STATE_HOME/stavka/warbench-v2`, falling back to
+  `~/.local/state/stavka/warbench-v2`). Credentials live beside it with
+  owner-only directory/file permissions (`0700`/`0600`), are never migrated
+  from the standalone repository, and are never copied into Cloudflare.
 - The CLI shares `@stavka/warbench-core` orchestration with the server-side
   `WarbenchStudyStore` Durable Object, so file-backed and DO-backed evidence
   enforce identical immutability rules.
+- Calibration/smoke data uses non-holdout seeds. Full studies use ten unique
+  seeds derived from the frozen protocol label `warbench-study-v2-holdout`.
+- Combat is simultaneous, persisted rows and manifests are schema-decoded, and
+  completed evidence is canonically sorted, hashed once, and verified before
+  final export. JSON, PDF, CSV, and Markdown derive from that same object.
 - The unified dashboard carries no Warbench section; the placeholder route was
   removed.
 
