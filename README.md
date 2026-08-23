@@ -29,29 +29,18 @@ Requirements:
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
-
-cp apps/commander/.dev.vars.example apps/commander/.dev.vars
-cp apps/poligon/.dev.vars.example apps/poligon/.dev.vars
 ```
 
-The examples use the rule Commander and an exact-local synthetic Access
-identity. They contain matching placeholder machine keys and do not need a
-provider account.
-
-Run the Agent-backed loop in separate terminals:
+Start the unified local application:
 
 ```bash
-pnpm --filter @stavka/commander dev
+pnpm --filter @stavka/stavka dev
 ```
 
-```bash
-pnpm --filter @stavka/poligon dev
-```
-
-Commander defaults to `http://127.0.0.1:8787`; Poligon prints its URL. For a
-zero-network browser simulation, open Poligon with `?host=offline`. Use
-`?mode=versus` for isolated OPFOR and BLUFOR commanders, or open `/replay` to
-inspect a local canonical Commander export without uploading it.
+The unified dashboard contains local simulation, replay, model, usage, and
+system routes. Commander and inference are private Cloudflare services in the
+production topology and are reached through service bindings, not public
+browser origins.
 
 The local LLM gateway is also deterministic by default:
 
@@ -62,8 +51,23 @@ pnpm ai:smoke
 
 `ai:up` binds Maskirovka to `127.0.0.1:4141`; `ai:smoke` uses only the mock
 seat. Live provider actions and local/manual deployment actions are always
-explicit operator steps. A successful `main` CI verification is the authorized
-automatic production path.
+explicit operator steps. CI is verification-only; production deployment is a
+separate manual workflow restricted to `main`.
+
+Warbench is an independent local CLI, not a dashboard or deployed service:
+
+```bash
+pnpm warbench models
+pnpm warbench calibrate
+pnpm warbench create warbench-smoke-v2 --mode smoke --model <exact-model-id>
+pnpm warbench status warbench-smoke-v2
+```
+
+Its default data directory is outside the repository under the operator's XDG
+state directory (or `~/.local/state/stavka/warbench-v2`). Use `--data-dir` to
+select another owner-only location. See
+[`ADR-003`](docs/decisions/ADR-003-warbench-cli.md) for the immutable-study
+contract.
 
 ## Engineering contract
 
@@ -89,19 +93,23 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 
 ## Repository map
 
-| Path                   | Responsibility                                                                                                         |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol`    | Strict Effect Schemas for protocol v1, full/delta state, config updates, map briefings, LLM frames, and replay exports |
-| `packages/access-auth` | Constant-time machine bearer auth and Cloudflare Access verification                                                   |
-| `packages/doctrine`    | Typed Commander doctrine presets                                                                                       |
-| `packages/sim-core`    | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
-| `packages/sim-link`    | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
-| `tools/tasks`          | Effect-first repository task orchestration behind short package-script aliases                                         |
-| `apps/commander`       | Effect HttpApi Worker, durable Commander/Sergeants, seat routing/accounting, logs, inline/R2 replay exports            |
-| `apps/poligon`         | TanStack/THREE proving ground with Agent, offline, versus, replay, and cost views                                      |
-| `tools/maskirovka`     | Local Effect HttpApi mock/subscription/API gateway, replay cache, contributor client, accounting, and operations SPA   |
-| `apps/maskirovka-seat` | Single-seat Worker/Container code with machine API and Access-protected leaf dashboard                                 |
-| `mods/StavkaTest`      | Preserved historical Workbench research harness; not the production mod                                                |
+| Path                         | Responsibility                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol`          | Strict Effect Schemas for protocol v1, full/delta state, config updates, map briefings, LLM frames, and replay exports |
+| `packages/access-auth`       | Constant-time machine bearer auth and Cloudflare Access verification                                                   |
+| `packages/doctrine`          | Typed Commander doctrine presets                                                                                       |
+| `packages/sim-core`          | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
+| `packages/sim-link`          | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
+| `packages/warbench-core`     | Provider-independent deterministic simulator, immutable studies, calibration, gates, and paired analysis               |
+| `packages/model-provider-pi` | Pinned Pi/Codex provider and device-authorization adapter                                                              |
+| `packages/warbench-report`   | Deterministic PDF evidence rendering from the canonical study object                                                   |
+| `tools/warbench`             | Operator-local immutable-study CLI and owner-only file store                                                           |
+| `tools/tasks`                | Effect-first repository task orchestration behind short package-script aliases                                         |
+| `services/commander`         | Private Effect HttpApi Worker, durable Commander/Sergeants, accounting, logs, and replay exports                       |
+| `services/inference`         | Private Maskirovka gateway Worker/Container and operations dashboard                                                   |
+| `apps/stavka`                | Unified Access-protected dashboard, simulation, replay, model, usage, and system routes                                |
+| `apps/maskirovka-seat`       | Optional hosted single-seat Worker/Container; not part of the production deploy plan                                   |
+| `mods/StavkaTest`            | Preserved historical Workbench research harness; not the production mod                                                |
 
 ## Verification
 
@@ -119,15 +127,13 @@ pnpm ai:smoke
 ```
 
 Commander sessions are isolated by `(session_id, mission_epoch, faction)`.
-After a local Commander/Poligon smoke, delete the ignored `.dev.vars` copies and
-rebuild Poligon so `dist/server` does not retain them. Exact gate results and
-the local browser acceptance evidence are recorded in
+Exact gate results and the local browser acceptance evidence are recorded in
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 These checks use mocks, fakes, and replay data. They do not prove a real
 Cloudflare deployment, Access policy, subscription seat, production addon, or
-dedicated server. The production job uploads and configures all four services
-in order; while workers.dev returns error 1042, that success is not HTTP health.
+dedicated server. The manual production job deploys inference, Commander, then
+the unified app; upload success alone is not post-deploy HTTP health.
 
 ## Documentation
 
@@ -135,6 +141,8 @@ in order; while workers.dev returns error 1042, that success is not HTTP health.
   probe commands
 - [Operator guide](docs/OPERATOR_GUIDE.md) — local stacks, modes, routes,
   exports, secrets, and deployment preparation
+- [Warbench study runbook](docs/runbooks/warbench-study.md) — calibration,
+  exact-model smoke, protocol freeze, held-out execution, and evidence rules
 - [Implementation and acceptance status](docs/IMPLEMENTATION_STATUS.md) —
   product/phase matrix and the exact external gates
 - [Effect v4 engineering guide](docs/EFFECT_V4.md) — service, repository,

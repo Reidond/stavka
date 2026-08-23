@@ -10,6 +10,7 @@ import {
 } from "@stavka/warbench-core";
 import {
   codexJsonCompleter,
+  listCodexModelIds,
   pollDeviceAuthorization,
   refreshCodexCredentials,
   startDeviceAuthorization,
@@ -104,10 +105,14 @@ export const liveCodexProvider = (
   dataDir: string,
   side: "blue" | "red" = "blue",
 ): CandidateProvider => ({
-  probe: () =>
+  probe: (requestedModel) =>
     ensureFresh(dataDir).pipe(
       Effect.flatMap((credentials) =>
-        controllerFromCompleter("codex-probe", codexJsonCompleter(credentials), side)
+        controllerFromCompleter(
+          "codex-probe",
+          codexJsonCompleter(credentials, { requestedModel }),
+          side,
+        )
           .decide(makeScenario(1))
           .pipe(
             Effect.map((decision) => ({ model: decision.model })),
@@ -158,7 +163,7 @@ export const runDeviceConnect = (
         Effect.mapError(toProviderFailure),
         Effect.flatMap((outcome) =>
           outcome.pending
-            ? Effect.sleep(`${intervalMs} millis`).pipe(Effect.andThen(pollLoop()))
+            ? Effect.sleep(`${intervalMs} millis`).pipe(Effect.andThen(Effect.suspend(pollLoop)))
             : Effect.succeed(outcome.credentials),
         ),
       );
@@ -183,14 +188,16 @@ export interface ProbeOutcome {
   };
 }
 
+export const availableCodexModels = (): ReadonlyArray<string> => listCodexModelIds();
+
 /**
  * One live Codex request through the full validation pipeline. Never logs
  * authorization headers, account ids, tokens, or challenge bodies — only the
  * sanitized diagnostic fields needed to classify worker-direct vs runner
  * transport failures.
  */
-export const probeCodex = (dataDir: string): Effect.Effect<ProbeOutcome> =>
-  Effect.match(liveCodexProvider(dataDir).probe(), {
+export const probeCodex = (dataDir: string, requestedModel: string): Effect.Effect<ProbeOutcome> =>
+  Effect.match(liveCodexProvider(dataDir).probe(requestedModel), {
     onFailure: (failure): ProbeOutcome => ({
       ok: false,
       message: failure.message,

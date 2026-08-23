@@ -28,12 +28,22 @@
 
 ## Production deployment
 
-- A successful `verify` job on `main` is the authorized automatic production path. The single `.github/workflows/ci.yml` workflow deploys only after verification on a `main` push or a manual dispatch whose ref is `main`.
-- The production task prebuilds gateway and seat dashboards plus Poligon, then deploys all four Cloudflare services sequentially: Maskirovka gateway, hosted Maskirovka seat, Commander, and Poligon. Do not add a parallel or duplicate deployment workflow.
+- `.github/workflows/ci.yml` is verification-only. Production is the separate manual `.github/workflows/deploy.yml` workflow, restricted to `main` and the GitHub `production` environment.
+- The production task deploys exactly three Cloudflare services sequentially: private inference, private Commander, then the unified Stavka app. The hosted Maskirovka seat is optional and is not part of production deployment.
+- `stavka.sands.red` is the only public application origin and must stay behind Cloudflare Access. Commander and inference keep `workers_dev: false` and `preview_urls: false` and are reached through service bindings.
 - Local, manual, and live deployment commands remain explicit operator actions. Never run `pnpm run deploy:production` during repository-only verification.
 - Configure the GitHub `production` environment with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The account-scoped token needs Workers Scripts Edit and Containers Edit; add KV, R2, or route permissions only if a future CI task provisions or manages those resources.
-- A successful deployment proves upload and Wrangler configuration only. The account's workers.dev `error code: 1042` can still block HTTP invocation; do not claim post-deploy health while that blocker persists. Worker secrets and provider credentials stay out of band.
-- Roll back with `wrangler rollback` per service in reverse dependency order (Poligon, Commander, hosted seat, gateway), or an equivalent documented version rollback.
+- A successful deployment proves upload and Wrangler configuration only. Do not claim post-deploy health until the Access-protected custom domain and private service path are probed. Worker secrets and provider credentials stay out of band.
+- Roll back with `wrangler rollback` per service in reverse dependency order (unified app, Commander, inference), or an equivalent documented version rollback.
+
+## Warbench studies
+
+- Warbench is an operator-local CLI and must remain independent of Commander, protocol, Cloudflare, and provider implementations through the `@stavka/warbench-core` firewall.
+- Use an owner-only data directory outside the repository. Never print or commit Codex access tokens, refresh tokens, account IDs, cookies, passwords, or MFA data.
+- Full and smoke studies require an explicit exact model. Probe that exact model before candidate execution; never select the first provider model implicitly.
+- Results are one-attempt immutable slots. Resume by skipping recorded slots; never delete, overwrite, selectively retry, or inspect partial held-out tactical outcomes.
+- Run `pnpm warbench calibrate` before any live study. Calibration seeds and held-out seeds must remain disjoint.
+- A final export requires a completed, digest-verified study. JSON, PDF, CSV, and Markdown must derive from the same canonical evidence object.
 
 ## LLM development
 
@@ -52,4 +62,4 @@
   ```
 
 - `GET /healthz` is the machine-readable seat/budget view; `GET /v1/models` lists aliases and current resolutions; the local operations SPA is at `/_/`.
-- Run `pnpm eval -- --replay` before commit. Replay misses fail without touching a network. Use record, `doctor --live`, live sergeants, metered API, and local/manual deployment only as explicit operator actions; successful main CI is the automatic production path.
+- Run `pnpm eval -- --replay` before commit. Replay misses fail without touching a network. Use record, `doctor --live`, live sergeants, metered API, live Warbench candidate runs, and deployment only as explicit operator actions.

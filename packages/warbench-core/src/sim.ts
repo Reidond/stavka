@@ -53,30 +53,54 @@ const stepToward = (from: Vec2, to: Vec2, speed = 7): Vec2 => {
 };
 
 export const step = (state: Observation, decisions: readonly Decision[]): Observation => {
-  const orders = new Map(
-    decisions.flatMap((decision) => decision.orders).map((order) => [order.unitId, order]),
-  );
-  const units = state.units.map((unit) => ({ ...unit, position: { ...unit.position } }));
-  const byId = new Map(units.map((unit) => [unit.id, unit]));
+  // Select duplicate orders by their canonical encoding rather than input
+  // order. Valid controllers never duplicate a unit, but this makes the pure
+  // simulator invariant to decision and order-array permutations as well.
+  const orders = new Map<string, Decision["orders"][number]>();
+  for (const order of decisions.flatMap((decision) => decision.orders)) {
+    const current = orders.get(order.unitId);
+    if (!current || JSON.stringify(order) < JSON.stringify(current))
+      orders.set(order.unitId, order);
+  }
 
-  for (const unit of units) {
+  // Phase 1: every movement resolves from the tick-start snapshot.
+  const movedUnits = state.units
+    .map((unit) => {
+      const copy = { ...unit, position: { ...unit.position } };
+      const order = orders.get(unit.id);
+      if (unit.hp > 0 && order?.type === "move") {
+        copy.position = stepToward(unit.position, order.target);
+      }
+      return copy;
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const postMovementById = new Map(movedUnits.map((unit) => [unit.id, unit]));
+
+  // Phase 2: evaluate all attacks from one post-movement snapshot and aggregate
+  // damage. No attacker can remove another attacker's turn by appearing first.
+  const damageByTarget = new Map<string, number>();
+  for (const unit of movedUnits) {
     if (unit.hp <= 0) continue;
     const order = orders.get(unit.id);
-    if (!order) continue;
-    if (order.type === "move") unit.position = stepToward(unit.position, order.target);
-    if (order.type === "attack") {
-      const target = byId.get(order.targetId);
-      if (
-        target &&
-        target.hp > 0 &&
-        target.side !== unit.side &&
-        distance(unit.position, target.position) <= 22
-      ) {
-        target.hp = Math.max(0, target.hp - unit.attack);
-      }
+    if (order?.type !== "attack") continue;
+    const target = postMovementById.get(order.targetId);
+    if (
+      target &&
+      target.hp > 0 &&
+      target.side !== unit.side &&
+      distance(unit.position, target.position) <= 22
+    ) {
+      damageByTarget.set(target.id, (damageByTarget.get(target.id) ?? 0) + unit.attack);
     }
   }
 
+  // Phase 3: apply the aggregate simultaneously.
+  const units = movedUnits.map((unit) => ({
+    ...unit,
+    hp: Math.max(0, unit.hp - (damageByTarget.get(unit.id) ?? 0)),
+  }));
+
+  // Phase 4: objectives observe the final living-unit set for this tick.
   const objectives = state.objectives.map((objective) => {
     const nearby = units.filter(
       (unit) => unit.hp > 0 && distance(unit.position, objective.position) <= 12,

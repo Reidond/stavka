@@ -118,6 +118,13 @@ export interface CodexCompleterOptions {
   readonly onResponse?: (diagnostic: UpstreamDiagnostic) => void;
 }
 
+/** Exact model ids exposed by the installed, pinned Pi provider package. */
+export const listCodexModelIds = (): ReadonlyArray<string> =>
+  openaiCodexProvider()
+    .getModels()
+    .map((model) => model.id)
+    .sort();
+
 /**
  * A {@link JsonCompleter} that executes one pinned Pi/Codex request per call.
  * Failures surface as `ControllerError`s so the simulator accounting can
@@ -178,7 +185,9 @@ export const codexJsonCompleter =
           reasoning: "low",
           transport: "sse",
           timeoutMs: 30_000,
-          maxRetries: 1,
+          // Confirmatory studies record the first provider outcome. Retrying a
+          // failed decision would selectively erase reliability evidence.
+          maxRetries: 0,
         });
         let text = "";
         for await (const event of stream) {

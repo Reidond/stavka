@@ -63,8 +63,9 @@ order (app → commander → inference).
 ## Operator-local Codex provider connection
 
 ```sh
-pnpm warbench connect      # device authorization; stores operator-local file
-pnpm warbench probe        # one live request; prints sanitized diagnostics only
+pnpm warbench models
+pnpm warbench connect
+pnpm warbench probe --model <exact-model-id>
 ```
 
 Warbench credentials never enter Cloudflare Access, a Worker secret, browser
@@ -91,9 +92,22 @@ category only.
 Run only from a tagged, CI-green commit with no deployments during the study:
 
 ```sh
-pnpm warbench create study-v1 --mode full
-pnpm warbench run-rule study-v1
-pnpm warbench run-candidate study-v1     # refuses to start without a live probe
-pnpm warbench complete study-v1          # terminal; digest frozen
-pnpm warbench evidence study-v1 --json out/study-v1.json --pdf out/study-v1.pdf
+pnpm warbench calibrate
+pnpm warbench create study-v2 --mode full --model <exact-model-id>
+pnpm warbench run-rule study-v2
+pnpm warbench status study-v2
+pnpm warbench run-candidate study-v2
+pnpm warbench complete study-v2
+pnpm warbench verify-evidence study-v2
+pnpm warbench evidence study-v2 \
+  --json out/study-v2/evidence.json \
+  --pdf out/study-v2/report.pdf \
+  --csv out/study-v2/results.csv \
+  --markdown docs/results/study-v2.md
 ```
+
+Arm commands skip already recorded slots and never overwrite them. Provider
+failures and invalid decisions are first-attempt evidence; do not selectively
+retry or delete them. Do not inspect partial held-out tactical scores, change
+the working tree, switch commits, tune the prompt, or deploy after the first
+candidate slot is written.
