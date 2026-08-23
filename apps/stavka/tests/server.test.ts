@@ -95,6 +95,35 @@ describe("Poligon HTTP routing", () => {
     expect(mocks.tanStackFetch).not.toHaveBeenCalled();
   });
 
+  it("forwards first-time account setup to the private identity control plane", async () => {
+    let forwarded: Request | undefined;
+    const inferenceFetch = vi.fn<Fetcher["fetch"]>(async (request) => {
+      forwarded = request instanceof Request ? request : new Request(request);
+      return Response.json({ status: "active" });
+    });
+    const response = await handleRequest(
+      new Request("http://127.0.0.1/auth/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName: "Owner", organizationName: "Stavka" }),
+      }),
+      makeEnv({
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "owner@example.test",
+        INFERENCE_SERVICE: { fetch: inferenceFetch },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(forwarded?.url).toBe("http://127.0.0.1/auth/signup");
+    expect(forwarded?.method).toBe("POST");
+    await expect(forwarded?.json()).resolves.toEqual({
+      displayName: "Owner",
+      organizationName: "Stavka",
+    });
+    expect(mocks.tanStackFetch).not.toHaveBeenCalled();
+  });
+
   it("fails provider-account operations closed when inference is not bound", async () => {
     const response = await handleRequest(
       new Request("http://127.0.0.1/admin/provider-accounts/codex/production/test", {

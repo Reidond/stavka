@@ -1,7 +1,15 @@
 import { Container, type StopParams } from "@cloudflare/containers";
+import type {
+  AccountAccessPrincipal,
+  AccountScope,
+  AccountSession,
+  ActiveAccountSession,
+  OrganizationUser,
+  SignUpPayload,
+} from "@stavka/access-auth";
 import {
   refreshCodexCredential,
-  type ProviderAccountPublic,
+  type OwnedProviderAccountPublic,
   type ProviderId,
   type ProvisionProviderAccountPayload,
 } from "@stavka/provider-auth";
@@ -36,6 +44,7 @@ import {
   DurableProviderAccountRepository,
   type PersistedProviderAccount,
 } from "./provider-account-repository";
+import { DurableOrganizationRepository } from "./organization-repository";
 
 export interface GatewayModelsResponse {
   readonly object: "list";
@@ -56,7 +65,7 @@ export interface GatewayStatus {
   readonly aliases: readonly GatewayAlias[];
   readonly container: { readonly status: string; readonly last_change: number };
   readonly auth: Readonly<Record<GatewayProvider, GatewayAuthMetadata>>;
-  readonly providerAccounts: readonly ProviderAccountPublic[];
+  readonly providerAccounts: readonly OwnedProviderAccountPublic[];
   readonly config: { readonly revision: number; readonly updated_at: number };
   readonly window: {
     readonly durable: true;
@@ -94,6 +103,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   override envVars = { NODE_ENV: "production", PORT: "4141" };
 
   private readonly providerAccounts: DurableProviderAccountRepository;
+  private readonly organizations: DurableOrganizationRepository;
   private readonly config: GatewayConfigRepositoryService;
   private readonly requests: DurableRequestMetadataRepository;
   private readonly window: DurableWindowTrackerRepository;
@@ -101,6 +111,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
   constructor(ctx: DurableObjectState<{}>, env: GatewayEnv) {
     super(ctx, env);
+    this.organizations = new DurableOrganizationRepository(ctx.storage);
     this.providerAccounts = new DurableProviderAccountRepository(
       ctx.storage.sql,
       env.STAVKA_PROVIDER_VAULT_KEY,
@@ -110,6 +121,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     this.window = new DurableWindowTrackerRepository(ctx.storage.sql);
     Effect.runSync(
       Effect.all([
+        this.organizations.initialize,
         this.providerAccounts.initialize,
         this.config.initialize,
         this.requests.initialize,
@@ -119,8 +131,23 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     this.sleepAfter = readGatewayConfig(env).sleepAfter;
   }
 
-  async getGatewayStatus(): Promise<GatewayStatus> {
-    return Effect.runPromise(this.statusEffect());
+  async getGatewayStatus(scope?: AccountScope): Promise<GatewayStatus> {
+    return Effect.runPromise(this.statusEffect(scope));
+  }
+
+  async getAccountSession(principal: AccountAccessPrincipal): Promise<AccountSession> {
+    return Effect.runPromise(this.organizations.session(principal));
+  }
+
+  async signUpAccount(
+    principal: AccountAccessPrincipal,
+    payload: SignUpPayload,
+  ): Promise<ActiveAccountSession> {
+    return Effect.runPromise(this.organizations.signUp(principal, payload));
+  }
+
+  async listOrganizationUsers(scope: AccountScope): Promise<readonly OrganizationUser[]> {
+    return Effect.runPromise(this.organizations.listUsers(scope));
   }
 
   async getModels(): Promise<GatewayModelsResponse> {
@@ -180,18 +207,19 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     );
   }
 
-  async listProviderAccounts(): Promise<readonly ProviderAccountPublic[]> {
-    return Effect.runPromise(this.providerAccounts.list);
+  async listProviderAccounts(scope: AccountScope): Promise<readonly OwnedProviderAccountPublic[]> {
+    return Effect.runPromise(this.providerAccounts.list(scope));
   }
 
   async putProviderAccount(
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
     payload: ProvisionProviderAccountPayload,
-  ): Promise<ProviderAccountPublic> {
+  ): Promise<OwnedProviderAccountPublic> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        const persisted = yield* this.providerAccounts.put(provider, name, payload);
+        const persisted = yield* this.providerAccounts.put(scope, provider, name, payload);
         yield* this.restartForConfiguration();
         return persisted;
       }),
@@ -199,31 +227,40 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   }
 
   async activateProviderAccount(
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
-  ): Promise<ProviderAccountPublic> {
+  ): Promise<OwnedProviderAccountPublic> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        const persisted = yield* this.providerAccounts.activate(provider, name);
+        const persisted = yield* this.providerAccounts.activate(scope, provider, name);
         yield* this.restartForConfiguration();
         return persisted;
       }),
     );
   }
 
-  async deleteProviderAccount(provider: ProviderId, name: string): Promise<void> {
+  async deleteProviderAccount(
+    scope: AccountScope,
+    provider: ProviderId,
+    name: string,
+  ): Promise<void> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        yield* this.providerAccounts.delete(provider, name);
+        yield* this.providerAccounts.delete(scope, provider, name);
         yield* this.restartForConfiguration();
       }),
     );
   }
 
-  async testProviderAccount(provider: ProviderId, name: string): Promise<ProviderAccountPublic> {
+  async testProviderAccount(
+    scope: AccountScope,
+    provider: ProviderId,
+    name: string,
+  ): Promise<OwnedProviderAccountPublic> {
     return Effect.runPromise(
       this.providerAccounts
-        .read(provider, name)
+        .read(scope, provider, name)
         .pipe(
           Effect.flatMap((account) =>
             account
@@ -301,7 +338,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     return Effect.gen({ self: this }, function* () {
       const accounts: PersistedProviderAccount[] = [];
       for (const provider of gatewayProviders) {
-        let account = yield* this.providerAccounts.active(provider);
+        let account = yield* this.providerAccounts.activeForRuntime(provider);
         if (!account) continue;
         if (
           provider === "codex" &&
@@ -311,7 +348,11 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
           const refreshed = yield* refreshCodexCredential(account.credential).pipe(
             Effect.mapError((error) => new Error(error.message)),
           );
-          yield* this.providerAccounts.put(provider, account.name, {
+          const scope = {
+            organizationId: account.organizationId,
+            userId: account.ownerUserId,
+          };
+          yield* this.providerAccounts.put(scope, provider, account.name, {
             label: account.label,
             authKind: account.authKind,
             credential: refreshed,
@@ -319,7 +360,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
             ...(account.remoteWorkspaceId ? { remoteWorkspaceId: account.remoteWorkspaceId } : {}),
             activate: true,
           });
-          account = yield* this.providerAccounts.active(provider);
+          account = yield* this.providerAccounts.activeForRuntime(provider);
         }
         if (account) accounts.push(account);
       }
@@ -327,12 +368,12 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     });
   }
 
-  private statusEffect(): Effect.Effect<GatewayStatus, unknown> {
+  private statusEffect(scope?: AccountScope): Effect.Effect<GatewayStatus, unknown> {
     return Effect.gen({ self: this }, function* () {
       const [config, accounts, activeAccounts, runtime, snapshot, count, state] = yield* Effect.all(
         [
           this.readConfig(),
-          this.providerAccounts.list,
+          scope ? this.providerAccounts.list(scope) : Effect.succeed([]),
           this.activeProviderAccounts(),
           this.config.runtime,
           this.window.read,
@@ -674,7 +715,7 @@ const emptyMetadata = (provider: GatewayProvider): GatewayAuthMetadata => ({
   revision: 0,
 });
 
-const publicAccount = (account: PersistedProviderAccount): ProviderAccountPublic => {
+const publicAccount = (account: PersistedProviderAccount): OwnedProviderAccountPublic => {
   const { credential: _credential, ...metadata } = account;
   return metadata;
 };

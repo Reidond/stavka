@@ -96,7 +96,7 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 | Path                             | Responsibility                                                                                                         |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`              | Strict Effect Schemas for protocol v1, full/delta state, config updates, map briefings, LLM frames, and replay exports |
-| `packages/access-auth`           | Constant-time machine bearer auth and Cloudflare Access verification                                                   |
+| `packages/access-auth`           | Machine bearer auth, Cloudflare Access verification, and organization/user session contracts                           |
 | `packages/doctrine`              | Typed Commander doctrine presets                                                                                       |
 | `packages/sim-core`              | Seeded 100 ms simulation, terrain, objectives, command fidelity, restore, and 50-group profile                         |
 | `packages/sim-link`              | Effect transport/link, faction projection, fog of war, deltas, config updates, reports, and command execution          |
@@ -109,8 +109,8 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 | `tools/stavka-cli`               | Cloudflare profile selection plus provider account provisioning and activation                                         |
 | `tools/tasks`                    | Effect-first repository task orchestration behind short package-script aliases                                         |
 | `services/commander`             | Private Effect HttpApi Worker, durable Commander/Sergeants, accounting, logs, and replay exports                       |
-| `services/inference`             | Private Maskirovka gateway Worker/Container and operations dashboard                                                   |
-| `apps/stavka`                    | Unified Access-protected dashboard, simulation, replay, model, usage, and system routes                                |
+| `services/inference`             | Private Maskirovka gateway, organization/user repository, owned provider vault, and operations dashboard               |
+| `apps/stavka`                    | Unified Access-protected dashboard with first-time account setup and private provider authorization                    |
 | `apps/maskirovka-seat`           | Private hosted single-seat Worker/Container deployed as part of the production stack                                   |
 | `mods/StavkaTest`                | Preserved historical Workbench research harness; not the production mod                                                |
 

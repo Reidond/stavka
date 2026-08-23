@@ -3,6 +3,7 @@ import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/reac
 import type { ReactNode } from "react";
 
 import { StavkaShell } from "../components/shell";
+import { AccountGate } from "../components/account-gate";
 import type { RouterContext } from "../router";
 import appCss from "../styles.css?url";
 
@@ -39,7 +40,9 @@ function Root() {
   return (
     <Document>
       <QueryClientProvider client={queryClient}>
-        <StavkaShell />
+        <AccountGate>
+          <StavkaShell />
+        </AccountGate>
       </QueryClientProvider>
     </Document>
   );

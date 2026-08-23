@@ -24,10 +24,11 @@ Commander and inference reachable only through Cloudflare service bindings.
      as Worker secrets/vars on `apps/stavka`.
 3. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
    service tokens via `authorizeMachine`, not Access sessions.
-4. **Provider account control plane**: the unified app forwards only
-   `/admin/provider-accounts` and its child routes to the private inference
-   Worker through `INFERENCE_SERVICE`. Attach both the human allow policy and
-   the read-only automation service-token policy to this single Access app.
+4. **Account control plane**: the unified app forwards `/auth/*`,
+   `/account/users`, and `/admin/provider-accounts*` to the private inference
+   Worker through `INFERENCE_SERVICE`. The verified human identity must be the
+   configured owner to create the first profile. Service tokens are rejected
+   from all user and provider-account routes.
 
 ## Deploy
 
@@ -57,6 +58,9 @@ curl -sS https://stavka.sands.red/healthz
 
 Then sign in through Access and verify:
 
+- The first visit shows setup, creates one organization and owner profile, and
+  a second Access identity cannot self-register.
+- `/settings/providers` shows only the signed-in profile and accounts bound to it.
 - `/overview`, `/simulations` (run a rule-only scenario), `/replays` load.
 - `/system` shows Commander + inference health as `live` (or `degraded`
   with the failing alias named).

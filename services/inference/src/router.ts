@@ -1,8 +1,15 @@
 import {
   authorizeMachine,
+  accountScope,
   can,
   verifyAccessRequest,
+  type AccountAccessPrincipal,
+  type AccountScope,
+  type AccountSession,
+  type ActiveAccountSession,
   type AccessIdentity,
+  type OrganizationUser,
+  type SignUpPayload,
 } from "@stavka/access-auth";
 import { Cause, Context, Effect, Layer, Schema } from "effect";
 import {
@@ -20,6 +27,7 @@ import {
   MaskirovkaGatewayApi,
   ProvisionProviderAccountPayloadSchema,
   ProviderSchema,
+  SignUpPayloadSchema,
   TierSchema,
 } from "./http-contract";
 import {
@@ -31,14 +39,20 @@ import {
 } from "./config";
 import type { GatewayModelsResponse, GatewayStatus } from "./gateway-container";
 import type {
-  ProviderAccountPublic,
+  OwnedProviderAccountPublic,
   ProviderId,
   ProvisionProviderAccountPayload,
 } from "@stavka/provider-auth";
 
 export interface GatewayStub {
   readonly fetch: (request: Request) => Promise<Response>;
-  readonly getGatewayStatus: () => Promise<GatewayStatus>;
+  readonly getGatewayStatus: (scope?: AccountScope) => Promise<GatewayStatus>;
+  readonly getAccountSession: (principal: AccountAccessPrincipal) => Promise<AccountSession>;
+  readonly signUpAccount: (
+    principal: AccountAccessPrincipal,
+    payload: SignUpPayload,
+  ) => Promise<ActiveAccountSession>;
+  readonly listOrganizationUsers: (scope: AccountScope) => Promise<readonly OrganizationUser[]>;
   readonly getModels: () => Promise<GatewayModelsResponse>;
   readonly listRecentRequests: (limit: number) => Promise<readonly unknown[]>;
   readonly remapAlias: (
@@ -47,21 +61,30 @@ export interface GatewayStub {
     model: string,
   ) => Promise<GatewayStatus>;
   readonly setKillSwitch: (enabled: boolean) => Promise<GatewayStatus>;
-  readonly listProviderAccounts: () => Promise<readonly ProviderAccountPublic[]>;
+  readonly listProviderAccounts: (
+    scope: AccountScope,
+  ) => Promise<readonly OwnedProviderAccountPublic[]>;
   readonly putProviderAccount: (
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
     payload: ProvisionProviderAccountPayload,
-  ) => Promise<ProviderAccountPublic>;
+  ) => Promise<OwnedProviderAccountPublic>;
   readonly activateProviderAccount: (
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
-  ) => Promise<ProviderAccountPublic>;
-  readonly deleteProviderAccount: (provider: ProviderId, name: string) => Promise<void>;
+  ) => Promise<OwnedProviderAccountPublic>;
+  readonly deleteProviderAccount: (
+    scope: AccountScope,
+    provider: ProviderId,
+    name: string,
+  ) => Promise<void>;
   readonly testProviderAccount: (
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
-  ) => Promise<ProviderAccountPublic>;
+  ) => Promise<OwnedProviderAccountPublic>;
 }
 
 export interface GatewayRouterDependencies {
@@ -179,6 +202,53 @@ const requireAccess = (
           ),
     ),
   );
+
+export const accountPrincipal = (
+  identity: AccessIdentity,
+): Effect.Effect<AccountAccessPrincipal, WorkerHttpError> =>
+  identity.serviceToken
+    ? Effect.fail(
+        new WorkerHttpError(
+          403,
+          "HUMAN_ACCOUNT_REQUIRED",
+          "A human Cloudflare Access identity is required",
+        ),
+      )
+    : Effect.succeed({
+        subject: identity.subject,
+        ...(identity.email ? { email: identity.email } : {}),
+        accessRole: identity.role === "automation" ? ("spectator" as const) : identity.role,
+      });
+
+const activeAccountSession = (
+  runtime: GatewayRuntimeShape,
+  identity: AccessIdentity,
+): Effect.Effect<ActiveAccountSession, WorkerHttpError> =>
+  Effect.gen(function* () {
+    const principal = yield* accountPrincipal(identity);
+    const session = yield* Effect.tryPromise({
+      try: () => gatewayFor(runtime).getAccountSession(principal),
+      catch: () =>
+        new WorkerHttpError(503, "ACCOUNT_UNAVAILABLE", "Stavka account service is unavailable"),
+    });
+    if (session.status === "active") return session;
+    return yield* Effect.fail(
+      new WorkerHttpError(409, "SETUP_REQUIRED", "Complete first-time Stavka setup"),
+    );
+  });
+
+const requireOrganizationAdmin = (
+  session: ActiveAccountSession,
+): Effect.Effect<void, WorkerHttpError> =>
+  session.membership.role === "owner" || session.membership.role === "admin"
+    ? Effect.void
+    : Effect.fail(
+        new WorkerHttpError(
+          403,
+          "ORGANIZATION_ADMIN_REQUIRED",
+          "Organization owner or admin membership is required",
+        ),
+      );
 
 const decodeJson = <A>(
   request: Request,
@@ -318,14 +388,75 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
     )
     .handleRaw("responses", ({ request }) => safe(proxy(request, "openai-responses")))
     .handleRaw("messages", ({ request }) => safe(proxy(request, "anthropic-messages")))
+    .handleRaw("accountSession", ({ request }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          const principal = yield* accountPrincipal(identity);
+          const session = yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).getAccountSession(principal),
+            catch: () =>
+              new WorkerHttpError(
+                503,
+                "ACCOUNT_UNAVAILABLE",
+                "Stavka account service is unavailable",
+              ),
+          });
+          return json(session);
+        }),
+      ),
+    )
+    .handleRaw("signUpAccount", ({ request }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const principal = yield* accountPrincipal(identity);
+          const payload = yield* decodeJson(
+            webRequest,
+            Schema.decodeUnknownEffect(SignUpPayloadSchema),
+          );
+          const session = yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).signUpAccount(principal, payload),
+            catch: (cause) =>
+              new WorkerHttpError(
+                409,
+                "REGISTRATION_CLOSED",
+                cause instanceof Error ? cause.message : "Stavka registration is unavailable",
+              ),
+          });
+          return json(session);
+        }),
+      ),
+    )
+    .handleRaw("organizationUsers", ({ request }) =>
+      safe(
+        Effect.gen(function* () {
+          const runtime = yield* GatewayRuntime;
+          const webRequest = yield* toWebRequest(request);
+          const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          const session = yield* activeAccountSession(runtime, identity);
+          const users = yield* Effect.tryPromise({
+            try: () => gatewayFor(runtime).listOrganizationUsers(accountScope(session)),
+            catch: () =>
+              new WorkerHttpError(503, "ACCOUNT_UNAVAILABLE", "Organization users are unavailable"),
+          });
+          return json({ users });
+        }),
+      ),
+    )
     .handleRaw("adminStatus", ({ request }) =>
       safe(
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
           const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          const session = yield* activeAccountSession(runtime, identity);
           const status = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).getGatewayStatus(),
+            try: () => gatewayFor(runtime).getGatewayStatus(accountScope(session)),
             catch: () =>
               new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Gateway status is unavailable"),
           });
@@ -333,7 +464,9 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
             ...status,
             access: {
               role: identity.role,
-              can_admin: can(identity, "admin"),
+              can_admin:
+                can(identity, "admin") &&
+                (session.membership.role === "owner" || session.membership.role === "admin"),
               service_token: identity.serviceToken,
             },
           });
@@ -345,7 +478,8 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "read");
+          const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          yield* activeAccountSession(runtime, identity);
           const limit = Math.max(1, Math.min(500, Number(query.limit ?? "100") || 100));
           const requests = yield* Effect.tryPromise({
             try: () => gatewayFor(runtime).listRecentRequests(limit),
@@ -365,7 +499,8 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "read");
+          const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          yield* activeAccountSession(runtime, identity);
           const status = yield* Effect.tryPromise({
             try: () => gatewayFor(runtime).getGatewayStatus(),
             catch: () =>
@@ -380,7 +515,9 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const tier = yield* Schema.decodeUnknownEffect(TierSchema)(params.tier).pipe(
             Effect.mapError(() => new WorkerHttpError(404, "UNKNOWN_TIER", "Unknown tier alias")),
           );
@@ -406,7 +543,9 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const payload = yield* decodeJson(
             webRequest,
             Schema.decodeUnknownEffect(KillSwitchPayloadSchema),
@@ -425,13 +564,14 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "read");
+          const identity = yield* requireAccess(webRequest, runtime.env, "read");
+          const session = yield* activeAccountSession(runtime, identity);
           const accounts = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).listProviderAccounts(),
+            try: () => gatewayFor(runtime).listProviderAccounts(accountScope(session)),
             catch: () =>
               new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Provider accounts are unavailable"),
           });
-          return json({ accounts });
+          return json({ account: session, accounts });
         }),
       ),
     )
@@ -440,7 +580,9 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const { provider, name } = yield* decodeProviderAccountParams(params);
           const decoded = yield* decodeJson(
             webRequest,
@@ -448,7 +590,13 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
           );
           const payload = yield* validateProvision(provider, decoded);
           const result = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).putProviderAccount(provider, name, payload),
+            try: () =>
+              gatewayFor(runtime).putProviderAccount(
+                accountScope(session),
+                provider,
+                name,
+                payload,
+              ),
             catch: (cause) =>
               new WorkerHttpError(
                 503,
@@ -465,10 +613,13 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const { provider, name } = yield* decodeProviderAccountParams(params);
           const result = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).activateProviderAccount(provider, name),
+            try: () =>
+              gatewayFor(runtime).activateProviderAccount(accountScope(session), provider, name),
             catch: (cause) =>
               new WorkerHttpError(
                 503,
@@ -485,10 +636,13 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const { provider, name } = yield* decodeProviderAccountParams(params);
           const result = yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).testProviderAccount(provider, name),
+            try: () =>
+              gatewayFor(runtime).testProviderAccount(accountScope(session), provider, name),
             catch: (cause) =>
               new WorkerHttpError(
                 503,
@@ -505,10 +659,13 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
         Effect.gen(function* () {
           const runtime = yield* GatewayRuntime;
           const webRequest = yield* toWebRequest(request);
-          yield* requireAccess(webRequest, runtime.env, "admin");
+          const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+          const session = yield* activeAccountSession(runtime, identity);
+          yield* requireOrganizationAdmin(session);
           const { provider, name } = yield* decodeProviderAccountParams(params);
           yield* Effect.tryPromise({
-            try: () => gatewayFor(runtime).deleteProviderAccount(provider, name),
+            try: () =>
+              gatewayFor(runtime).deleteProviderAccount(accountScope(session), provider, name),
             catch: () =>
               new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Provider account is unavailable"),
           });

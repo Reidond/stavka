@@ -1,8 +1,14 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 
 import type { GatewayEnv, GatewayProvider } from "../src/config";
 import type { MaskirovkaGateway } from "../src/gateway-container";
-import { createGatewayTestHandler, handleTestRequest, type GatewayStub } from "../src/router";
+import {
+  accountPrincipal,
+  createGatewayTestHandler,
+  handleTestRequest,
+  type GatewayStub,
+} from "../src/router";
 
 const bearer = "Bearer sk-stavka-test-gateway";
 
@@ -60,8 +66,42 @@ const status = () => ({
   requests: { retained: 0, limit: 500 as const, metadata_only: true as const },
 });
 
+const activeSession = () => ({
+  status: "active" as const,
+  user: {
+    id: "user-1",
+    displayName: "Owner",
+    email: "owner@example.test",
+    createdAt: 1,
+    updatedAt: 1,
+  },
+  organization: {
+    id: "organization-1",
+    slug: "stavka-organization",
+    name: "Stavka",
+    createdAt: 1,
+    updatedAt: 1,
+  },
+  membership: {
+    organizationId: "organization-1",
+    userId: "user-1",
+    role: "owner" as const,
+    joinedAt: 1,
+  },
+});
+
+const accountOwner = {
+  owner: { id: "user-1", displayName: "Owner", email: "owner@example.test" },
+  organization: { id: "organization-1", name: "Stavka" },
+};
+
 const fakeStub = (): GatewayStub => ({
   getGatewayStatus: vi.fn(async () => status()),
+  getAccountSession: vi.fn(async () => activeSession()),
+  signUpAccount: vi.fn(async () => activeSession()),
+  listOrganizationUsers: vi.fn(async () => [
+    { user: activeSession().user, membership: activeSession().membership },
+  ]),
   getModels: vi.fn(async () => ({
     object: "list" as const,
     data: status().aliases.map((alias) => ({
@@ -76,7 +116,7 @@ const fakeStub = (): GatewayStub => ({
   remapAlias: vi.fn(async () => status()),
   setKillSwitch: vi.fn(async () => status()),
   listProviderAccounts: vi.fn(async () => []),
-  putProviderAccount: vi.fn(async (provider: GatewayProvider, name: string, payload) => ({
+  putProviderAccount: vi.fn(async (_scope, provider: GatewayProvider, name: string, payload) => ({
     provider,
     name,
     label: payload.label,
@@ -85,8 +125,9 @@ const fakeStub = (): GatewayStub => ({
     revision: 3,
     createdAt: 8,
     updatedAt: 9,
+    ...accountOwner,
   })),
-  activateProviderAccount: vi.fn(async (provider: GatewayProvider, name: string) => ({
+  activateProviderAccount: vi.fn(async (_scope, provider: GatewayProvider, name: string) => ({
     provider,
     name,
     label: name,
@@ -95,9 +136,10 @@ const fakeStub = (): GatewayStub => ({
     revision: 3,
     createdAt: 8,
     updatedAt: 9,
+    ...accountOwner,
   })),
   deleteProviderAccount: vi.fn(async () => undefined),
-  testProviderAccount: vi.fn(async (provider: GatewayProvider, name: string) => ({
+  testProviderAccount: vi.fn(async (_scope, provider: GatewayProvider, name: string) => ({
     provider,
     name,
     label: name,
@@ -106,6 +148,7 @@ const fakeStub = (): GatewayStub => ({
     revision: 3,
     createdAt: 8,
     updatedAt: 9,
+    ...accountOwner,
   })),
   fetch: vi.fn(async () => Response.json({ proxied: true })),
 });
@@ -127,6 +170,20 @@ const request = (
 };
 
 describe("hosted gateway Worker router", () => {
+  it("rejects service-token identities from the human account control plane", async () => {
+    await expect(
+      Effect.runPromise(
+        accountPrincipal({
+          subject: "automation-service",
+          role: "automation",
+          serviceToken: true,
+          permissions: ["read"],
+          claims: { common_name: "automation-service" },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "HUMAN_ACCOUNT_REQUIRED" });
+  });
+
   it("fails closed when the machine bearer key is absent or wrong", async () => {
     const stub = fakeStub();
     const missing = await request("/healthz", undefined, environment(), stub);
@@ -161,6 +218,78 @@ describe("hosted gateway Worker router", () => {
       },
     });
     expect(stub.fetch).not.toHaveBeenCalled();
+  });
+
+  it("bootstraps the signed-in owner profile before exposing account data", async () => {
+    const stub = fakeStub();
+    vi.mocked(stub.getAccountSession).mockResolvedValue({
+      status: "setup_required",
+      identity: { email: "owner@example.test", accessRole: "owner" },
+      canSignUp: true,
+    });
+    const env = {
+      ...environment(),
+      ENVIRONMENT: "local",
+      DEV_ACCESS_EMAIL: "owner@example.test",
+    };
+
+    const session = await request("/auth/session", undefined, env, stub);
+    const blockedAccounts = await request("/admin/provider-accounts", undefined, env, stub);
+    const created = await request(
+      "/auth/signup",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName: "Owner", organizationName: "Stavka" }),
+      },
+      env,
+      stub,
+    );
+
+    expect(session.status).toBe(200);
+    await expect(session.json()).resolves.toMatchObject({
+      status: "setup_required",
+      canSignUp: true,
+    });
+    expect(blockedAccounts.status).toBe(409);
+    await expect(blockedAccounts.json()).resolves.toMatchObject({
+      error: { code: "SETUP_REQUIRED" },
+    });
+    expect(stub.listProviderAccounts).not.toHaveBeenCalled();
+    expect(created.status).toBe(200);
+    expect(stub.signUpAccount).toHaveBeenCalledWith(
+      {
+        subject: "dev:owner@example.test",
+        email: "owner@example.test",
+        accessRole: "owner",
+      },
+      { displayName: "Owner", organizationName: "Stavka" },
+    );
+  });
+
+  it("returns the signed-in profile with only its scoped provider accounts", async () => {
+    const stub = fakeStub();
+    const env = {
+      ...environment(),
+      ENVIRONMENT: "local",
+      DEV_ACCESS_EMAIL: "owner@example.test",
+    };
+
+    const response = await request("/admin/provider-accounts", undefined, env, stub);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      account: {
+        status: "active",
+        user: { id: "user-1", email: "owner@example.test" },
+        organization: { id: "organization-1", name: "Stavka" },
+      },
+      accounts: [],
+    });
+    expect(stub.listProviderAccounts).toHaveBeenCalledWith({
+      organizationId: "organization-1",
+      userId: "user-1",
+    });
   });
 
   it("never echoes credentials from named-account put or delete routes", async () => {
@@ -199,11 +328,16 @@ describe("hosted gateway Worker router", () => {
     expect(del.status).toBe(200);
     expect(admin.status).toBe(200);
     expect(stub.putProviderAccount).toHaveBeenCalledWith(
+      { organizationId: "organization-1", userId: "user-1" },
       "claude",
       "personal",
       expect.objectContaining({ credential: { kind: "claude-subscription", oauthToken: secret } }),
     );
-    expect(stub.deleteProviderAccount).toHaveBeenCalledWith("codex", "personal");
+    expect(stub.deleteProviderAccount).toHaveBeenCalledWith(
+      { organizationId: "organization-1", userId: "user-1" },
+      "codex",
+      "personal",
+    );
 
     const putBody = await put.text();
     const delBody = await del.text();
@@ -238,6 +372,38 @@ describe("hosted gateway Worker router", () => {
     );
 
     expect(unauthenticated.status).toBe(401);
+    expect(stub.putProviderAccount).not.toHaveBeenCalled();
+  });
+
+  it("requires organization admin membership in addition to Access admin", async () => {
+    const stub = fakeStub();
+    vi.mocked(stub.getAccountSession).mockResolvedValue({
+      ...activeSession(),
+      membership: { ...activeSession().membership, role: "member" },
+    });
+    const response = await request(
+      "/admin/provider-accounts/claude/personal",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          label: "Personal",
+          authKind: "claude-subscription",
+          credential: { kind: "claude-subscription", oauthToken: "x".repeat(32) },
+        }),
+      },
+      {
+        ...environment(),
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "owner@example.test",
+      },
+      stub,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "ORGANIZATION_ADMIN_REQUIRED" },
+    });
     expect(stub.putProviderAccount).not.toHaveBeenCalled();
   });
 

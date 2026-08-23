@@ -166,6 +166,9 @@ importers:
       '@stavka/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@stavka/provider-auth':
+        specifier: workspace:*
+        version: link:../../packages/provider-auth
       '@stavka/sim-core':
         specifier: workspace:*
         version: link:../../packages/sim-core
