@@ -139,11 +139,14 @@ pnpm stavka -- auth push --account claude/max --cloudflare dev
 pnpm stavka -- auth activate --account codex/work --cloudflare dev
 ```
 
-Production profiles use `cloudflare login` or `cloudflare service-token`.
+Production provider provisioning uses a human `cloudflare login` profile.
 Credentials are encrypted with `STAVKA_PROVIDER_VAULT_KEY` in Durable Object
 SQLite and are never provider-token Wrangler secrets. Set comma-separated
 `ACCESS_OWNER_SUBJECTS` (Access `sub` values or verified emails) for humans who
-may provision accounts; unlisted humans and service tokens are read-only.
+may create the first Stavka profile and provision accounts. The first signed-in
+owner creates the one organization at `/auth/signup`; provider accounts are then
+bound to that user and organization from the verified assertion. Unlisted
+humans and service tokens cannot access the account control plane.
 
 ### Account bindings already created
 
@@ -166,39 +169,30 @@ Machine secrets were uploaded with `wrangler secret put` (never commit):
 
 Rotate with `pnpm generate-key` and another interactive `secret put`.
 
-### Cloudflare Access (operator dashboard — API token lacks Access scopes)
+### Cloudflare Access
 
-Wrangler OAuth on this machine can manage Workers/KV/R2/Containers but **cannot**
-create Access apps (`Authentication error` on `/access/*`). Create four
-self-hosted Access applications in Zero Trust:
+Keep exactly one self-hosted Access application in Zero Trust:
 
-1. **Zero Trust → Access → Applications → Add application → Self-hosted**
-2. Applications (workers.dev first):
-   - `Stavka Poligon` → `stavka-poligon.andrii-shafar.workers.dev`
-   - `Stavka Commander` → `stavka-commander.andrii-shafar.workers.dev`
-   - `Stavka Maskirovka gateway` → `stavka-maskirovka-gateway.andrii-shafar.workers.dev`
-     (protect `/_/` and `/admin/*`; machine `/healthz`, `/v1/*` stay bearer-only
-     at the Worker — Access still wraps the hostname unless you path-split)
-   - `Stavka Maskirovka seat` → the hosted seat workers.dev hostname when that
-     optional service is enabled
-3. Policy: Allow your operator email (or IdP group). Keep service tokens
-   least-privileged if used.
-4. Copy each app’s **Application Audience (AUD)** and the team domain.
+1. **Zero Trust → Access → Applications → Stavka**
+2. Public application domain: `stavka.sands.red`.
+3. Human policy: allow only the designated owner email or IdP identity. A
+   service-token policy may remain for non-human probes, but service identities
+   cannot access user profiles or provider accounts.
+4. Copy the application **Application Audience (AUD)** and team domain.
    `ACCESS_TEAM_DOMAIN` must include the scheme:
    `https://<team>.cloudflareaccess.com` (not bare hostname — JWT issuer/JWKS
    verification fails without `https://`).
-5. Set on every Worker (vars or secrets; not committed):
+5. Set the same Access values on the unified and inference Workers. Also set
+   `ACCESS_OWNER_SUBJECTS` on inference to the owner's Access `sub` or verified
+   email. Private Commander and seat Workers do not need public Access apps.
 
 ```bash
-pnpm --filter @stavka/maskirovka-gateway exec wrangler secret put ACCESS_TEAM_DOMAIN
-pnpm --filter @stavka/maskirovka-gateway exec wrangler secret put ACCESS_AUD
-pnpm --filter @stavka/commander exec wrangler secret put ACCESS_TEAM_DOMAIN
-pnpm --filter @stavka/commander exec wrangler secret put ACCESS_AUD
-pnpm --filter @stavka/poligon exec wrangler secret put ACCESS_TEAM_DOMAIN
-pnpm --filter @stavka/poligon exec wrangler secret put ACCESS_AUD
+pnpm --filter @stavka/inference exec wrangler secret put ACCESS_TEAM_DOMAIN
+pnpm --filter @stavka/inference exec wrangler secret put ACCESS_AUD
+pnpm --filter @stavka/inference exec wrangler secret put ACCESS_OWNER_SUBJECTS
+pnpm --filter @stavka/stavka exec wrangler secret put ACCESS_TEAM_DOMAIN
+pnpm --filter @stavka/stavka exec wrangler secret put ACCESS_AUD
 ```
-
-Use the matching AUD per app when audiences differ.
 
 ### Deploy smoke checklist
 

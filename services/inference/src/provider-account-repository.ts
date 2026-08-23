@@ -1,15 +1,21 @@
 import type {
-  ProviderAccountPublic,
+  OwnedProviderAccountPublic,
   ProviderCredential,
   ProviderId,
   ProvisionProviderAccountPayload,
 } from "@stavka/provider-auth";
+import type { AccountScope } from "@stavka/access-auth";
 import { Effect, Schema } from "effect";
 
 import { ProviderCredentialSchema } from "@stavka/provider-auth";
 import { GatewayRepositoryError, repositoryEffect } from "./gateway-repository-error";
 
 interface ProviderAccountRow extends Record<string, SqlStorageValue> {
+  readonly organization_id: string;
+  readonly owner_user_id: string;
+  readonly organization_name: string;
+  readonly owner_display_name: string;
+  readonly owner_email: string | null;
   readonly provider: string;
   readonly name: string;
   readonly label: string;
@@ -24,8 +30,10 @@ interface ProviderAccountRow extends Record<string, SqlStorageValue> {
   readonly active: number;
 }
 
-export interface PersistedProviderAccount extends ProviderAccountPublic {
+export interface PersistedProviderAccount extends OwnedProviderAccountPublic {
   readonly credential: ProviderCredential;
+  readonly organizationId: string;
+  readonly ownerUserId: string;
 }
 
 const base64 = (bytes: Uint8Array): string => {
@@ -61,10 +69,13 @@ const importVaultKey = (encoded: string): Effect.Effect<CryptoKey, GatewayReposi
     catch: (cause) => vaultError("provider-accounts.key", cause),
   });
 
-const additionalData = (provider: ProviderId, name: string): Uint8Array =>
-  new TextEncoder().encode(`stavka-provider-account:v1:${provider}/${name}`);
+const additionalData = (scope: AccountScope, provider: ProviderId, name: string): Uint8Array =>
+  new TextEncoder().encode(
+    `stavka-provider-account:v2:${scope.organizationId}/${scope.userId}/${provider}/${name}`,
+  );
 
 const encryptCredential = (
+  scope: AccountScope,
   provider: ProviderId,
   name: string,
   credential: ProviderCredential,
@@ -78,7 +89,7 @@ const encryptCredential = (
         {
           name: "AES-GCM",
           iv: asArrayBuffer(iv),
-          additionalData: asArrayBuffer(additionalData(provider, name)),
+          additionalData: asArrayBuffer(additionalData(scope, provider, name)),
           tagLength: 128,
         },
         key,
@@ -99,7 +110,13 @@ const decryptCredential = (
         {
           name: "AES-GCM",
           iv: asArrayBuffer(fromBase64(row.iv)),
-          additionalData: asArrayBuffer(additionalData(row.provider as ProviderId, row.name)),
+          additionalData: asArrayBuffer(
+            additionalData(
+              { organizationId: row.organization_id, userId: row.owner_user_id },
+              row.provider as ProviderId,
+              row.name,
+            ),
+          ),
           tagLength: 128,
         },
         key,
@@ -112,17 +129,23 @@ const decryptCredential = (
     catch: (cause) => vaultError("provider-accounts.decrypt", cause),
   });
 
-const publicFromRow = (row: ProviderAccountRow): ProviderAccountPublic => ({
+const publicFromRow = (row: ProviderAccountRow): OwnedProviderAccountPublic => ({
   provider: row.provider as ProviderId,
   name: row.name,
   label: row.label,
-  authKind: row.auth_kind as ProviderAccountPublic["authKind"],
+  authKind: row.auth_kind as OwnedProviderAccountPublic["authKind"],
   ...(row.remote_account_id ? { remoteAccountId: row.remote_account_id } : {}),
   ...(row.remote_workspace_id ? { remoteWorkspaceId: row.remote_workspace_id } : {}),
   active: row.active === 1,
   revision: row.revision,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  owner: {
+    id: row.owner_user_id,
+    displayName: row.owner_display_name,
+    ...(row.owner_email ? { email: row.owner_email } : {}),
+  },
+  organization: { id: row.organization_id, name: row.organization_name },
 });
 
 export class DurableProviderAccountRepository {
@@ -132,7 +155,9 @@ export class DurableProviderAccountRepository {
   ) {}
 
   readonly initialize = repositoryEffect("provider-accounts.initialize", () => {
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS provider_accounts (
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS organization_provider_accounts (
+      organization_id TEXT NOT NULL,
+      owner_user_id TEXT NOT NULL,
       provider TEXT NOT NULL,
       name TEXT NOT NULL,
       label TEXT NOT NULL,
@@ -144,41 +169,77 @@ export class DurableProviderAccountRepository {
       revision INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      PRIMARY KEY(provider, name)
+      PRIMARY KEY(organization_id, owner_user_id, provider, name),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (owner_user_id) REFERENCES stavka_users(id) ON DELETE CASCADE
     )`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS active_provider_accounts (
-      provider TEXT PRIMARY KEY,
-      name TEXT NOT NULL
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS organization_active_provider_accounts (
+      organization_id TEXT NOT NULL,
+      owner_user_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      name TEXT NOT NULL,
+      PRIMARY KEY(organization_id, owner_user_id, provider),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (owner_user_id) REFERENCES stavka_users(id) ON DELETE CASCADE
     )`);
+    this.sql.exec(
+      `CREATE INDEX IF NOT EXISTS idx_organization_provider_accounts_runtime
+       ON organization_provider_accounts(provider, organization_id, owner_user_id)`,
+    );
   });
 
   private rows(where = "", ...bindings: SqlStorageValue[]): readonly ProviderAccountRow[] {
     return this.sql
       .exec<ProviderAccountRow>(
-        `SELECT a.provider, a.name, a.label, a.auth_kind, a.ciphertext, a.iv,
+        `SELECT a.organization_id, a.owner_user_id, o.name AS organization_name,
+                u.display_name AS owner_display_name, u.email AS owner_email,
+                a.provider, a.name, a.label, a.auth_kind, a.ciphertext, a.iv,
                 a.remote_account_id, a.remote_workspace_id, a.revision,
                 a.created_at, a.updated_at,
                 CASE WHEN active.name = a.name THEN 1 ELSE 0 END AS active
-         FROM provider_accounts a
-         LEFT JOIN active_provider_accounts active ON active.provider = a.provider
+         FROM organization_provider_accounts a
+         JOIN organizations o ON o.id = a.organization_id
+         JOIN stavka_users u ON u.id = a.owner_user_id
+         LEFT JOIN organization_active_provider_accounts active
+           ON active.organization_id = a.organization_id
+          AND active.owner_user_id = a.owner_user_id
+          AND active.provider = a.provider
          ${where}
-         ORDER BY a.provider, a.name`,
+         ORDER BY a.provider, a.name, a.owner_user_id`,
         ...bindings,
       )
       .toArray();
   }
 
-  readonly list: Effect.Effect<readonly ProviderAccountPublic[], GatewayRepositoryError> =
-    repositoryEffect("provider-accounts.list", () => this.rows().map(publicFromRow));
+  list(
+    scope: AccountScope,
+  ): Effect.Effect<readonly OwnedProviderAccountPublic[], GatewayRepositoryError> {
+    return repositoryEffect("provider-accounts.list", () =>
+      this.rows(
+        "WHERE a.organization_id = ? AND a.owner_user_id = ?",
+        scope.organizationId,
+        scope.userId,
+      ).map(publicFromRow),
+    );
+  }
 
   read(
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
   ): Effect.Effect<PersistedProviderAccount | undefined, GatewayRepositoryError> {
     return Effect.gen({ self: this }, function* () {
       const row = yield* repositoryEffect(
         "provider-accounts.read",
-        () => this.rows("WHERE a.provider = ? AND a.name = ?", provider, name)[0],
+        () =>
+          this.rows(
+            `WHERE a.organization_id = ? AND a.owner_user_id = ?
+             AND a.provider = ? AND a.name = ?`,
+            scope.organizationId,
+            scope.userId,
+            provider,
+            name,
+          )[0],
       );
       if (!row) return undefined;
       if (!this.vaultKey)
@@ -190,11 +251,17 @@ export class DurableProviderAccountRepository {
         );
       const key = yield* importVaultKey(this.vaultKey);
       const credential = yield* decryptCredential(row, key);
-      return { ...publicFromRow(row), credential };
+      return {
+        ...publicFromRow(row),
+        credential,
+        organizationId: row.organization_id,
+        ownerUserId: row.owner_user_id,
+      };
     });
   }
 
   active(
+    scope: AccountScope,
     provider: ProviderId,
   ): Effect.Effect<PersistedProviderAccount | undefined, GatewayRepositoryError> {
     return Effect.gen({ self: this }, function* () {
@@ -203,20 +270,48 @@ export class DurableProviderAccountRepository {
         () =>
           this.sql
             .exec<{ readonly name: string }>(
-              `SELECT name FROM active_provider_accounts WHERE provider = ? LIMIT 1`,
+              `SELECT name FROM organization_active_provider_accounts
+               WHERE organization_id = ? AND owner_user_id = ? AND provider = ? LIMIT 1`,
+              scope.organizationId,
+              scope.userId,
               provider,
             )
             .toArray()[0]?.name,
       );
-      return name ? yield* this.read(provider, name) : undefined;
+      return name ? yield* this.read(scope, provider, name) : undefined;
+    });
+  }
+
+  activeForRuntime(
+    provider: ProviderId,
+  ): Effect.Effect<PersistedProviderAccount | undefined, GatewayRepositoryError> {
+    return Effect.gen({ self: this }, function* () {
+      const rows = yield* repositoryEffect("provider-accounts.runtime-active", () =>
+        this.rows("WHERE a.provider = ? AND active.name IS NOT NULL", provider),
+      );
+      if (rows.length > 1)
+        return yield* Effect.fail(
+          new GatewayRepositoryError({
+            operation: "provider-accounts.runtime-active",
+            message: `Multiple organizations have an active ${provider} account`,
+          }),
+        );
+      const row = rows[0];
+      if (!row) return undefined;
+      return yield* this.read(
+        { organizationId: row.organization_id, userId: row.owner_user_id },
+        provider,
+        row.name,
+      );
     });
   }
 
   put(
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
     payload: ProvisionProviderAccountPayload,
-  ): Effect.Effect<ProviderAccountPublic, GatewayRepositoryError> {
+  ): Effect.Effect<OwnedProviderAccountPublic, GatewayRepositoryError> {
     return Effect.gen({ self: this }, function* () {
       if (!this.vaultKey)
         return yield* Effect.fail(
@@ -226,23 +321,25 @@ export class DurableProviderAccountRepository {
           }),
         );
       const key = yield* importVaultKey(this.vaultKey);
-      const encrypted = yield* encryptCredential(provider, name, payload.credential, key);
+      const encrypted = yield* encryptCredential(scope, provider, name, payload.credential, key);
       const now = Date.now();
       yield* repositoryEffect("provider-accounts.put", () => {
         this.sql.exec(
-          `INSERT INTO provider_accounts (
-             provider, name, label, auth_kind, ciphertext, iv,
+          `INSERT INTO organization_provider_accounts (
+             organization_id, owner_user_id, provider, name, label, auth_kind, ciphertext, iv,
              remote_account_id, remote_workspace_id, revision, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-           ON CONFLICT(provider, name) DO UPDATE SET
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+           ON CONFLICT(organization_id, owner_user_id, provider, name) DO UPDATE SET
              label = excluded.label,
              auth_kind = excluded.auth_kind,
              ciphertext = excluded.ciphertext,
              iv = excluded.iv,
              remote_account_id = excluded.remote_account_id,
              remote_workspace_id = excluded.remote_workspace_id,
-             revision = provider_accounts.revision + 1,
+             revision = organization_provider_accounts.revision + 1,
              updated_at = excluded.updated_at`,
+          scope.organizationId,
+          scope.userId,
           provider,
           name,
           payload.label,
@@ -256,18 +353,32 @@ export class DurableProviderAccountRepository {
         );
         if (payload.activate === true) {
           this.sql.exec(
-            `INSERT INTO active_provider_accounts (provider, name) VALUES (?, ?)
-             ON CONFLICT(provider) DO UPDATE SET name = excluded.name`,
+            `INSERT INTO organization_active_provider_accounts
+               (organization_id, owner_user_id, provider, name) VALUES (?, ?, ?, ?)
+             ON CONFLICT(organization_id, owner_user_id, provider)
+             DO UPDATE SET name = excluded.name`,
+            scope.organizationId,
+            scope.userId,
             provider,
             name,
           );
         }
-        // Retire the former plaintext token table only after encrypted persistence succeeds.
+        // Retire unowned legacy storage only after the scoped encrypted write succeeds.
         this.sql.exec(`DROP TABLE IF EXISTS gateway_auth_state`);
+        this.sql.exec(`DROP TABLE IF EXISTS active_provider_accounts`);
+        this.sql.exec(`DROP TABLE IF EXISTS provider_accounts`);
       });
       const stored = yield* repositoryEffect(
         "provider-accounts.put.read",
-        () => this.rows("WHERE a.provider = ? AND a.name = ?", provider, name)[0],
+        () =>
+          this.rows(
+            `WHERE a.organization_id = ? AND a.owner_user_id = ?
+             AND a.provider = ? AND a.name = ?`,
+            scope.organizationId,
+            scope.userId,
+            provider,
+            name,
+          )[0],
       );
       if (!stored)
         return yield* Effect.fail(
@@ -281,13 +392,22 @@ export class DurableProviderAccountRepository {
   }
 
   activate(
+    scope: AccountScope,
     provider: ProviderId,
     name: string,
-  ): Effect.Effect<ProviderAccountPublic, GatewayRepositoryError> {
+  ): Effect.Effect<OwnedProviderAccountPublic, GatewayRepositoryError> {
     return Effect.gen({ self: this }, function* () {
       const exists = yield* repositoryEffect(
         "provider-accounts.activate.read",
-        () => this.rows("WHERE a.provider = ? AND a.name = ?", provider, name)[0],
+        () =>
+          this.rows(
+            `WHERE a.organization_id = ? AND a.owner_user_id = ?
+             AND a.provider = ? AND a.name = ?`,
+            scope.organizationId,
+            scope.userId,
+            provider,
+            name,
+          )[0],
       );
       if (!exists)
         return yield* Effect.fail(
@@ -298,8 +418,12 @@ export class DurableProviderAccountRepository {
         );
       yield* repositoryEffect("provider-accounts.activate", () => {
         this.sql.exec(
-          `INSERT INTO active_provider_accounts (provider, name) VALUES (?, ?)
-           ON CONFLICT(provider) DO UPDATE SET name = excluded.name`,
+          `INSERT INTO organization_active_provider_accounts
+             (organization_id, owner_user_id, provider, name) VALUES (?, ?, ?, ?)
+           ON CONFLICT(organization_id, owner_user_id, provider)
+           DO UPDATE SET name = excluded.name`,
+          scope.organizationId,
+          scope.userId,
           provider,
           name,
         );
@@ -308,15 +432,25 @@ export class DurableProviderAccountRepository {
     });
   }
 
-  delete(provider: ProviderId, name: string): Effect.Effect<void, GatewayRepositoryError> {
+  delete(
+    scope: AccountScope,
+    provider: ProviderId,
+    name: string,
+  ): Effect.Effect<void, GatewayRepositoryError> {
     return repositoryEffect("provider-accounts.delete", () => {
       this.sql.exec(
-        `DELETE FROM active_provider_accounts WHERE provider = ? AND name = ?`,
+        `DELETE FROM organization_active_provider_accounts
+         WHERE organization_id = ? AND owner_user_id = ? AND provider = ? AND name = ?`,
+        scope.organizationId,
+        scope.userId,
         provider,
         name,
       );
       this.sql.exec(
-        `DELETE FROM provider_accounts WHERE provider = ? AND name = ?`,
+        `DELETE FROM organization_provider_accounts
+         WHERE organization_id = ? AND owner_user_id = ? AND provider = ? AND name = ?`,
+        scope.organizationId,
+        scope.userId,
         provider,
         name,
       );

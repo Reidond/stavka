@@ -1,6 +1,13 @@
 import { Schema } from "effect";
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
 import {
+  AccountSessionSchema,
+  ActiveAccountSessionSchema,
+  OrganizationUserSchema,
+  SignUpPayloadSchema,
+} from "@stavka/access-auth";
+import {
+  OwnedProviderAccountPublicSchema,
   ProviderAccountNameSchema,
   ProvisionProviderAccountPayloadSchema,
 } from "@stavka/provider-auth";
@@ -12,6 +19,7 @@ export const TierSchema = Schema.Literals(gatewayTiers);
 export const SeatSchema = Schema.Literals(gatewaySeats);
 
 export { ProvisionProviderAccountPayloadSchema };
+export { SignUpPayloadSchema };
 export const AccountNameSchema = ProviderAccountNameSchema;
 
 export const AliasPayloadSchema = Schema.Struct({
@@ -30,6 +38,14 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
   HttpApiEndpoint.get("models", "/v1/models", { success: AnyResponse }),
   HttpApiEndpoint.post("responses", "/v1/responses", { success: AnyResponse }),
   HttpApiEndpoint.post("messages", "/v1/messages", { success: AnyResponse }),
+  HttpApiEndpoint.get("accountSession", "/auth/session", { success: AccountSessionSchema }),
+  HttpApiEndpoint.post("signUpAccount", "/auth/signup", {
+    payload: SignUpPayloadSchema,
+    success: ActiveAccountSessionSchema,
+  }),
+  HttpApiEndpoint.get("organizationUsers", "/account/users", {
+    success: Schema.Struct({ users: Schema.Array(OrganizationUserSchema) }),
+  }),
   HttpApiEndpoint.get("adminStatus", "/admin/status", { success: AnyResponse }),
   HttpApiEndpoint.get("adminRequests", "/admin/requests", {
     query: { limit: Schema.optional(Schema.String) },
@@ -45,11 +61,16 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
     payload: KillSwitchPayloadSchema,
     success: AnyResponse,
   }),
-  HttpApiEndpoint.get("providerAccounts", "/admin/provider-accounts", { success: AnyResponse }),
+  HttpApiEndpoint.get("providerAccounts", "/admin/provider-accounts", {
+    success: Schema.Struct({
+      account: ActiveAccountSessionSchema,
+      accounts: Schema.Array(OwnedProviderAccountPublicSchema),
+    }),
+  }),
   HttpApiEndpoint.put("putProviderAccount", "/admin/provider-accounts/:provider/:name", {
     params: { provider: ProviderSchema, name: AccountNameSchema },
     payload: ProvisionProviderAccountPayloadSchema,
-    success: AnyResponse,
+    success: OwnedProviderAccountPublicSchema,
   }),
   HttpApiEndpoint.delete("deleteProviderAccount", "/admin/provider-accounts/:provider/:name", {
     params: { provider: ProviderSchema, name: AccountNameSchema },
@@ -60,12 +81,26 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
     "/admin/provider-accounts/:provider/:name/activate",
     {
       params: { provider: ProviderSchema, name: AccountNameSchema },
-      success: AnyResponse,
+      success: OwnedProviderAccountPublicSchema,
     },
   ),
   HttpApiEndpoint.post("testProviderAccount", "/admin/provider-accounts/:provider/:name/test", {
     params: { provider: ProviderSchema, name: AccountNameSchema },
-    success: AnyResponse,
+    success: Schema.Struct({
+      provider: OwnedProviderAccountPublicSchema.fields.provider,
+      name: OwnedProviderAccountPublicSchema.fields.name,
+      test: Schema.Literal("credential-decrypted"),
+      label: OwnedProviderAccountPublicSchema.fields.label,
+      authKind: OwnedProviderAccountPublicSchema.fields.authKind,
+      remoteAccountId: Schema.optional(Schema.String),
+      remoteWorkspaceId: Schema.optional(Schema.String),
+      active: Schema.Boolean,
+      revision: Schema.Number,
+      createdAt: Schema.Number,
+      updatedAt: Schema.Number,
+      owner: OwnedProviderAccountPublicSchema.fields.owner,
+      organization: OwnedProviderAccountPublicSchema.fields.organization,
+    }),
   }),
   HttpApiEndpoint.get("dashboardIndex", "/_", { success: AnyResponse }),
   HttpApiEndpoint.get("dashboardAsset", "/_/:head/*", {

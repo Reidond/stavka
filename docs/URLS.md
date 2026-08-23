@@ -17,24 +17,30 @@ Production request flow:
 
 ```text
 browser / stavka CLI -> stavka.sands.red (Access: Stavka)
+                         |-- /auth/*, /account/* -> INFERENCE_SERVICE
                          |-- /admin/provider-accounts* -> INFERENCE_SERVICE
                          `-- simulations -> COMMANDER_SERVICE -> INFERENCE_SERVICE
 ```
 
 ### Unified path map
 
-| Path                                                | Audience          | Notes                                    |
-| --------------------------------------------------- | ----------------- | ---------------------------------------- |
-| `/healthz`                                          | Public liveness   | Unified Worker health                    |
-| `/`, application routes                             | Cloudflare Access | Operator UI                              |
-| `/agents/*`                                         | Cloudflare Access | Agents SDK HTTP/WebSocket                |
-| `/admin/provider-accounts`                          | Access read       | Named Codex/Claude account metadata      |
-| `/admin/provider-accounts/:provider/:name`          | Access owner      | Provision or delete an encrypted account |
-| `/admin/provider-accounts/:provider/:name/test`     | Access owner      | Validate the stored credential           |
-| `/admin/provider-accounts/:provider/:name/activate` | Access owner      | Activate the account                     |
+| Path                                                | Audience          | Notes                                                |
+| --------------------------------------------------- | ----------------- | ---------------------------------------------------- |
+| `/healthz`                                          | Public liveness   | Unified Worker health                                |
+| `/`, application routes                             | Cloudflare Access | Operator UI                                          |
+| `/agents/*`                                         | Cloudflare Access | Agents SDK HTTP/WebSocket                            |
+| `/auth/session`                                     | Access human      | Signed-in profile or setup-required state            |
+| `/auth/signup`                                      | Access owner      | Create the one Stavka organization and owner profile |
+| `/account/users`                                    | Active member     | Users in the caller's organization                   |
+| `/admin/provider-accounts`                          | Active member     | Caller-owned Codex/Claude account metadata           |
+| `/admin/provider-accounts/:provider/:name`          | Active owner      | Provision or delete an encrypted account             |
+| `/admin/provider-accounts/:provider/:name/test`     | Active owner      | Validate the caller-owned credential                 |
+| `/admin/provider-accounts/:provider/:name/activate` | Active owner      | Activate the caller-owned account                    |
 
-The provider-account routes are forwarded over `INFERENCE_SERVICE`; they never
-require a public inference hostname. Automation service tokens are read-only.
+The account and provider routes are forwarded over `INFERENCE_SERVICE`; they
+never require a public inference hostname. User and provider-account data are
+scoped from the verified Access assertion. Service tokens cannot enter the
+human account control plane.
 
 ### Private bindings and storage
 
@@ -52,8 +58,8 @@ require a public inference hostname. Automation service tokens are read-only.
 ## Cloudflare Access
 
 The only Access application is `Stavka`, covering `stavka.sands.red`. It keeps
-the human operator policy and a read-only `Stavka Codex automation` service
-token policy. Both the unified Worker and private inference Worker validate the
+the human operator policy and a `Stavka Codex automation` service-token policy
+for non-human probes. Both the unified Worker and private inference Worker validate the
 same Access assertion with:
 
 ```text
@@ -93,12 +99,12 @@ Commander -> unified app.
 
 ```bash
 curl -sSI https://stavka.sands.red | head -n1
-pnpm stavka -- auth list --cloudflare production-automation
+pnpm stavka -- auth list --cloudflare production
 ```
 
 The first request must be intercepted by Access for an unauthenticated caller.
-The second must pass Access through the read-only service token and return only
-provider-account metadata.
+The second must run with the signed-in human profile and return only that
+profile's provider-account metadata.
 
 Operator procedures, secrets, Access setup, and rollback live in
 [OPERATOR_GUIDE.md](./OPERATOR_GUIDE.md).

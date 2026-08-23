@@ -42,6 +42,7 @@ describe("hosted gateway architecture boundaries", () => {
 
   it("exposes repository operations as Effects without Promise returns", () => {
     for (const filename of [
+      "organization-repository.ts",
       "provider-account-repository.ts",
       "gateway-config-repository.ts",
       "request-metadata-repository.ts",

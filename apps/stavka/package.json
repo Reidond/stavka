@@ -20,6 +20,7 @@
     "@standard-schema/spec": "1.1.0",
     "@stavka/access-auth": "workspace:*",
     "@stavka/protocol": "workspace:*",
+    "@stavka/provider-auth": "workspace:*",
     "@stavka/sim-core": "workspace:*",
     "@stavka/sim-link": "workspace:*",
     "@stavka/warbench-core": "workspace:*",

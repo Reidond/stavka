@@ -36,6 +36,9 @@ export const StavkaShell = () => (
           </Link>
         ))}
       </nav>
+      <a href="/cdn-cgi/access/logout" className={`${navLinkClass} ml-auto`}>
+        Sign out
+      </a>
     </header>
     <main className="stavka-main">
       <Outlet />

@@ -113,18 +113,30 @@ export const ProvisionProviderAccountPayloadSchema = Schema.Struct({
 });
 export type ProvisionProviderAccountPayload = typeof ProvisionProviderAccountPayloadSchema.Type;
 
-export interface ProviderAccountPublic {
-  readonly provider: ProviderId;
-  readonly name: string;
-  readonly label: string;
-  readonly authKind: ProviderAccount["authKind"];
-  readonly remoteAccountId?: string;
-  readonly remoteWorkspaceId?: string;
-  readonly active: boolean;
-  readonly revision: number;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-}
+export const ProviderAccountPublicSchema = Schema.Struct({
+  provider: ProviderIdSchema,
+  name: ProviderAccountNameSchema,
+  label: ProviderAccountSchema.fields.label,
+  authKind: ProviderAccountSchema.fields.authKind,
+  remoteAccountId: Schema.optional(Schema.String),
+  remoteWorkspaceId: Schema.optional(Schema.String),
+  active: Schema.Boolean,
+  revision: Schema.Number,
+  createdAt: Schema.Number,
+  updatedAt: Schema.Number,
+});
+export type ProviderAccountPublic = typeof ProviderAccountPublicSchema.Type;
+
+export const OwnedProviderAccountPublicSchema = Schema.Struct({
+  ...ProviderAccountPublicSchema.fields,
+  owner: Schema.Struct({
+    id: Schema.String,
+    displayName: Schema.String,
+    email: Schema.optional(Schema.String),
+  }),
+  organization: Schema.Struct({ id: Schema.String, name: Schema.String }),
+});
+export type OwnedProviderAccountPublic = typeof OwnedProviderAccountPublicSchema.Type;
 
 export class ProviderAuthError extends Data.TaggedError("ProviderAuthError")<{
   readonly operation: string;

@@ -152,6 +152,12 @@ const ProviderAccountsRootRoute = HttpRouter.route(
   inferenceAdmin,
 );
 
+const AccountSessionRoute = HttpRouter.route("GET", "/auth/session", inferenceAdmin);
+
+const AccountSignUpRoute = HttpRouter.route("POST", "/auth/signup", inferenceAdmin);
+
+const OrganizationUsersRoute = HttpRouter.route("GET", "/account/users", inferenceAdmin);
+
 const PutProviderAccountRoute = HttpRouter.route(
   "PUT",
   "/admin/provider-accounts/*",
@@ -178,6 +184,9 @@ const TanStackRoute = HttpRouter.route("*", "/*", (request) =>
 
 const RawRoutesLive = HttpRouter.addAll([
   AgentsRoute,
+  AccountSessionRoute,
+  AccountSignUpRoute,
+  OrganizationUsersRoute,
   ProviderAccountsRootRoute,
   PutProviderAccountRoute,
   PostProviderAccountRoute,
