@@ -1,6 +1,0 @@
-ENVIRONMENT=local
-DEV_ACCESS_EMAIL=developer@localhost
-ACCESS_TEAM_DOMAIN=
-ACCESS_AUD=
-COMMANDER_URL=http://127.0.0.1:8787
-COMMANDER_API_KEY=sk-stavka-replace-me

@@ -22,7 +22,6 @@ describe("Maskirovka architecture boundaries", () => {
     for (const filename of [
       "../src/services/gateway-service.ts",
       "../src/services/seat-registry.ts",
-      "../src/services/doctor-service.ts",
       "../src/router.ts",
     ]) {
       expect(source(filename)).not.toMatch(/node:(?:fs|child_process)/u);
@@ -33,7 +32,6 @@ describe("Maskirovka architecture boundaries", () => {
     for (const filename of [
       "../src/services/gateway-service.ts",
       "../src/services/seat-registry.ts",
-      "../src/services/doctor-service.ts",
       "../src/router.ts",
       "../src/runtime.ts",
     ]) {

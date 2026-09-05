@@ -30,17 +30,7 @@ jobs:
           cache: true
           run-install: false
       - run: vp install --frozen-lockfile
-      - name: Install browser runtime
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify workspace and local browser flows
+      - name: Verify source, build, and deterministic tests
         run: pnpm verify
         env:
           MASKIROVKA_MODE: replay
-      - name: Preserve browser diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: browser-diagnostics
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 7

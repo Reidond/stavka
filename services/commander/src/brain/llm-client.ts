@@ -134,7 +134,7 @@ const generatedDecision = (
  * When a private inference service binding is configured, all model traffic
  * flows through the binding and never touches a public inference origin.
  * Otherwise requests use platform fetch against the configured base URL
- * (local development).
+ * (explicit endpoint overrides, including CI transport fixtures).
  */
 const httpClientLayer = (config: CommanderConfig): Layer.Layer<HttpClient.HttpClient> => {
   const service = config.inferenceService;

@@ -28,9 +28,8 @@
     "TICK_INTERVAL_ACTIVE_MS": "750",
     "TICK_INTERVAL_BURST_MS": "300",
     "STAVKA_AI_PROVIDER": "openai",
-    // Model traffic rides the INFERENCE_SERVICE service binding; this URL is
-    // only a local-development fallback (see .dev.vars).
-    "STAVKA_AI_BASE_URL": "http://127.0.0.1:4141",
+    // This internal URL is dispatched through the private INFERENCE_SERVICE binding.
+    "STAVKA_AI_BASE_URL": "https://inference.internal",
   },
   "observability": { "enabled": true },
 }

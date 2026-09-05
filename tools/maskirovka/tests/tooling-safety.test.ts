@@ -10,14 +10,7 @@ describe("Maskirovka workflow safety", () => {
       await readFile(resolve(repositoryRoot, "package.json"), "utf8"),
     ) as { readonly scripts: Readonly<Record<string, string>> };
 
-    for (const script of [
-      "ai:up",
-      "ai:doctor",
-      "ai:smoke",
-      "ai:models",
-      "ai:serve",
-      "ai:deploy-seat",
-    ]) {
+    for (const script of ["ai:smoke"]) {
       expect(packageJson.scripts[script]).toContain("vp run --no-cache");
     }
   });

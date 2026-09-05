@@ -6,7 +6,7 @@ Commander and inference reachable only through Cloudflare service bindings.
 ## Preconditions
 
 - Branch `main` is green on the CI verify workflow (check, lint, tests,
-  typecheck, build, replay eval, offline smoke, browser acceptance).
+  typecheck, build, replay eval, in-process mock smoke).
 - The GitHub `production` environment exists with `CLOUDFLARE_API_TOKEN`
   (Workers Scripts Edit, Containers Edit) and `CLOUDFLARE_ACCOUNT_ID`.
   Because the app declares its custom domain, the deployment credential also

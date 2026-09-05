@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { accessConfig, type Env } from "../src/config";
+import { accessConfig, readConfig, type Env } from "../src/config";
 
 const env = (environment?: string): Env => ({
   ORCHESTRATOR: {} as Env["ORCHESTRATOR"],
@@ -11,6 +11,10 @@ const env = (environment?: string): Env => ({
 });
 
 describe("Commander Access posture", () => {
+  it("defaults model requests to the private Cloudflare service origin", () => {
+    expect(readConfig(env("production")).aiBaseUrl).toBe("https://inference.internal");
+  });
+
   it("enables synthetic development identity only for an explicit local environment", () => {
     expect(accessConfig(env("local")).environment).toBe("local");
   });

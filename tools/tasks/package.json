@@ -4,21 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:local": "node --import tsx src/local-dev.ts",
     "eval": "node --import tsx src/cli.ts eval",
     "lint:tailwind": "node --import tsx src/cli.ts lint-tailwind",
     "build:maskirovka-gateway": "node --import tsx src/cli.ts build-maskirovka-gateway",
     "deploy:production": "node --import tsx src/cli.ts deploy-production",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify": "node --import tsx src/cli.ts verify",
-    "qa": "node --import tsx src/cli.ts qa",
-    "qa:serve": "node --import tsx src/qa-server.ts",
-    "bench:sim": "node --import tsx src/cli.ts bench-sim"
+    "verify": "node --import tsx src/cli.ts verify"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.102",
-    "effect": "4.0.0-beta.102",
-    "jsonc-parser": "^3.3.1"
+    "effect": "4.0.0-beta.102"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

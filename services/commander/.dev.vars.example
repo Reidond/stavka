@@ -1,9 +1,0 @@
-API_KEY=sk-stavka-replace-me
-ENVIRONMENT=local
-DEV_ACCESS_EMAIL=developer@localhost
-ACCESS_TEAM_DOMAIN=
-ACCESS_AUD=
-STAVKA_AI_PROVIDER=mock
-# Prefer gateway wrangler-dev / workers.dev origin; :4141 Node is legacy/CI-only.
-STAVKA_AI_BASE_URL=http://127.0.0.1:4141
-STAVKA_AI_KEY=maskirovka-local

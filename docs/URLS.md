@@ -27,7 +27,7 @@ browser / stavka CLI -> stavka.sands.red (Access: Stavka)
 
 | Path                                                | Audience          | Notes                                                |
 | --------------------------------------------------- | ----------------- | ---------------------------------------------------- |
-| `/healthz`                                          | Public liveness   | Unified Worker health                                |
+| `/healthz`                                          | Cloudflare Access | Unified Worker health                                |
 | `/`, application routes                             | Cloudflare Access | Operator UI                                          |
 | `/agents/*`                                         | Cloudflare Access | Agents SDK HTTP/WebSocket                            |
 | `/auth/session`                                     | Access human      | Signed-in profile or setup-required state            |
@@ -78,18 +78,9 @@ The unified Worker receives the current application audience as `ACCESS_AUD`.
 Inference receives the same audience plus `ACCESS_OWNER_SUBJECTS` so provider
 credential mutations fail closed for anyone except an explicitly listed owner.
 
-## Local development
+## Development and acceptance
 
-| Surface                        | Default origin              | Start command                                               |
-| ------------------------------ | --------------------------- | ----------------------------------------------------------- |
-| Unified Stavka                 | Vite-assigned local URL     | `pnpm --filter @stavka/stavka dev`                          |
-| Commander                      | `http://127.0.0.1:8787`     | `pnpm --filter @stavka/commander dev`                       |
-| Inference gateway              | Wrangler-assigned local URL | build dashboard, then `pnpm --filter @stavka/inference dev` |
-| Hosted seat                    | Wrangler-assigned local URL | build dashboard, then seat `dev`                            |
-| Local Maskirovka compatibility | `http://127.0.0.1:4141`     | `pnpm ai:up`                                                |
-
-Exact-local Access synthesis requires `ENVIRONMENT=local` and
-`DEV_ACCESS_EMAIL`. Production URLs never accept that synthetic identity.
+Use `https://stavka.sands.red` for app, live model, visual, and integration testing. Local app/gateway launchers and the local browser acceptance stack have been removed. CI uses deterministic tests without an interactive app environment. See [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md).
 
 ## Repository and CI
 
@@ -99,9 +90,7 @@ Exact-local Access synthesis requires `ENVIRONMENT=local` and
 | Workflow           | `.github/workflows/ci.yml`          |
 | GitHub environment | `production`                        |
 
-The `deploy` job runs only after `verify` succeeds on a `main` push or a manual
-dispatch whose ref is `main`. Deployment order is inference -> hosted seat ->
-Commander -> unified app.
+CI verifies source only. The separate manual `deploy.yml` workflow is restricted to `main` and the `production` environment; dispatch it after CI succeeds on that revision. Deployment order is inference -> Commander -> unified app. The hosted seat is optional and excluded.
 
 ## Quick probes
 

@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import agents from "agents/vite";
 import { defineConfig } from "vite";
 
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig({
   resolve: {
     dedupe: ["react", "react-dom", "three"],
   },
@@ -13,22 +13,9 @@ export default defineConfig(({ command, mode }) => ({
     agents(),
     cloudflare({
       viteEnvironment: { name: "ssr" },
-      ...(command === "serve" && mode === "local-account"
-        ? {
-            remoteBindings: false,
-            auxiliaryWorkers: [
-              { configPath: "../../services/commander/wrangler.jsonc", devOnly: true },
-              {
-                configPath: "../../services/inference/wrangler.jsonc",
-                config: { assets: undefined },
-                devOnly: true,
-              },
-            ],
-          }
-        : {}),
     }),
     tanstackStart(),
     react(),
     tailwindcss(),
   ],
-}));
+});

@@ -12,7 +12,6 @@ import {
   tailwindLintTask,
   type TaskCommand,
   verificationTask,
-  browserQaTask,
 } from "./task-plan";
 
 const TaskName = Schema.Literals([
@@ -21,8 +20,6 @@ const TaskName = Schema.Literals([
   "build-maskirovka-gateway",
   "deploy-production",
   "verify",
-  "qa",
-  "bench-sim",
 ]);
 type TaskName = Schema.Schema.Type<typeof TaskName>;
 
@@ -77,10 +74,6 @@ const commandsForTask = (
       return productionDeployTask;
     case "verify":
       return verificationTask;
-    case "qa":
-      return browserQaTask;
-    case "bench-sim":
-      return [];
   }
 
   return task satisfies never;
@@ -88,11 +81,6 @@ const commandsForTask = (
 
 const program = Effect.gen(function* () {
   const task = yield* Schema.decodeUnknownEffect(TaskName)(process.argv[2]);
-  if (task === "bench-sim") {
-    const { benchmark } = yield* Effect.promise(() => import("../../performance/sim-world"));
-    yield* Console.log(JSON.stringify(benchmark(), null, 2));
-    return;
-  }
   const forwardedArguments = process.argv.slice(3).filter((argument) => argument !== "--");
   const commands = commandsForTask(task, forwardedArguments);
   for (const command of commands) yield* runCommand(command);

@@ -9,8 +9,7 @@ import { restoreGatewaySubscriptionAuth } from "./auth-state";
 /**
  * Production Container entrypoint. It reads only the injected environment,
  * restores subscription credentials from MASKIROVKA_AUTH_STATE_B64, and launches
- * the existing gateway HttpApi through Effect Layers. Host CLI commands, doctor
- * checks, and .dev.vars loading stay outside the hosted image.
+ * the existing gateway HttpApi through Effect Layers. CI smoke/replay commands stay outside the hosted image.
  */
 const program = Effect.gen(function* () {
   yield* restoreGatewaySubscriptionAuth();

@@ -45,21 +45,11 @@
 - Run `pnpm warbench calibrate` before any live study. Calibration seeds and held-out seeds must remain disjoint.
 - A final export requires a completed, digest-verified study. JSON, PDF, CSV, and Markdown must derive from the same canonical evidence object.
 
-## LLM development
+## Development and verification
 
-- Start the local gateway with `pnpm ai:up`. It binds to `127.0.0.1:4141`, runs the non-billing doctor, and generates the Wrangler `.dev.vars` files. Never add real provider API keys to development files.
-- Code requests only `stavka/commander`, `stavka/sergeant`, or `stavka/heavy`; Maskirovka owns concrete seat/model resolution.
-- OpenAI clients use Responses only:
-
-  ```sh
-  curl -sS http://127.0.0.1:4141/v1/responses -H 'content-type: application/json' -d '{"model":"stavka/commander","input":"Hold position"}'
-  ```
-
-- Anthropic clients use Messages only:
-
-  ```sh
-  curl -sS http://127.0.0.1:4141/v1/messages -H 'content-type: application/json' -d '{"model":"stavka/sergeant","max_tokens":64,"messages":[{"role":"user","content":"Hold position"}]}'
-  ```
-
-- `GET /healthz` is the machine-readable seat/budget view; `GET /v1/models` lists aliases and current resolutions; the local operations SPA is at `/_/`.
-- Run `pnpm eval -- --replay` before commit. Replay misses fail without touching a network. Use record, `doctor --live`, live sergeants, metered API, live Warbench candidate runs, and deployment only as explicit operator actions.
+- Run the app, live models, and integration/visual acceptance on Cloudflare at `https://stavka.sands.red`, behind the existing Cloudflare Access policy. Do not start local app servers, a local model gateway, local account profiles, or a local browser acceptance stack.
+- Keep CI simple: lint, formatting, Tailwind, typechecks, builds, deterministic unit tests, in-process mock smoke, and replay tests. CI never deploys or calls live providers. Do not reintroduce Playwright local-server suites or standalone local performance/acceptance harnesses.
+- Build and inspect source locally as needed; verify app behavior against the deployed revision on Cloudflare. Record the commit/version being tested. A source change needs an explicit deployment before it can be verified in the deployed app.
+- Code requests only `stavka/commander`, `stavka/sergeant`, or `stavka/heavy`; Maskirovka owns concrete seat/model resolution. OpenAI clients use Responses; Anthropic clients use Messages.
+- Use the deployed Models page or the signed-in owner's Cloudflare profile for live model probes. Provider credentials stay in the CLI account store and encrypted Cloudflare vault; no browser token entry or local `.dev.vars` provisioning. Service tokens do not authorize provider execution.
+- Run `pnpm verify` and `pnpm eval -- --replay` before commit. Replay misses fail without invoking a provider. Live provider calls, record mode, Warbench candidate studies, and deployment remain explicit operator actions.

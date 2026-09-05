@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm build:dashboard && wrangler dev",
     "build:dashboard": "vp build --config vite.dashboard.config.ts",
     "build": "pnpm build:dashboard && wrangler deploy --dry-run --outdir dist/worker",
     "build:container": "docker build -t stavka-maskirovka-seat:local .",

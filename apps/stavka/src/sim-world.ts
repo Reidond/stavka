@@ -514,7 +514,7 @@ export class SimWorld extends Agent<Env, PoligonState> {
     if (existing) return { link: existing, sessionId };
 
     // Production rides the private COMMANDER_SERVICE binding; COMMANDER_URL
-    // remains a local-development fallback.
+    // remains an explicit endpoint override for CI transport fixtures.
     const service = this.env.COMMANDER_SERVICE;
     const link = new RestCommanderLink({
       endpoint: service ? "https://commander.internal" : (this.env.COMMANDER_URL as string),

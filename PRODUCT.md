@@ -1,5 +1,7 @@
 # Stavka — LLM-Powered AI Commander for Arma Reforger
 
+> **Current development workflow — 2026-09-05:** run the app, live models, and integration/visual acceptance on Cloudflare. Local app/gateway launchers and standalone local acceptance harnesses are retired. Keep deterministic CI checks only. [AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md) supersedes older local-development and doctor instructions in this design history.
+
 **PRODUCT.md — Unified Product Document**
 
 > Stavka is an orchestration layer that wraps Arma Reforger's existing Commander /

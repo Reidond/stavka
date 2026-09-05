@@ -7,7 +7,7 @@ macOS without a game installation.
 
 This workspace implements strict protocol and replay
 contracts, Commander orchestration, deterministic simulation and link behavior,
-Poligon's hosted and browser-local modes, local and hosted Maskirovka code, the
+Poligon's hosted and browser-local modes, Cloudflare-hosted Maskirovka code, the
 Kumo-based frontend surfaces, and deterministic verification/evaluation tooling.
 
 > **External boundary:** no production Arma addon or dedicated-server layer is
@@ -30,28 +30,15 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-Start the unified local application:
+Use the deployed application at [stavka.sands.red](https://stavka.sands.red). App, live model, visual, and integration testing run on Cloudflare. Commander and inference are private services reached through bindings.
+
+Run source checks through CI:
 
 ```bash
-pnpm --filter @stavka/stavka dev
+pnpm verify
 ```
 
-The unified dashboard contains local simulation, replay, model, usage, and
-system routes. Commander and inference are private Cloudflare services in the
-production topology and are reached through service bindings, not public
-browser origins.
-
-The local LLM gateway is also deterministic by default:
-
-```bash
-pnpm ai:up
-pnpm ai:smoke
-```
-
-`ai:up` binds Maskirovka to `127.0.0.1:4141`; `ai:smoke` uses only the mock
-seat. Live provider actions and local/manual deployment actions are always
-explicit operator steps. CI is verification-only; production deployment is a
-separate manual workflow restricted to `main`.
+The local app/gateway launchers and browser acceptance stack have been removed. CI runs lint, types, builds, deterministic unit/replay tests, and in-process mock smoke. It never deploys or invokes live providers. Production deployment remains a separate manual action restricted to `main`.
 
 Warbench is an independent local CLI, not a dashboard or deployed service:
 
@@ -116,10 +103,9 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 ## Verification
 
 Run the repository gates before relying on a revision. See the
-[agent workflow](docs/AGENT_WORKFLOW.md) for isolated worktrees, fast QA, and traces:
+[agent workflow](docs/AGENT_WORKFLOW.md) for CI and Cloudflare acceptance:
 
 ```bash
-pnpm exec playwright install chromium
 pnpm verify
 ```
 
@@ -127,16 +113,14 @@ Commander sessions are isolated by `(session_id, mission_epoch, faction)`.
 Exact gate results and the local browser acceptance evidence are recorded in
 [the September audit](docs/audits/2026-09-05.md).
 
-These checks combine mocks/replay data with local workerd, SQLite, service bindings, and Chromium. They do not prove a real
-Cloudflare deployment, Access policy, subscription seat, production addon, or
-dedicated server. The manual production job deploys inference, Commander, then
+These checks use deterministic fixtures and replay data. Live Worker, SQLite, service-binding, browser, Access, and subscription behavior is verified on Cloudflare. CI does not prove a production addon or dedicated server. The manual production job deploys inference, Commander, then
 the unified app; upload success alone is not post-deploy HTTP health.
 
 ## Documentation
 
-- [Service URLs](docs/URLS.md) — local and production origins, path maps, and
+- [Service URLs](docs/URLS.md) — Cloudflare origins, path maps, and
   probe commands
-- [Operator guide](docs/OPERATOR_GUIDE.md) — local stacks, modes, routes,
+- [Operator guide](docs/OPERATOR_GUIDE.md) — Cloudflare operation, modes, routes,
   exports, secrets, and deployment preparation
 - [Warbench study runbook](docs/runbooks/warbench-study.md) — calibration,
   exact-model smoke, protocol freeze, held-out execution, and evidence rules

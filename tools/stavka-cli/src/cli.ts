@@ -24,7 +24,6 @@ const usage = `Stavka provider accounts
   stavka codex login <name> [--device] [--label <label>]
   claude setup-token | stavka claude login <name> --token-stdin [--label <label>]
   stavka cloudflare login <name> --url <Access URL> [--label <label>]
-  stavka cloudflare local <name> --url <localhost URL> [--label <label>]
   stavka cloudflare service-token <name> --url <Access URL> --client-id <id> --client-secret-stdin
   stavka accounts
   stavka use <codex|claude|cloudflare> <name>
@@ -228,7 +227,7 @@ const saveCloudflareProfile = (
       Effect.flatMap(accountName),
     );
     const rawUrl = yield* required(argument(args, "--url"), "--url is required");
-    const url = auth.kind === "local" ? rawUrl : yield* cloudflareAccessUrl(rawUrl);
+    const url = yield* cloudflareAccessUrl(rawUrl);
     const now = new Date().toISOString();
     yield* store.putCloudflareProfile({
       name,
@@ -239,20 +238,6 @@ const saveCloudflareProfile = (
       updatedAt: now,
     });
     yield* writeLine(`Saved and activated cloudflare/${name}.`);
-  });
-
-const cloudflareLocal = (args: readonly string[]): Effect.Effect<void, Error | ProviderAuthError> =>
-  Effect.gen(function* () {
-    const url = new URL(yield* required(argument(args, "--url"), "--url is required"));
-    if (
-      url.protocol !== "http:" ||
-      (url.hostname !== "127.0.0.1" && url.hostname !== "localhost")
-    ) {
-      return yield* Effect.fail(
-        new Error("Local profiles require an http://127.0.0.1 or http://localhost URL"),
-      );
-    }
-    yield* saveCloudflareProfile(args, { kind: "local" });
   });
 
 const cloudflareServiceToken = (
@@ -287,18 +272,11 @@ const remoteRequest = <A>(
 ): Effect.Effect<A, Error> =>
   Effect.tryPromise({
     try: async () => {
-      const baseUrl =
-        profile.auth.kind === "local"
-          ? (() => {
-              const url = new URL(profile.url);
-              if (
-                url.protocol !== "http:" ||
-                (url.hostname !== "127.0.0.1" && url.hostname !== "localhost")
-              )
-                throw new Error("Local Cloudflare profiles require a loopback HTTP URL");
-              return url;
-            })()
-          : parseCloudflareAccessUrl(profile.url);
+      if (profile.auth.kind === "local")
+        throw new Error(
+          "Local profiles are no longer supported. Use cloudflare login with https://stavka.sands.red.",
+        );
+      const baseUrl = parseCloudflareAccessUrl(profile.url);
       const headers = accessHeaders(profile);
       new Headers(init.headers).forEach((value, key) => headers.set(key, value));
       const response = await fetch(new URL(path, `${baseUrl.toString().replace(/\/$/u, "")}/`), {
@@ -435,7 +413,6 @@ export const runCli = (args: readonly string[]): Effect.Effect<void, Error | Pro
   if (group === "codex" && command === "login") return codexLogin(rest);
   if (group === "claude" && command === "login") return claudeLogin(rest);
   if (group === "cloudflare" && command === "login") return cloudflareLogin(rest);
-  if (group === "cloudflare" && command === "local") return cloudflareLocal(rest);
   if (group === "cloudflare" && command === "service-token") return cloudflareServiceToken(rest);
   if (group === "accounts") return accounts();
   if (group === "use") return useAccount([command ?? "", ...rest]);

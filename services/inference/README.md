@@ -1,81 +1,28 @@
-# Maskirovka gateway (Cloudflare Container)
+# Private Cloudflare inference gateway
 
-Product Posture A: the full Maskirovka gateway (Claude + Codex seats in-process)
-runs as a Cloudflare Container behind a Worker/Durable Object. Local development
-uses `wrangler dev` for this app — not a separate Node `:4141` process and never
-a home-Mac dial-in seat.
+The full Maskirovka gateway runs in a Cloudflare Container behind a private Worker/Durable Object. Use [stavka.sands.red](https://stavka.sands.red) for app, live model, and integration testing. The unified app forwards account and provider APIs through `INFERENCE_SERVICE`; no public inference hostname or local gateway is required.
 
-Optional single-provider leaf: `apps/maskirovka-seat` (Cloudflare only). That
-leaf is not the PRODUCT production path.
+## Provider accounts
 
-## Local path (`wrangler dev`)
+Model execution requires verified human Cloudflare Access, an active Stavka profile, and owner/admin membership. Credentials are selected within that user's organization and account scope and encrypted in Durable Object SQLite. Service tokens and machine bearers cannot authorize provider execution. Browser pages expose metadata only.
 
-```sh
-# From the repository root
-cp services/inference/.dev.vars.example services/inference/.dev.vars
-# Set MASKIROVKA_GATEWAY_KEY, STAVKA_PROVIDER_VAULT_KEY, and DEV_ACCESS_EMAIL.
-
-pnpm --filter @stavka/inference build:dashboard
-pnpm --filter @stavka/inference types   # after wrangler.jsonc changes
-pnpm --filter @stavka/inference typecheck
-pnpm --filter @stavka/inference test
-pnpm --filter @stavka/inference dev
-```
-
-Package scripts are single-command aliases (no `&&` / `||`). Build the dashboard
-before `dev`, `build`, or `deploy` so `/_` dashboard assets exist.
-
-Machine authentication is limited to non-decrypting metadata routes (`/healthz`
-and `/v1/models`). Model execution (`/v1/responses` and `/v1/messages`) requires
-a verified human Cloudflare Access identity, an active Stavka profile, and owner
-or admin membership. The gateway resolves and decrypts provider accounts only
-inside that user's organization/user scope. A machine bearer or service token
-alone cannot invoke Codex or Claude. Human ops (`/_`, `/admin/*`) also require
-Cloudflare Access (local mode: `ENVIRONMENT=local` + `DEV_ACCESS_EMAIL`).
-
-## Named provider accounts
-
-Provider credentials never pass through the browser or ordinary Wrangler
-environment variables. The `stavka` CLI owns local Codex OAuth, Claude
-subscription/API-key input, named Cloudflare Access profiles, and remote
-provisioning. Remote credentials are AES-GCM encrypted in Durable Object SQLite;
-admin JSON and `/_/` expose metadata only.
+Connect named accounts through the operator CLI:
 
 ```sh
 pnpm stavka -- codex login work
 claude setup-token | pnpm stavka -- claude login max --token-stdin
-pnpm stavka -- cloudflare local dev --url http://127.0.0.1:8787
-pnpm stavka -- auth push --account codex/work --cloudflare dev
-pnpm stavka -- auth push --account claude/max --cloudflare dev
-pnpm stavka -- auth list --cloudflare dev
+pnpm stavka -- cloudflare login production --url https://stavka.sands.red
+pnpm stavka -- auth push --account codex/work --cloudflare production
+pnpm stavka -- auth push --account claude/max --cloudflare production
+pnpm stavka -- auth list --cloudflare production
 ```
 
-For production, point both profile kinds at `https://stavka.sands.red`: use
-`cloudflare login` for interactive Access or `cloudflare service-token` for
-read-only automation. The unified app forwards the provider-account API and
-both `/v1/*` model APIs to this private Worker through `INFERENCE_SERVICE`.
-Configure the signed-in human's Access `sub` or email in comma-separated
-`ACCESS_OWNER_SUBJECTS`; otherwise credential mutation and model execution fail
-closed. The same `/admin/provider-accounts` API supports list, put, test,
-activate, and delete. Commander does not receive provider credentials and its
-machine service binding cannot invoke a provider without a future, explicitly
-propagated human grant.
+Configure the permitted human Access subject/email in `ACCESS_OWNER_SUBJECTS`. Worker secrets and provider credentials stay out of source and CI. Legacy local Cloudflare profiles cannot be used for requests.
 
-## Deploy
+## CI and deployment
 
-```sh
-pnpm --filter @stavka/inference build:dashboard
-pnpm --filter @stavka/inference run deploy
-```
+`pnpm verify` runs source checks, builds, deterministic tests, replay, and in-process mock smoke. The Container build also validates the bundled runtime without network access. These checks do not run a local application or invoke live providers.
 
-After the single `Stavka` Access application protects `stavka.sands.red`:
+After CI passes and deployment is authorized, use the separate production workflow or `pnpm run deploy:production`. It deploys inference, Commander, and the unified app in order. Verify Access, private bindings, and provider behavior on Cloudflare as described in [the deployment runbook](../../docs/runbooks/deployment.md).
 
-1. Create a production Access profile and push the named Claude/Codex accounts.
-2. `curl -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" …/healthz`
-3. `curl -H "Authorization: Bearer $MASKIROVKA_GATEWAY_KEY" …/v1/models`
-4. Call `https://stavka.sands.red/v1/responses` from the signed-in owner profile;
-   confirm a machine bearer without Access receives `ACCESS_REQUIRED`.
-
-See [docs/URLS.md](../../docs/URLS.md) for the full origin/path catalog and
-[docs/OPERATOR_GUIDE.md](../../docs/OPERATOR_GUIDE.md) for bindings, secrets,
-Access steps, and the known workers.dev `1042` account blocker.
+The Commander-to-provider owner grant remains a separate integration gate; a successful direct model test does not prove tactical command application. See [remaining work](../../docs/REMAINING_WORK.md).

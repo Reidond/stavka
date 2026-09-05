@@ -11,7 +11,7 @@ import { CheckedAt, Loading, Refresh } from "../../components/page-state";
 import { PageActions } from "../../components/shell";
 
 export const Route = createFileRoute("/settings/providers")({ component: ProviderSettings });
-const cloudflareProfile = import.meta.env.MODE === "local-account" ? "development" : "production";
+const cloudflareProfile = "production";
 const setupCommands = {
   codex: [
     "pnpm stavka -- codex login production",

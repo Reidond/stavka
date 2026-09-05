@@ -2,7 +2,7 @@
 
 The [September audit](audits/2026-09-05.md) records local changes, measured
 performance, and read-only Cloudflare evidence. The [agent workflow](AGENT_WORKFLOW.md)
-provides repeatable acceptance. Repository verification does not deploy the
+provides the current Cloudflare acceptance workflow. Local app/gateway and browser acceptance harnesses have been retired; historical local receipts below are previous evidence, not the current workflow. Repository verification does not deploy the
 working tree or invoke a live provider.
 
 Addressed: operational pages and session navigation; real Chromium checks for

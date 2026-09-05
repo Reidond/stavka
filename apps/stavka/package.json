@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
     "build": "vp build && node tests/assert-built-tailwind.mjs",
     "test": "vp test --run --config vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

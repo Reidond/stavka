@@ -1,40 +1,14 @@
-# Maskirovka (shared gateway library + legacy Node CLI)
+# Maskirovka shared Cloudflare gateway
 
-Shared Maskirovka Effect gateway code lives here. The **operator primary path**
-is the Cloudflare Container app at `apps/maskirovka-gateway` (`wrangler dev` /
-deploy). This package’s Node CLI on `127.0.0.1:4141` (`pnpm ai:up`) remains for
-offline CI, doctor, smoke, and replay corpus work.
+This package contains the Effect gateway runtime used by the private Cloudflare inference service in `services/inference`. The Container entrypoint is `src/container/main.ts`; its Node HTTP server is the Container's internal listener. App and live provider testing use [stavka.sands.red](https://stavka.sands.red).
 
-**Hosted leaf (optional):** `apps/maskirovka-seat` — single-provider Cloudflare
-Container only. Never a home-Mac dial-in.
-
-**Posture B unsupported:** outbound contributor registration from a personal
-machine (`serve --register`) is not an approved Stavka hosted posture. Prefer
-the gateway Container with browser credential store at `/_/`.
-
-## Legacy Node gateway
+The standalone local gateway, doctor, development-variable writer, and personal-machine contributor client have been removed. The CLI supports only deterministic CI commands:
 
 ```sh
-pnpm --filter @stavka/maskirovka doctor
 pnpm --filter @stavka/maskirovka smoke
 pnpm --filter @stavka/maskirovka eval -- --replay
 ```
 
-The Effect v4 `HttpApi` surface owns tier routing, fallback, governors, durable
-headroom, record/replay, and (in Node mode) the Access-protected SPA at `/_/`.
-On Cloudflare, the Worker serves dashboard assets and the Container runs this
-same gateway entry (`src/container/main.ts`).
+Smoke uses in-process HTTP handlers and a mock seat. Replay reads the tracked corpus and fails on a miss without invoking a provider. Neither command starts a server, reads provider credentials, or writes development environment files. Unit tests cover gateway routing, governors, caching, and accounting with fake adapters.
 
-## Deterministic checks
-
-```sh
-pnpm --filter @stavka/maskirovka typecheck
-pnpm exec vitest run tools/maskirovka/tests
-pnpm exec oxlint --deny-warnings tools/maskirovka
-pnpm --filter @stavka/maskirovka build
-pnpm --filter @stavka/maskirovka smoke
-pnpm --filter @stavka/maskirovka eval -- --replay
-```
-
-The tests use fake adapters and WebSocket peers. Replay mode fails on a corpus
-miss and never invokes a network seat.
+The optional `apps/maskirovka-seat` is also Cloudflare-hosted and is excluded from the three-service production deployment. See [the agent workflow](../../docs/AGENT_WORKFLOW.md) and [deployment runbook](../../docs/runbooks/deployment.md).

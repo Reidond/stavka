@@ -97,7 +97,7 @@ const doctrineFrom = (value: string | undefined): DoctrineId =>
   value === "aggressive" || value === "defensive" ? value : "balanced";
 
 const maskirovkaBaseUrl = (value: string | undefined): string => {
-  const normalized = (value ?? "http://127.0.0.1:4141").replace(/\/$/, "");
+  const normalized = (value ?? "https://inference.internal").replace(/\/$/, "");
   let url: URL;
   try {
     url = new URL(normalized);

@@ -12,7 +12,6 @@ import {
 import { createPortal } from "react-dom";
 import { Sidebar, useSidebar } from "@cloudflare/kumo/components/sidebar";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
   SquaresFour,
@@ -63,7 +62,6 @@ export function StavkaShell() {
   );
 }
 function ShellContents() {
-  const local = import.meta.env.MODE === "local-account";
   const { isMobile, state, setOpenMobile } = useSidebar();
   const [actions, setActions] = useState<HTMLElement | null>(null);
   const navigate = useNavigate();
@@ -158,13 +156,11 @@ function ShellContents() {
                   <strong>{active?.user.displayName ?? "Signed-in user"}</strong>
                   <small>{active?.membership.role ?? "Member"}</small>
                 </div>
-                {local ? null : (
-                  <Tooltip content="Sign out">
-                    <a href="/cdn-cgi/access/logout" aria-label="Sign out">
-                      <SignOut size={18} />
-                    </a>
-                  </Tooltip>
-                )}
+                <Tooltip content="Sign out">
+                  <a href="/cdn-cgi/access/logout" aria-label="Sign out">
+                    <SignOut size={18} />
+                  </a>
+                </Tooltip>
               </>
             ) : null}
           </div>
@@ -184,7 +180,6 @@ function ShellContents() {
           ) : (
             <h1>{current}</h1>
           )}
-          {local ? <Badge variant="secondary">Local</Badge> : null}
           <div className="stavka-header-actions" ref={setActions} />
         </header>
         <ActionsContext.Provider value={actions}>

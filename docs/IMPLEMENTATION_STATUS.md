@@ -126,26 +126,9 @@ pnpm --filter @stavka/maskirovka-seat build:container
 
 None of these commands proves external infrastructure or provider behavior.
 
-## Local integration gate
+## Cloudflare integration gate
 
-After deterministic gates:
-
-1. Copy the Commander and Poligon `.dev.vars.example` files.
-2. Start Commander and Poligon with their workspace filters.
-3. Confirm both health probes and a `401` for an unauthenticated Commander
-   machine request.
-4. Run a fixed Agent-hosted scenario through connect → terrain upload → full
-   tick → delta tick → bounded command → terminal command result.
-5. Run `mode=versus` and confirm independent OPFOR/BLUFOR sessions and costs.
-6. Reload the same scenario identity and verify checkpoint/state restoration;
-   restart Commander and verify a requested full resync.
-7. Run `host=offline` and verify stepping never creates Agent, HTTP, or
-   WebSocket traffic.
-8. Import a local canonical export at `/replay` and inspect the cause → decision
-   → commands → outcomes timeline and cost table.
-
-A green unit suite without the real local HTTP/Agent/browser loop is not a
-complete local-stack acceptance result.
+The local app stack and browser acceptance harness have been removed. Run app, provider, persistence, simulation, and visual checks on the deployed Cloudflare revision. Follow [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) and record the tested commit/service versions. CI retains deterministic tests; it does not stand in for deployed integration evidence.
 
 ## External gates — pending
 

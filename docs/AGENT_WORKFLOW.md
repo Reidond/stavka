@@ -1,59 +1,28 @@
-# Local development and acceptance
+# Cloudflare development and CI
 
-Use Node 22, pnpm 11.18.0, and a running Docker engine. Install dependencies
-with `pnpm install --frozen-lockfile`, then install Chromium once with
-`pnpm exec playwright install chromium` (Linux: add `--with-deps`).
+Use the deployed application at [stavka.sands.red](https://stavka.sands.red) for app development review, visual checks, provider tests, and integration acceptance. The same Cloudflare Access identity and private service bindings apply to every live check. Local app servers, local provider profiles, the standalone model gateway, and the local Playwright stack have been removed.
 
-| Command                                             | Purpose                                                                                                                   |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm qa`                                           | Build the four browser surfaces and run Chromium acceptance                                                               |
-| `pnpm qa:serve`                                     | Keep the built unified app and its private Workers running for interactive debugging                                      |
-| `pnpm exec playwright test tools/qa/stavka.spec.ts` | Repeat the unified browser flow using the current builds                                                                  |
-| `pnpm exec vp test --run <test-file>`               | Run focused behavior tests                                                                                                |
-| `pnpm bench:sim`                                    | Measure seeded 10,000-step simulation workloads                                                                           |
-| `pnpm verify`                                       | Run formatting/lint, Tailwind, tests, fresh typechecks/builds, replay eval, offline gateway smoke, and browser acceptance |
+## Source and CI checks
 
-`qa:serve` requires existing builds; run `pnpm qa` first. It prints its URL and
-temporary storage path. The profile form accepts synthetic local data. The QA
-stack uses real workerd, SQLite, R2 emulation, service bindings, and Agent
-WebSockets. Commander uses the mock provider, which correctly reports
-`degraded`. No subscription credential is needed for these checks.
+Use Node 22 and pnpm 11.18.0. Install dependencies with `pnpm install --frozen-lockfile`.
 
-QA creates scoped temporary Wrangler configurations and storage outside the
-checkout. It projects required fields from checked-in/build configuration,
-supplies synthetic local authentication, and does not copy `.dev.vars`, real
-provider credentials, routes, or production variable values. Ctrl-C stops child
-processes and removes temporary storage. Production Access checks remain active
-in the actual deployment configurations.
+| Command                               | Purpose                                                                                                  |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pnpm verify`                         | Lint/format, Tailwind, deterministic tests, typechecks/builds, replay, and in-process mock gateway smoke |
+| `pnpm exec vp test --run <test-file>` | Focused CI behavior tests                                                                                |
+| `pnpm eval -- --replay`               | Replay corpus verification with no provider invocation                                                   |
 
-The auxiliary dashboard tests run their actual built assets with a simulated
-503 API response. They verify error rendering, mobile/desktop layout, and pane
-scrolling; they do not claim hosted-container lifecycle acceptance.
+These checks do not launch a browser stack, create a local account, load subscription credentials, or deploy. Worker builds are dry runs. Container image validation stays part of the image build, with its smoke step running without network access. Test fixtures may synthesize identities and services in memory; they are not a supported application environment.
 
-## Worktrees and debugging
+## Cloudflare acceptance
 
-Install dependencies in each worktree. Assign concurrent QA stacks a base port
-with three additional free ports: `STAVKA_QA_PORT=18800 pnpm qa` uses 18800–18803.
-State is fresh on every run. Do not copy development credential files between
-worktrees. The existing `pnpm ai:up` gateway uses a separate default port, 4141.
+1. Finish the source and CI checks on the intended revision.
+2. After deployment is explicitly authorized, use the production workflow or the documented operator command in [the deployment runbook](runbooks/deployment.md). Production deploys inference, Commander, then the unified app. Record the commit and service versions.
+3. Open the custom domain through Cloudflare Access. Check Home, Simulations, Sessions, Models, Providers, Access, and Health at the relevant viewport sizes.
+4. Verify private Commander/inference health and confirm anonymous HTTP and WebSocket upgrades are intercepted by Access.
+5. When live model tests are authorized, run them from Models using the signed-in owner's provider accounts. Distinguish a cached response, a fresh provider response, and a successfully applied simulation command.
+6. Exercise persistence, exports, provider lifecycle, and other integration behavior on Cloudflare when that behavior is in scope. Record errors and outcomes against the deployed version.
 
-Playwright stores failure screenshots and traces under `test-results/`. Open a
-reported trace with `pnpm exec playwright show-trace <trace.zip>`. Dashboard
-tests save both viewport screenshots. Check the first failed stage of
-`pnpm verify`; execution stops on its nonzero exit code. Typecheck and build
-bypass the task cache so acceptance covers the current files.
+A passing CI run does not prove a deployed integration. A production page still on an earlier version does not verify uncommitted source. Existing gaps are tracked in [REMAINING_WORK.md](REMAINING_WORK.md).
 
-Use `/system` for private-binding configuration/readiness, then Step a hosted
-simulation and use **Inspect OPFOR session** (or BLUFOR in versus mode) to inspect
-its recorded decisions and replay. `/usage` accepts the same session ID and
-faction. Missing sessions report an explicit error. `/replays` imports canonical
-session export files without a backend round trip.
-
-## Explicit operator actions
-
-`pnpm verify` never deploys or calls a live model. CI uses this same command.
-Production deployment is the manual `Deploy production` workflow on `main`,
-under the GitHub `production` environment, and deploys inference, Commander,
-then the unified app. The hosted seat is optional. Live provider calls,
-calibration/studies, deployment, and destructive lifecycle drills require their
-explicit operator instructions. Real Arma/Workbench tests are outside this suite.
+Provider sign-in/provisioning and the independent Warbench CLI remain operator tools. This workflow change does not move or rewrite immutable study data. Arma/Workbench and dedicated-server validation remain separate.

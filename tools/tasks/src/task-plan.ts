@@ -137,7 +137,7 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
     ],
   },
   {
-    label: "local Maskirovka Tailwind diagnostics",
+    label: "shared Maskirovka Tailwind diagnostics",
     executable: "pnpm",
     arguments: [
       "exec",
@@ -189,13 +189,4 @@ export const verificationTask: ReadonlyArray<TaskCommand> = [
   ),
   { label: "deterministic replay", executable: "pnpm", arguments: ["eval", "--", "--replay"] },
   { label: "offline gateway smoke", executable: "pnpm", arguments: ["ai:smoke"] },
-  { label: "browser acceptance", executable: "pnpm", arguments: ["exec", "playwright", "test"] },
-];
-
-export const browserQaTask: ReadonlyArray<TaskCommand> = [
-  filterScript(appFilter, "build"),
-  filterScript(gatewayFilter, "build:dashboard"),
-  filterScript("@stavka/maskirovka-seat", "build:dashboard"),
-  filterScript("@stavka/maskirovka", "build:dashboard"),
-  { label: "browser acceptance", executable: "pnpm", arguments: ["exec", "playwright", "test"] },
 ];

@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
     "build:dashboard": "vp build --config vite.dashboard.config.ts",
     "build": "pnpm --filter @stavka/tasks build:maskirovka-gateway",
     "build:container": "docker build -f Dockerfile -t stavka-maskirovka-gateway:local ../..",
