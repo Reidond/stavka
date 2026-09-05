@@ -1,50 +1,86 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
+import { Empty } from "@cloudflare/kumo/components/empty";
+import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { readOrganizationUsers } from "../../account-api";
-
+import { readAccountSession, readOrganizationUsers } from "../../account-api";
+import { accountSessionQueryKey } from "../../components/account-gate";
+import { CheckedAt, Loading, Refresh, titleCase } from "../../components/page-state";
+import { PageActions } from "../../components/shell";
 export const Route = createFileRoute("/settings/access")({ component: AccessSettings });
 function AccessSettings() {
   const users = useQuery({
     queryKey: ["stavka-organization-users"],
     queryFn: readOrganizationUsers,
+    retry: false,
   });
+  const session = useQuery({
+    queryKey: accountSessionQueryKey,
+    queryFn: readAccountSession,
+    staleTime: 30_000,
+  });
+  const currentId = session.data?.status === "active" ? session.data.user.id : undefined;
   return (
     <div className="stavka-pane space-y-4">
-      <header className="stavka-page-heading">
-        <div>
-          <h1>Organization access</h1>
-          <p>
-            Cloudflare Access controls sign-in. These are the current organization memberships;
-            provider credentials remain private to their owner.
-          </p>
-        </div>
-      </header>
+      <PageActions>
+        <CheckedAt timestamp={users.dataUpdatedAt} />
+        <Refresh loading={users.isFetching} onClick={() => void users.refetch()} />
+      </PageActions>
+      <p className="text-sm text-kumo-subtle">
+        Cloudflare Access controls sign-in; membership determines organization access.
+      </p>
       {users.error ? (
         <Banner variant="error" title="Memberships unavailable" description={users.error.message} />
-      ) : null}
-      {users.isPending ? <p>Loading memberships…</p> : null}
-      {users.data ? (
-        <LayerCard className="overflow-x-auto p-4">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-kumo-hairline text-xs text-kumo-subtle">
-                <th className="pb-3 font-medium">Name</th>
-                <th className="pb-3 font-medium">Role</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.data.map(({ user, membership }) => (
-                <tr key={user.id} className="border-b border-kumo-hairline last:border-0">
-                  <td className="py-4">{user.displayName}</td>
-                  <td className="capitalize">{membership.role}</td>
+      ) : (
+        <section className="stavka-panel">
+          <div className="table-scroll">
+            <table className="operations-table access-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th className="access-email">Email</th>
+                  <th>Role</th>
+                  <th>Joined</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </LayerCard>
-      ) : null}
+              </thead>
+              <tbody>
+                {users.isPending ? (
+                  <tr>
+                    <td colSpan={4}>
+                      <Loading label="Loading memberships" />
+                    </td>
+                  </tr>
+                ) : (
+                  users.data.map(({ user, membership }) => (
+                    <tr key={user.id} data-current={user.id === currentId}>
+                      <td>
+                        {user.displayName}
+                        {user.id === currentId ? (
+                          <span className="ml-2 text-xs text-kumo-subtle">You</span>
+                        ) : null}
+                        <Collapsible.Root className="access-mobile-details">
+                          <Collapsible.DefaultTrigger>Email</Collapsible.DefaultTrigger>
+                          <Collapsible.Panel className="break-all">
+                            {user.email ?? "Not provided"}
+                          </Collapsible.Panel>
+                        </Collapsible.Root>
+                      </td>
+                      <td className="access-email">{user.email ?? "Not provided"}</td>
+                      <td>{titleCase(membership.role)}</td>
+                      <td>
+                        <time title={new Date(membership.joinedAt).toLocaleString()}>
+                          {new Date(membership.joinedAt).toLocaleDateString()}
+                        </time>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {users.data?.length === 0 ? <Empty size="sm" title="No memberships available" /> : null}
+        </section>
+      )}
     </div>
   );
 }

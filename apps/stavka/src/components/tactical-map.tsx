@@ -504,7 +504,7 @@ export function TacticalMap({
         <g aria-hidden="true">
           <g transform={`translate(${scaleRight - scaleBarPx - 34} ${scaleY - 4})`}>
             <path d="M 0 -8 L -6 9 L 0 4 L 6 9 Z" fill={tacticalMapColors.chrome} />
-            <text x="0" y="-12" fill={tacticalMapColors.chrome} textAnchor="middle" fontSize="11">
+            <text x="0" y="-12" fill={tacticalMapColors.chrome} textAnchor="middle" fontSize="12">
               N
             </text>
           </g>
@@ -519,7 +519,7 @@ export function TacticalMap({
             y={scaleY - 11}
             textAnchor="middle"
             fill={tacticalMapColors.chrome}
-            fontSize="11"
+            fontSize="12"
           >
             {Math.round(scaleBarPx / scale)} m
           </text>

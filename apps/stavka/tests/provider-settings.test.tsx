@@ -52,7 +52,7 @@ describe("provider settings", () => {
     expect(html).not.toContain("private application");
   });
 
-  it("shows the signed-in owner on the owned Codex and Claude authorization surface", () => {
+  it("shows provider metadata without duplicating profile details", () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(accountSessionQueryKey, activeSession);
     queryClient.setQueryData(
@@ -90,11 +90,13 @@ describe("provider settings", () => {
       </QueryClientProvider>,
     );
 
-    expect(html).toContain("Authorization owner");
-    expect(html).toContain("Andrii Shafar");
-    expect(html).toContain("owner@example.test");
+    expect(html).not.toContain("Authorization owner");
+    expect(html).not.toContain("owner@example.test");
+    expect(html).toContain("ChatGPT sign-in");
+    expect(html).toContain("Connected");
+    expect(html).toContain("Updated");
     expect(html).toContain("Production Codex");
-    expect(html).toContain("1 visible user");
+    expect(html).toContain("Active");
     expect(html).not.toContain("access-secret");
   });
 });

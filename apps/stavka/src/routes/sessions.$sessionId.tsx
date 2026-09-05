@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Effect, Schema } from "effect";
-import { SessionInspector } from "../components/operations";
+import { SessionInspector } from "../components/sessions";
 export const Route = createFileRoute("/sessions/$sessionId")({
   validateSearch: Schema.toStandardSchemaV1(
     Schema.Struct({

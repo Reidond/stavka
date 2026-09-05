@@ -8,8 +8,12 @@ Commander and inference reachable only through Cloudflare service bindings.
 - Branch `main` is green on the CI verify workflow (check, lint, tests,
   typecheck, build, replay eval, offline smoke, browser acceptance).
 - The GitHub `production` environment exists with `CLOUDFLARE_API_TOKEN`
-  (Workers Scripts Edit, Containers Edit) and `CLOUDFLARE_ACCOUNT_ID`, and
-  requires manual approval.
+  (Workers Scripts Edit, Containers Edit) and `CLOUDFLARE_ACCOUNT_ID`.
+  Because the app declares its custom domain, the deployment credential also
+  needs Workers Routes Edit and Zone Read on `sands.red`. An account-only token
+  that cannot access zone routes can upload services but fail during route sync.
+  Dispatch is an explicit operator action; environment approval rules may add
+  a separate approval gate.
 - Wrangler 4.x authenticated locally only for explicit operator actions.
 
 ## One-time Cloudflare setup

@@ -48,7 +48,7 @@ export const PoligonFigure = ({
 }) => (
   <LayerCard render={<figure />} className={className ?? "overflow-hidden p-0"}>
     <div className="min-h-0">{children}</div>
-    <figcaption className="border-t border-kumo-hairline px-3 py-2 text-xs tracking-wider text-kumo-subtle uppercase">
+    <figcaption className="border-t border-kumo-hairline px-3 py-2 text-xs text-kumo-subtle">
       {caption}
     </figcaption>
   </LayerCard>
@@ -100,8 +100,8 @@ export const PoligonDataTable = <TData,>({
   });
 
   return (
-    <LayerCard className="overflow-x-auto p-0">
-      <Table>
+    <div className="overflow-x-auto">
+      <Table className="text-sm [&_th]:text-xs [&_th]:font-medium">
         <Table.Header variant="compact">
           {table.getHeaderGroups().map((group) => (
             <Table.Row key={group.id}>
@@ -130,7 +130,7 @@ export const PoligonDataTable = <TData,>({
       {data.length === 0 ? (
         <p className="m-0 px-3 py-6 text-center text-xs text-kumo-subtle uppercase">{emptyLabel}</p>
       ) : null}
-    </LayerCard>
+    </div>
   );
 };
 
@@ -170,7 +170,7 @@ export const PoligonLogFeed = <T,>({
       aria-live="polite"
     >
       {items.length === 0 ? (
-        <div className="stavka-empty min-h-0">
+        <div className="flex min-h-0 items-center justify-center p-6 text-sm text-kumo-subtle">
           <p>No events recorded yet.</p>
         </div>
       ) : null}

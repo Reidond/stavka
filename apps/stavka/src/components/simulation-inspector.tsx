@@ -1,5 +1,8 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
-import { Button } from "@cloudflare/kumo/components/button";
+import { Link } from "@cloudflare/kumo/components/link";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { Link as RouterLink } from "@tanstack/react-router";
+import { commanderSessionId } from "../scenario-identity";
 import { ArrowSquareOut, Info, ListChecks, Users } from "@phosphor-icons/react";
 import type { SimGroup, SimObjective } from "@stavka/sim-core";
 import type { ReactNode } from "react";
@@ -140,7 +143,7 @@ export function SimulationUnitList({
                 >
                   <span className="simulation-unit-title">
                     {group.id}
-                    <Badge variant="secondary">{group.faction}</Badge>
+                    <span>{group.faction}</span>
                   </span>
                   <span className="simulation-unit-status" data-status={group.status}>
                     {group.status}
@@ -170,7 +173,9 @@ export function SimulationUnitList({
             {objectives.map((objective) => (
               <li key={objective.id} className="simulation-objective-row">
                 <strong>{objective.name}</strong>
-                <Badge variant={objectiveVariant(objective.status)}>{objective.status}</Badge>
+                <Badge variant={objectiveVariant(objective.status)}>
+                  {capitalize(objective.status)}
+                </Badge>
                 <span>{Math.round(objective.capture_progress * 100)}% captured</span>
                 {objective.ownerFaction ? <span>held by {objective.ownerFaction}</span> : null}
                 <span>{formatPosition(objective.position)}</span>
@@ -215,8 +220,13 @@ export function SimulationDecisionList({
         {recent.map((item, index) => (
           <li key={item.key} className="simulation-entry">
             <div className="simulation-entry-meta">
-              <Badge variant="secondary">{item.faction}</Badge>
-              {index === 0 ? <Badge variant="outline">Latest</Badge> : null}
+              <span>{item.faction}</span>
+              {index === 0 ? <span>Latest</span> : null}
+              <Badge
+                variant={decisionSource(item.model) === "Model decisions" ? "success" : "warning"}
+              >
+                {decisionSource(item.model)}
+              </Badge>
               <span>{item.model}</span>
               <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
             </div>
@@ -256,34 +266,49 @@ export function SimulationEventLog({ logs }: { readonly logs: readonly PoligonLo
   );
 }
 
-const commanderVariant = (commander: PoligonCommanderState | undefined) =>
-  commander?.lastError
-    ? "error"
-    : !commander?.connected
-      ? "secondary"
-      : commander.mode === "llm"
-        ? "success"
-        : "warning";
-
-const commanderNote = (commander: PoligonCommanderState | undefined): string => {
-  if (commander?.lastError) return commander.lastError;
-  if (!commander?.connected) return "Step or resume to connect this faction to Commander.";
-  if (commander.mode === "llm") {
-    return `Model configured. Last tick ${commander.lastTickId}. Check recorded results under Decisions and Usage.`;
-  }
-  return `${capitalize(commander.mode)} decisions. This does not confirm a live model response.`;
-};
+export const decisionSource = (model: string): "Model decisions" | "Rule decisions" =>
+  model === "rule-planner" || /^mock(?::|\/|-|$)/i.test(model)
+    ? "Rule decisions"
+    : "Model decisions";
+export function commanderPresentation(
+  commander: PoligonCommanderState | undefined,
+  decision: PoligonDecision | undefined,
+): { label: string; variant: "error" | "secondary" | "success" | "warning"; description: string } {
+  if (commander?.lastError)
+    return { label: "Error", variant: "error", description: commander.lastError };
+  if (!commander?.connected)
+    return {
+      label: "Not connected",
+      variant: "secondary",
+      description: "Step or resume to connect this faction to Commander.",
+    };
+  if (!decision)
+    return {
+      label: "Awaiting decision",
+      variant: "secondary",
+      description: "Connected. A recorded response is required to verify model decisions.",
+    };
+  const label = decisionSource(decision.model);
+  return {
+    label,
+    variant: label === "Model decisions" ? "success" : "warning",
+    description:
+      label === "Model decisions"
+        ? "The latest recorded decision returned from " + decision.model + "."
+        : "The latest recorded decision used " +
+          decision.model +
+          "; it does not confirm live inference.",
+  };
+}
 
 export function SimulationCommanderStatus({
   state,
   offline,
   factions,
-  onInspectSession,
 }: {
   readonly state: PoligonState;
   readonly offline: boolean;
   readonly factions: readonly string[];
-  readonly onInspectSession: (faction: string) => void;
 }) {
   if (offline) {
     return (
@@ -303,21 +328,34 @@ export function SimulationCommanderStatus({
   return (
     <>
       {factions.map((faction) => {
-        const commander = state.commanders[faction];
+        const status = commanderPresentation(
+          state.commanders[faction],
+          state.decisions.filter((decision) => decision.faction === faction).at(-1),
+        );
         return (
           <div className="simulation-commander-row" key={faction}>
             <div className="simulation-commander-status">
               <div>
                 <strong>{faction}</strong>{" "}
-                <Badge variant={commanderVariant(commander)}>
-                  {commander?.connected ? commander.mode : "not connected"}
-                </Badge>
+                <Tooltip content={status.description}>
+                  <span tabIndex={0}>
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                  </span>
+                </Tooltip>
               </div>
-              <span className="simulation-commander-note">{commanderNote(commander)}</span>
             </div>
-            <Button size="sm" onClick={() => onInspectSession(faction)}>
-              Inspect {faction} session <ArrowSquareOut size={13} />
-            </Button>
+            <Link
+              render={
+                <RouterLink
+                  to="/sessions/$sessionId"
+                  params={{ sessionId: commanderSessionId({ ...state, faction }) }}
+                  search={{ faction }}
+                />
+              }
+              aria-label={`Open ${faction} in Sessions`}
+            >
+              Open in Sessions <ArrowSquareOut size={13} aria-hidden="true" />
+            </Link>
           </div>
         );
       })}

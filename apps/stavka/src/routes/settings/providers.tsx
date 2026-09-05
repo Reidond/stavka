@@ -1,17 +1,16 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Banner } from "@cloudflare/kumo/components/banner";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
+import { Empty } from "@cloudflare/kumo/components/empty";
+import { Collapsible } from "@cloudflare/kumo/components/collapsible";
+import { ClipboardText } from "@cloudflare/kumo/components/clipboard-text";
+import { Code } from "@cloudflare/kumo/components/code";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import type { ActiveAccountSession } from "@stavka/access-auth";
+import { readProviderAccounts } from "../../account-api";
+import { CheckedAt, Loading, Refresh } from "../../components/page-state";
+import { PageActions } from "../../components/shell";
 
-import { readAccountSession, readOrganizationUsers, readProviderAccounts } from "../../account-api";
-import { accountSessionQueryKey } from "../../components/account-gate";
-
-export const Route = createFileRoute("/settings/providers")({
-  component: ProviderSettings,
-});
-
+export const Route = createFileRoute("/settings/providers")({ component: ProviderSettings });
 const cloudflareProfile = import.meta.env.MODE === "local-account" ? "development" : "production";
 const setupCommands = {
   codex: [
@@ -23,150 +22,124 @@ const setupCommands = {
     `pnpm stavka -- auth push --account claude/production --cloudflare ${cloudflareProfile}`,
   ],
 } as const;
-
-const ConnectionGuide = ({ provider }: { readonly provider: "codex" | "claude" }) => (
-  <LayerCard className="space-y-3 p-4">
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="m-0 text-base font-semibold text-kumo-strong">
-        {provider === "codex" ? "Codex subscription" : "Claude Code subscription"}
-      </h2>
-      <Badge variant="secondary">{provider}</Badge>
-    </div>
-    <p className="m-0 text-sm text-kumo-default">
-      Authorize locally, then upload the encrypted credential. Stavka binds it to the signed-in
-      profile shown above; no user or organization identifier is accepted from the CLI.
-    </p>
-    <ol className="m-0 space-y-2 pl-5 text-sm text-kumo-default">
-      {setupCommands[provider].map((command) => (
-        <li key={command}>
-          <code className="rounded-sm bg-kumo-tint px-1.5 py-1 text-xs break-all text-kumo-strong">
-            {command}
-          </code>
-        </li>
-      ))}
-    </ol>
-  </LayerCard>
-);
-
-export function ProviderSettings() {
-  const session = useQuery({
-    queryKey: accountSessionQueryKey,
-    queryFn: readAccountSession,
-    staleTime: 30_000,
-  });
-  const sessionData = session.data;
-  const active: ActiveAccountSession | undefined =
-    sessionData?.status === "active" ? sessionData : undefined;
-  const users = useQuery({
-    queryKey: ["stavka-organization-users"],
-    queryFn: readOrganizationUsers,
-    enabled: active !== undefined,
-  });
-  const accounts = useQuery({
-    queryKey: ["stavka-provider-accounts"],
-    queryFn: readProviderAccounts,
-    enabled: active !== undefined,
-  });
-
+function ConnectionGuide() {
   return (
-    <div className="stavka-pane space-y-4">
-      <header className="stavka-page-heading">
-        <div>
-          <h1>Providers</h1>
-          <p>Codex and Claude subscription credentials are private to your Stavka profile.</p>
-        </div>
-      </header>
-
-      {active ? <ProfileCard session={active} userCount={users.data?.length} /> : null}
-      {session.error || users.error || accounts.error ? (
-        <Banner
-          variant="error"
-          title="Account data unavailable"
-          description={(session.error ?? users.error ?? accounts.error)?.message ?? "Unknown error"}
-        />
-      ) : null}
-
-      <section className="space-y-3" aria-labelledby="connected-accounts-title">
-        <div className="flex items-center justify-between gap-3">
-          <h2
-            id="connected-accounts-title"
-            className="m-0 text-base font-semibold text-kumo-strong"
-          >
-            Connected accounts
-          </h2>
-          <Badge variant="secondary">{accounts.data?.length ?? 0}</Badge>
-        </div>
-        {accounts.isPending ? (
-          <p className="m-0 text-sm text-kumo-subtle">Loading provider accounts…</p>
-        ) : null}
-        {accounts.data?.length === 0 ? (
-          <LayerCard className="p-4">
-            <p className="m-0 text-sm text-kumo-default">
-              No provider account is connected yet. Open the connection instructions below to get
-              started.
-            </p>
-          </LayerCard>
-        ) : null}
-        <div className="grid gap-3 lg:grid-cols-2">
-          {accounts.data?.map((account) => (
-            <LayerCard key={`${account.provider}/${account.name}`} className="space-y-2 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="m-0 font-medium text-kumo-strong">{account.label}</p>
-                <Badge variant={account.active ? "success" : "secondary"}>
-                  {account.active ? "active" : "inactive"}
-                </Badge>
-              </div>
-              <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-kumo-subtle">Provider</dt>
-                <dd className="m-0 text-kumo-default">{account.provider}</dd>
-                <dt className="text-kumo-subtle">Owner</dt>
-                <dd className="m-0 text-kumo-default">
-                  {account.owner.displayName}
-                  {account.owner.email ? ` · ${account.owner.email}` : ""}
-                </dd>
-                <dt className="text-kumo-subtle">Organization</dt>
-                <dd className="m-0 text-kumo-default">{account.organization.name}</dd>
-                <dt className="text-kumo-subtle">Auth</dt>
-                <dd className="m-0 text-kumo-default">{account.authKind}</dd>
-              </dl>
-            </LayerCard>
-          ))}
-        </div>
-      </section>
-      <details className="stavka-panel">
-        <summary className="cursor-pointer p-5 text-sm font-medium text-kumo-strong">
-          Connect a provider account
-        </summary>
-        <div className="grid gap-4 p-5 pt-0 lg:grid-cols-2">
-          <ConnectionGuide provider="codex" />
-          <ConnectionGuide provider="claude" />
-        </div>
-      </details>
+    <div className="provider-guide">
+      <p>
+        Authorize locally, then upload the encrypted credential. It is bound to your signed-in
+        Stavka profile.
+      </p>
+      {(["codex", "claude"] as const).map((provider) => (
+        <section className="space-y-3" key={provider}>
+          <h2>{provider === "codex" ? "Codex subscription" : "Claude Code subscription"}</h2>
+          <ol className="m-0 list-decimal space-y-3 pl-5">
+            {setupCommands[provider].map((command) => (
+              <li key={command}>
+                <div className="provider-command">
+                  <Code code={command} className="min-w-0 flex-1 whitespace-normal" />
+                  <ClipboardText text="Copy" textToCopy={command} size="sm" />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
     </div>
   );
 }
-
-const ProfileCard = ({
-  session,
-  userCount,
-}: {
-  readonly session: ActiveAccountSession;
-  readonly userCount: number | undefined;
-}) => (
-  <LayerCard className="space-y-2 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <p className="m-0 text-xs tracking-wider text-kumo-subtle uppercase">Authorization owner</p>
-        <p className="m-0 text-base font-semibold text-kumo-strong">{session.user.displayName}</p>
-        {session.user.email ? (
-          <p className="m-0 text-sm text-kumo-default">{session.user.email}</p>
-        ) : null}
-      </div>
-      <Badge variant="success">{session.membership.role}</Badge>
+const authLabels = {
+  "chatgpt-oauth": "ChatGPT sign-in",
+  "claude-subscription": "Claude subscription",
+  "anthropic-api-key": "Anthropic API key",
+};
+export function ProviderSettings() {
+  const accounts = useQuery({
+    queryKey: ["stavka-provider-accounts"],
+    queryFn: readProviderAccounts,
+    retry: false,
+  });
+  return (
+    <div className="stavka-pane space-y-4">
+      <PageActions>
+        <CheckedAt timestamp={accounts.dataUpdatedAt} />
+        <Refresh loading={accounts.isFetching} onClick={() => void accounts.refetch()} />
+      </PageActions>
+      <p className="text-sm text-kumo-subtle">
+        Connected provider credentials are private to your profile.
+      </p>
+      {accounts.error ? (
+        <Banner
+          variant="error"
+          title="Provider accounts unavailable"
+          description={accounts.error.message}
+        />
+      ) : accounts.isPending || accounts.data.length ? (
+        <section className="stavka-panel">
+          <div className="table-scroll">
+            <table className="operations-table">
+              <thead>
+                <tr>
+                  {["Label", "Provider", "Auth method", "Connected", "Updated", "Status"].map(
+                    (header) => (
+                      <th key={header}>{header}</th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.isPending ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <Loading label="Loading provider accounts" />
+                    </td>
+                  </tr>
+                ) : (
+                  accounts.data.map((account) => (
+                    <tr key={`${account.provider}/${account.name}`}>
+                      <td>{account.label}</td>
+                      <td>{account.provider === "codex" ? "Codex" : "Claude"}</td>
+                      <td>{authLabels[account.authKind]}</td>
+                      <td>
+                        <time title={new Date(account.createdAt).toLocaleString()}>
+                          {new Date(account.createdAt).toLocaleDateString()}
+                        </time>
+                      </td>
+                      <td>
+                        <time title={new Date(account.updatedAt).toLocaleString()}>
+                          {new Date(account.updatedAt).toLocaleDateString()}
+                        </time>
+                      </td>
+                      <td>
+                        <Badge variant={account.active ? "success" : "secondary"}>
+                          {account.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : (
+        <section className="stavka-panel">
+          <Empty
+            className="rounded-none border-0 [&_h2]:text-sm"
+            size="sm"
+            title="Connect your first provider"
+            description="Use the CLI commands below to authorize a subscription."
+          />
+          <ConnectionGuide />
+        </section>
+      )}
+      {accounts.data?.length ? (
+        <Collapsible.Root className="stavka-panel p-4">
+          <Collapsible.DefaultTrigger>Connect another account</Collapsible.DefaultTrigger>
+          <Collapsible.Panel>
+            <ConnectionGuide />
+          </Collapsible.Panel>
+        </Collapsible.Root>
+      ) : null}
     </div>
-    <p className="m-0 text-sm text-kumo-default">
-      {session.organization.name} · {userCount ?? 1} visible user
-      {(userCount ?? 1) === 1 ? "" : "s"}
-    </p>
-  </LayerCard>
-);
+  );
+}

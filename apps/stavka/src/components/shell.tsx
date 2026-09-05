@@ -1,43 +1,79 @@
 import type { ActiveAccountSession } from "@stavka/access-auth";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Button } from "@cloudflare/kumo/components/button";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { Sidebar, useSidebar } from "@cloudflare/kumo/components/sidebar";
+import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
+import { Badge } from "@cloudflare/kumo/components/badge";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
   SquaresFour,
   Crosshair,
   ListChecks,
-  PlayCircle,
   Cpu,
-  ChartBar,
   Plugs,
   Users,
   Pulse,
-  List,
-  X,
   SignOut,
-  ShieldCheck,
 } from "@phosphor-icons/react";
 import { readAccountSession } from "../account-api";
 import { accountSessionQueryKey } from "./account-gate";
 
 const sections = [
-  { to: "/", label: "Overview", icon: SquaresFour, group: "Workspace" },
-  { to: "/simulations", label: "Simulations", icon: Crosshair, group: "Workspace" },
-  { to: "/decisions", label: "Decisions", icon: ListChecks, group: "Workspace" },
-  { to: "/replays", label: "Replays", icon: PlayCircle, group: "Workspace" },
-  { to: "/usage", label: "Usage", icon: ChartBar, group: "Operations" },
-  { to: "/models", label: "Models", icon: Cpu, group: "Operations" },
-  { to: "/settings/providers", label: "Providers", icon: Plugs, group: "Operations" },
-  { to: "/settings/access", label: "Access", icon: Users, group: "Operations" },
-  { to: "/system", label: "System", icon: Pulse, group: "Operations" },
+  { to: "/", label: "Home", icon: SquaresFour, group: "" },
+  { to: "/simulations", label: "Simulations", icon: Crosshair, group: "Run" },
+  { to: "/sessions", label: "Sessions", icon: ListChecks, group: "Review" },
+  { to: "/models", label: "Models", icon: Cpu, group: "Configure" },
+  { to: "/settings/providers", label: "Providers", icon: Plugs, group: "Configure" },
+  { to: "/settings/access", label: "Access", icon: Users, group: "Configure" },
+  { to: "/system", label: "Health", icon: Pulse, group: "Configure" },
 ] as const;
-
+const ActionsContext = createContext<HTMLElement | null>(null);
+export function PageActions({ children }: { readonly children: ReactNode }) {
+  const target = useContext(ActionsContext);
+  return target ? createPortal(children, target) : null;
+}
 export function StavkaShell() {
-  const localDevelopment = import.meta.env.MODE === "local-account";
-  const [menuOpen, setMenuOpen] = useState(false);
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const current = sections.find((item) => item.to === pathname)?.label ?? "Session detail";
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1200px)");
+    const update = () => setOpen(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return (
+    <Sidebar.Provider
+      open={open}
+      onOpenChange={setOpen}
+      mobileBreakpoint={900}
+      className="stavka-shell min-h-0"
+      style={{ "--sidebar-width": "240px", "--sidebar-width-icon": "56px" } as CSSProperties}
+    >
+      <ShellContents />
+    </Sidebar.Provider>
+  );
+}
+function ShellContents() {
+  const local = import.meta.env.MODE === "local-account";
+  const { isMobile, state, setOpenMobile } = useSidebar();
+  const [actions, setActions] = useState<HTMLElement | null>(null);
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (router) => router.location.pathname });
+  const sessionPage =
+    pathname.startsWith("/sessions") || ["/decisions", "/usage", "/replays"].includes(pathname);
+  const current = sessionPage
+    ? "Sessions"
+    : (sections.find((item) => item.to === pathname)?.label ?? "Home");
+  const nested = /^\/sessions\/[^/]+/.test(pathname);
   const session = useQuery({
     queryKey: accountSessionQueryKey,
     queryFn: readAccountSession,
@@ -46,97 +82,117 @@ export function StavkaShell() {
   const sessionData = session.data;
   const active: ActiveAccountSession | undefined =
     sessionData?.status === "active" ? sessionData : undefined;
+  const expanded = isMobile || state !== "collapsed";
   return (
-    <div className="stavka-shell">
-      {menuOpen ? (
-        <button
-          className="stavka-nav-backdrop"
-          aria-label="Close navigation"
-          onClick={() => setMenuOpen(false)}
-        />
-      ) : null}
-      <aside className="stavka-sidebar" data-open={menuOpen}>
-        <Link to="/" className="stavka-brand" onClick={() => setMenuOpen(false)}>
-          <span className="stavka-brand-mark">
-            <Crosshair size={22} weight="bold" />
-          </span>
-          <span>
-            STAVKA<small>COMMAND WORKSPACE</small>
-          </span>
-        </Link>
-        <div className="stavka-workspace-label">
-          <span className="stavka-status-dot" />
-          {active?.organization.name ?? "Workspace"}
-        </div>
-        <nav aria-label="Primary" className="stavka-navigation">
-          {["Workspace", "Operations"].map((group) => (
-            <div key={group} className="stavka-nav-group">
-              <p>{group}</p>
-              {sections
-                .filter((item) => item.group === group)
-                .map(({ to, label, icon: Icon }) => (
-                  <Link
-                    key={to}
-                    to={to}
-                    className="stavka-nav-link"
-                    activeProps={{ className: "stavka-nav-link is-active" }}
-                    activeOptions={{ exact: to === "/" }}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <Icon size={19} />
-                    <span>{label}</span>
-                  </Link>
-                ))}
-            </div>
-          ))}
-        </nav>
-        <div className="stavka-sidebar-footer">
-          <ShieldCheck size={17} />
-          <span>
-            {localDevelopment
-              ? "Local development · loopback only"
-              : "Protected by Cloudflare Access"}
-          </span>
-        </div>
-        <div className="stavka-profile">
-          <span className="stavka-avatar">
-            {(active?.user.displayName ?? "U").slice(0, 1).toUpperCase()}
-          </span>
-          <div>
-            <strong>{active?.user.displayName ?? "Signed-in user"}</strong>
-            <small>{active?.membership.role ?? "Checking access"}</small>
+    <>
+      <Sidebar aria-label="Primary navigation">
+        <Sidebar.Header className="h-[52px] min-h-[52px]">
+          <Sidebar.Menu>
+            <Sidebar.MenuButton
+              href="/"
+              icon={<Crosshair size={22} className="shrink-0" aria-hidden="true" />}
+              tooltip="Stavka home"
+              onClick={(event) => {
+                if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                  event.preventDefault();
+                  void navigate({ to: "/" });
+                  if (isMobile) setOpenMobile(false);
+                }
+              }}
+            >
+              Stavka
+            </Sidebar.MenuButton>
+          </Sidebar.Menu>
+        </Sidebar.Header>
+        <Sidebar.Content>
+          <nav aria-label="Primary">
+            {["", "Run", "Review", "Configure"].map((group) => (
+              <Sidebar.Group key={group}>
+                {group ? (
+                  <Sidebar.GroupLabel className="text-xs">{group}</Sidebar.GroupLabel>
+                ) : null}
+                <Sidebar.Menu>
+                  {sections
+                    .filter((item) => item.group === group)
+                    .map(({ to, label, icon: Icon }) => (
+                      <Sidebar.MenuButton
+                        key={to}
+                        href={to}
+                        icon={<Icon size={20} className="shrink-0" aria-hidden="true" />}
+                        tooltip={label}
+                        active={label === current}
+                        aria-current={label === current ? "page" : undefined}
+                        onClick={(event) => {
+                          if (
+                            !event.metaKey &&
+                            !event.ctrlKey &&
+                            !event.shiftKey &&
+                            !event.altKey
+                          ) {
+                            event.preventDefault();
+                            void navigate({ to });
+                            if (isMobile) setOpenMobile(false);
+                          }
+                        }}
+                      >
+                        {label}
+                      </Sidebar.MenuButton>
+                    ))}
+                </Sidebar.Menu>
+              </Sidebar.Group>
+            ))}
+          </nav>
+        </Sidebar.Content>
+        <Sidebar.Footer>
+          <div className="stavka-profile">
+            <Tooltip
+              content={`${active?.user.displayName ?? "User"} · ${active?.membership.role ?? "Member"}`}
+            >
+              <span className="stavka-avatar" tabIndex={expanded ? -1 : 0}>
+                {(active?.user.displayName ?? "U").slice(0, 1).toUpperCase()}
+              </span>
+            </Tooltip>
+            {expanded ? (
+              <>
+                <div>
+                  <strong>{active?.user.displayName ?? "Signed-in user"}</strong>
+                  <small>{active?.membership.role ?? "Member"}</small>
+                </div>
+                {local ? null : (
+                  <Tooltip content="Sign out">
+                    <a href="/cdn-cgi/access/logout" aria-label="Sign out">
+                      <SignOut size={18} />
+                    </a>
+                  </Tooltip>
+                )}
+              </>
+            ) : null}
           </div>
-          {localDevelopment ? null : (
-            <a href="/cdn-cgi/access/logout" aria-label="Sign out" title="Sign out">
-              <SignOut size={18} />
-            </a>
-          )}
-        </div>
-      </aside>
+        </Sidebar.Footer>
+      </Sidebar>
       <div className="stavka-workspace">
         <header className="stavka-header">
-          <Button
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            className="stavka-menu-button"
-            size="sm"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            {menuOpen ? <X size={18} /> : <List size={18} />}
-          </Button>
-          <div className="stavka-breadcrumb">
-            <span>Workspace</span>
-            <span>/</span>
-            <strong>{current}</strong>
-          </div>
-          <span className="stavka-header-account">
-            <ShieldCheck size={15} />
-            {active?.organization.name ?? "Stavka"}
-          </span>
+          <Sidebar.Trigger aria-label="Toggle navigation" />
+          {nested ? (
+            <Breadcrumbs size="sm">
+              <Breadcrumbs.Link href="/sessions">Sessions</Breadcrumbs.Link>
+              <Breadcrumbs.Separator />
+              <Breadcrumbs.Current>
+                <h1>Session</h1>
+              </Breadcrumbs.Current>
+            </Breadcrumbs>
+          ) : (
+            <h1>{current}</h1>
+          )}
+          {local ? <Badge variant="secondary">Local</Badge> : null}
+          <div className="stavka-header-actions" ref={setActions} />
         </header>
-        <main className="stavka-main">
-          <Outlet />
-        </main>
+        <ActionsContext.Provider value={actions}>
+          <main className="stavka-main">
+            <Outlet />
+          </main>
+        </ActionsContext.Provider>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SessionInspector } from "../components/operations";
+import { SessionInspector } from "../components/sessions";
 export const Route = createFileRoute("/decisions")({
-  component: () => <SessionInspector title="Decisions" />,
+  component: () => <SessionInspector initialView="timeline" />,
 });

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SessionInspector } from "../components/operations";
+import { SessionInspector } from "../components/sessions";
 export const Route = createFileRoute("/usage")({
-  component: () => <SessionInspector title="Usage" usageOnly />,
+  component: () => <SessionInspector initialView="usage" />,
 });

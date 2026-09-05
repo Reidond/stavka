@@ -8,10 +8,9 @@ import type {
 import { Button } from "@cloudflare/kumo/components/button";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
-  PoligonBadge,
   PoligonDataTable,
   PoligonFigure,
   PoligonLogFeed,
@@ -80,6 +79,17 @@ const markerColor = (kind: ReplayTacticalMarker["kind"]): string =>
       : poligonVisualizationPalette.objective;
 
 const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
+  const map = useRef<SVGSVGElement>(null);
+  const [mapWidth, setMapWidth] = useState(600);
+  useEffect(() => {
+    if (!map.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setMapWidth(entry.contentRect.width);
+    });
+    observer.observe(map.current);
+    return () => observer.disconnect();
+  }, []);
+  const labelSize = 13 / Math.max(0.1, Math.min(mapWidth / 600, 1));
   const markers = projectReplayTacticalMarkers(frame.snapshot);
   const xValues = markers.map((marker) => marker.x);
   const zValues = markers.map((marker) => marker.z);
@@ -96,6 +106,7 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
       <svg
+        ref={map}
         viewBox="0 0 600 340"
         role="img"
         aria-label={`Reconstructed tactical state at tick ${frame.tickId}`}
@@ -125,7 +136,7 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
               ) : (
                 <circle cx={x} cy={y} r={9} fill={color} />
               )}
-              <text x={x} y={y + 30} textAnchor="middle" fill="#e2e8f0" fontSize="13">
+              <text x={x} y={y + 30} textAnchor="middle" fill="#e2e8f0" fontSize={labelSize}>
                 {marker.label}
               </text>
             </g>
@@ -176,10 +187,10 @@ const ReplayStateProgression = ({ frames }: { readonly frames: readonly ReplayFr
       <section className="space-y-3 p-3" aria-label="Reconstructed replay world progression">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            <PoligonBadge>{frame.kind}</PoligonBadge>
-            <PoligonBadge>{frame.source}</PoligonBadge>
-            <PoligonBadge>{frame.events.length} events</PoligonBadge>
-            <PoligonBadge>{frame.commandResults.length} results</PoligonBadge>
+            <span>{frame.kind}</span>
+            <span>{frame.source}</span>
+            <span>{frame.events.length} events</span>
+            <span>{frame.commandResults.length} results</span>
           </div>
           <div className="flex gap-2">
             <Button
@@ -275,14 +286,14 @@ const costColumns: ColumnDef<ReplayCostRow, unknown>[] = [
   {
     accessorKey: "faction",
     header: "Faction",
-    cell: ({ row }) => <PoligonBadge>{row.original.faction}</PoligonBadge>,
+    cell: ({ row }) => <span>{row.original.faction}</span>,
   },
   {
     id: "agent",
     header: "Agent / model",
     cell: ({ row }) => (
       <div className="min-w-36">
-        <PoligonBadge>{row.original.agent_tier}</PoligonBadge>
+        <span>{row.original.agent_tier}</span>
         <span className="mt-1 block text-xs text-kumo-subtle">{row.original.model}</span>
       </div>
     ),
@@ -298,7 +309,7 @@ const costColumns: ColumnDef<ReplayCostRow, unknown>[] = [
     cell: ({ row }) => (
       <span>
         {formatInteger(row.original.input_tokens + row.original.output_tokens)}
-        <span className="block text-[0.65rem] text-kumo-subtle">
+        <span className="block text-xs text-kumo-subtle">
           {formatInteger(row.original.input_tokens)} in ·{" "}
           {formatInteger(row.original.output_tokens)} out
         </span>
@@ -312,78 +323,94 @@ const costColumns: ColumnDef<ReplayCostRow, unknown>[] = [
   },
 ];
 
-export const ReplayDashboard = ({ replay }: { readonly replay: SessionExport }) => {
+export const ReplayDashboard = ({
+  replay,
+  view = "all",
+  showSummary = true,
+}: {
+  readonly replay: SessionExport;
+  readonly view?: "all" | "timeline" | "state" | "usage";
+  readonly showSummary?: boolean;
+}) => {
   const timeline = buildReplayTimeline(replay);
   const costs = aggregateReplayCosts(replay);
   const frames = reconstructReplayFrames(replay);
 
   return (
     <div className="space-y-4">
-      <LayerCard className="flex flex-wrap items-center gap-2 p-3">
-        <PoligonBadge>{replay.session.session_id}</PoligonBadge>
-        <PoligonBadge>{replay.session.faction}</PoligonBadge>
-        <PoligonBadge>{replay.session.doctrine}</PoligonBadge>
-        <PoligonBadge>{replay.session.mode}</PoligonBadge>
-        <span className="text-xs text-kumo-subtle">Exported {replay.session.exported_at}</span>
-      </LayerCard>
+      {showSummary ? (
+        <LayerCard className="flex flex-wrap items-center gap-2 p-3">
+          <span>{replay.session.session_id}</span>
+          <span>{replay.session.faction}</span>
+          <span>{replay.session.doctrine}</span>
+          <span>{replay.session.mode}</span>
+          <span className="text-xs text-kumo-subtle">Exported {replay.session.exported_at}</span>
+        </LayerCard>
+      ) : null}
 
-      <ReplayStateProgression
-        key={`${replay.session.session_id}:${replay.session.exported_at}`}
-        frames={frames}
-      />
+      {view === "all" || view === "state" ? (
+        <ReplayStateProgression
+          key={`${replay.session.session_id}:${replay.session.exported_at}`}
+          frames={frames}
+        />
+      ) : null}
 
-      <PoligonFigure
-        caption={`${timeline.length} decisions · ${replay.archive.ticks.length} ticks · ${replay.archive.events.length} archived events`}
-      >
-        <section className="space-y-3 p-3" aria-label="Cause to outcome replay timeline">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="m-0 text-sm font-semibold text-kumo-strong">Decision timeline</h2>
-            <div className="flex items-center gap-1 text-xs" aria-label="Timeline stages">
-              <PoligonBadge>Cause</PoligonBadge>
-              <span aria-hidden="true">→</span>
-              <PoligonBadge>Decision</PoligonBadge>
-              <span aria-hidden="true">→</span>
-              <PoligonBadge>Commands</PoligonBadge>
-              <span aria-hidden="true">→</span>
-              <PoligonBadge>Outcomes</PoligonBadge>
+      {view === "all" || view === "timeline" ? (
+        <PoligonFigure
+          caption={`${timeline.length} decisions · ${replay.archive.ticks.length} ticks · ${replay.archive.events.length} archived events`}
+        >
+          <section className="space-y-3 p-3" aria-label="Cause to outcome replay timeline">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="m-0 text-sm font-semibold text-kumo-strong">Decision timeline</h2>
+              <div className="flex items-center gap-1 text-xs" aria-label="Timeline stages">
+                <span>Cause</span>
+                <span aria-hidden="true">→</span>
+                <span>Decision</span>
+                <span aria-hidden="true">→</span>
+                <span>Commands</span>
+                <span aria-hidden="true">→</span>
+                <span>Outcomes</span>
+              </div>
             </div>
-          </div>
-          <PoligonLogFeed
-            items={timeline}
-            getKey={(item) => item.id}
-            renderItem={(item) => (
-              <article className="space-y-2">
-                <p className="m-0 text-xs text-kumo-subtle">{item.timestamp}</p>
-                <p className="m-0">
-                  <strong>Cause</strong> · {item.cause}
-                </p>
-                <p className="m-0">
-                  <strong>Decision</strong> · {item.decision || "No summary recorded"}
-                </p>
-                <p className="m-0">
-                  <strong>Commands</strong> · {item.commands.join("; ") || "No commands issued"}
-                </p>
-                <p className="m-0">
-                  <strong>Outcomes</strong> · {item.outcomes.join("; ") || "No archived outcome"}
-                </p>
-              </article>
-            )}
-            height={420}
-          />
-        </section>
-      </PoligonFigure>
+            <PoligonLogFeed
+              items={timeline}
+              getKey={(item) => item.id}
+              renderItem={(item) => (
+                <article className="space-y-2">
+                  <p className="m-0 text-xs text-kumo-subtle">{item.timestamp}</p>
+                  <p className="m-0">
+                    <strong>Cause</strong> · {item.cause}
+                  </p>
+                  <p className="m-0">
+                    <strong>Decision</strong> · {item.decision || "No summary recorded"}
+                  </p>
+                  <p className="m-0">
+                    <strong>Commands</strong> · {item.commands.join("; ") || "No commands issued"}
+                  </p>
+                  <p className="m-0">
+                    <strong>Outcomes</strong> · {item.outcomes.join("; ") || "No archived outcome"}
+                  </p>
+                </article>
+              )}
+              height={420}
+            />
+          </section>
+        </PoligonFigure>
+      ) : null}
 
-      <PoligonFigure caption="Grouped by session, faction, agent tier, and model">
-        <section className="space-y-3 p-3" aria-label="Replay cost breakdown">
-          <h2 className="m-0 text-sm font-semibold text-kumo-strong">Calls, tokens, and cost</h2>
-          <PoligonDataTable
-            data={costs}
-            columns={costColumns}
-            emptyLabel="No model usage recorded in this export"
-            getRowId={(row) => row.key}
-          />
-        </section>
-      </PoligonFigure>
+      {view === "all" || view === "usage" ? (
+        <PoligonFigure caption="Grouped by session, faction, agent tier, and model">
+          <section className="space-y-3 p-3" aria-label="Replay cost breakdown">
+            <h2 className="m-0 text-sm font-semibold text-kumo-strong">Calls, tokens, and cost</h2>
+            <PoligonDataTable
+              data={costs}
+              columns={costColumns}
+              emptyLabel="No model usage recorded in this export"
+              getRowId={(row) => row.key}
+            />
+          </section>
+        </PoligonFigure>
+      ) : null}
     </div>
   );
 };

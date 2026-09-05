@@ -54,7 +54,7 @@ describe("CommanderCostDashboard", () => {
     );
 
     expect(markup).toContain("Commander session cost dashboard");
-    expect(markup).toContain("Current commander session usage");
+    expect(markup).toContain("Session usage");
     expect(markup).toContain("OPFOR");
     expect(markup).toContain("stavka/commander");
     expect(markup).toContain("3 calls");

@@ -36,7 +36,8 @@ import {
 } from "../components/simulation-setup";
 import { SimulationStage } from "../components/simulation-stage";
 import { useOfflineSimHost } from "../offline-sim-host";
-import { commanderSessionId, simWorldAgentName } from "../scenario-identity";
+import { useRememberSimulation } from "../recent-sessions";
+import { simWorldAgentName } from "../scenario-identity";
 import type { PoligonState, SimWorld } from "../sim-world";
 
 const SearchSeed = Schema.Union([Schema.Number, Schema.NumberFromString]).check(
@@ -80,6 +81,13 @@ export const Route = createFileRoute("/simulations")({
 
 function PoligonPage() {
   const search = Route.useSearch();
+  useRememberSimulation({ ...search, timeScale: search.time_scale }, "OPFOR", search.host);
+  useRememberSimulation(
+    { ...search, timeScale: search.time_scale },
+    "BLUFOR",
+    search.host,
+    search.mode === "versus",
+  );
   const navigate = useNavigate({ from: "/" });
   return <PoligonHost search={search} navigate={navigate} />;
 }
@@ -235,7 +243,7 @@ const SimulationIdentity = ({
   readonly faction?: string | undefined;
 }) => (
   <div className="simulation-identity">
-    <h1>{scenarioTitles[scenario]}</h1>
+    <h2>{scenarioTitles[scenario]}</h2>
     <p className="simulation-identity-meta">
       <span>Seed {seed}</span>
       <span aria-hidden="true">·</span>
@@ -256,15 +264,12 @@ const SimulationIdentity = ({
   </div>
 );
 
-const accessBadge = (accessMode: AccessMode) => (
-  <Badge variant={accessMode === "spectator" ? "warning" : "secondary"}>
-    {accessMode === "loading"
-      ? "Checking access"
-      : accessMode === "offline"
-        ? "Browser offline"
-        : accessMode}
-  </Badge>
-);
+const accessBadge = (accessMode: AccessMode) =>
+  accessMode === "operator" || accessMode === "offline" ? null : (
+    <Badge variant={accessMode === "spectator" ? "warning" : "secondary"}>
+      {accessMode === "loading" ? "Checking access" : "Read-only"}
+    </Badge>
+  );
 
 const SimulationConnecting = ({
   search,
@@ -495,7 +500,7 @@ function SimulationWorkspace({
           }}
         />
       </div>
-      <div className="poligon-layout simulation-body">
+      <div className="simulation-body">
         <SimulationStage
           state={state}
           camera={search.camera}
@@ -598,18 +603,7 @@ function SimulationWorkspace({
             )}
           </div>
           <footer className="simulation-panel-foot" aria-label="Commander status">
-            <SimulationCommanderStatus
-              state={state}
-              offline={offline}
-              factions={factions}
-              onInspectSession={(faction) =>
-                void navigate({
-                  to: "/sessions/$sessionId",
-                  params: { sessionId: commanderSessionId({ ...state, faction }) },
-                  search: { faction },
-                })
-              }
-            />
+            <SimulationCommanderStatus state={state} offline={offline} factions={factions} />
           </footer>
         </aside>
       </div>
