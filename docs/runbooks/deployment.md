@@ -26,14 +26,26 @@ Commander and inference reachable only through Cloudflare service bindings.
    - Worker-side JWT verification is already enforced by
      `@stavka/access-auth`; configure `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`
      as Worker secrets/vars on `apps/stavka`.
-3. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
-   service tokens via `authorizeMachine`, not Access sessions.
+3. **Game bridge**: `/api/connect`, `/api/map`, `/api/tick`, and
+   `/api/disconnect` require a Cloudflare Access service token at the edge and
+   the Commander machine bearer at the application. Keep server credentials
+   in the dedicated server's restricted profile, outside the addon.
 4. **Account control plane**: the unified app forwards `/auth/*`,
    `/account/users`, `/admin/provider-accounts*`, `/v1/responses`, and
    `/v1/messages` to the private inference Worker through `INFERENCE_SERVICE`.
    The verified human identity must be the configured owner to create the first
    profile or invoke a provider. Service tokens and machine bearer tokens are
    rejected from every credential-decrypting route.
+5. **Commander execution**: a signed-in owner/admin enables AI for an exact
+   session, mission epoch and faction from Sessions or Simulations. The button
+   authorizes 20 request attempts for one hour using that user's active provider
+   accounts. Each provider attempt consumes one slot, including failed attempts.
+   Commander alone binds the private `CommanderInference` entrypoint. It derives
+   session context from its authoritative state; a game bearer or service token
+   cannot issue an execution grant. Disabling, expiry, role removal or renewal
+   prevents queued requests from starting; a response already executing may finish.
+   Grants and their consumed budgets survive Durable Object restarts. Starting
+   a new mission epoch requires a new explicit authorization.
 
 ## Deploy
 
@@ -74,6 +86,10 @@ Then sign in through Access, verify `/healthz` and `/system`, and check:
   resolved model, usage, and costs.
 - The same model request with only `MASKIROVKA_GATEWAY_KEY`, or with a service
   token and no human Access assertion, fails with `ACCESS_REQUIRED`.
+- Enable AI for one session/faction and verify a real provider response produces
+  a validated, applied tactical command. Record its session, epoch, provider
+  metadata and receipt. Disable AI afterward and verify the grant is revoked.
+  Rule fallback and a model response with rejected commands do not prove this path.
 
 If readiness fails: `wrangler rollback` per service in reverse dependency
 order (app → commander → inference).

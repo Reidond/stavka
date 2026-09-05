@@ -6,6 +6,7 @@ import type { MaskirovkaGateway } from "../src/gateway-container";
 import {
   accountPrincipal,
   createGatewayTestHandler,
+  createCommanderExecutionTestHandler,
   handleTestRequest,
   type GatewayStub,
 } from "../src/router";
@@ -32,6 +33,7 @@ const environment = (): GatewayEnv => ({
   MASKIROVKA_CODEX_WINDOW_CALL_LIMIT: "0",
   MASKIROVKA_CODEX_WINDOW_TOKEN_LIMIT: "0",
   MASKIROVKA_CODEX_WINDOW_HOURS: "5",
+  MASKIROVKA_MAX_RESPONSE_BYTES: "10485760",
 });
 
 const status = () => ({
@@ -96,6 +98,19 @@ const accountOwner = {
 };
 
 const fakeStub = (): GatewayStub => ({
+  authorizeExecution: vi.fn(async (_scope, input) => ({
+    ...input,
+    grant_id: "grant",
+    status: "active" as const,
+    authorized_at: 1,
+    expires_at: 60001,
+    requests_used: 0,
+  })),
+  readExecution: vi.fn(async () => null),
+  revokeExecution: vi.fn(async () => null),
+  fetchForSession: vi.fn(async () =>
+    Response.json({ error: { code: "EXECUTION_NOT_AUTHORIZED" } }, { status: 403 }),
+  ),
   getGatewayStatus: vi.fn(async () => status()),
   getAccountSession: vi.fn(async () => activeSession()),
   signUpAccount: vi.fn(async () => activeSession()),
@@ -154,8 +169,12 @@ const fakeStub = (): GatewayStub => ({
 });
 
 const app = createGatewayTestHandler();
+const commanderApp = createCommanderExecutionTestHandler();
 
-afterAll(() => app.dispose());
+afterAll(async () => {
+  await app.dispose();
+  await commanderApp.dispose();
+});
 
 const request = (
   path: string,
@@ -170,6 +189,94 @@ const request = (
 };
 
 describe("hosted gateway Worker router", () => {
+  it("requires a human owner to issue a bounded exact-session grant", async () => {
+    const stub = fakeStub();
+    const payload = {
+      session_id: "session",
+      mission_epoch: 1,
+      faction: "OPFOR",
+      duration_minutes: 60,
+      request_limit: 20,
+    };
+    const init = {
+      method: "POST",
+      headers: { authorization: bearer, "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    };
+    expect((await request("/admin/execution/authorize", init, environment(), stub)).status).toBe(
+      401,
+    );
+    expect(stub.authorizeExecution).not.toHaveBeenCalled();
+    const env = { ...environment(), ENVIRONMENT: "local", DEV_ACCESS_EMAIL: "owner@example.test" };
+    const authorized = await request("/admin/execution/authorize", init, env, stub);
+    expect(authorized.status).toBe(200);
+    expect(stub.authorizeExecution).toHaveBeenCalledWith(
+      { organizationId: "organization-1", userId: "user-1" },
+      payload,
+    );
+    const crossOrigin = await request(
+      "/admin/execution/authorize",
+      { ...init, headers: { ...init.headers, origin: "https://other.example" } },
+      env,
+      stub,
+    );
+    expect(crossOrigin.status).toBe(403);
+    expect(stub.authorizeExecution).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await request(
+          "/admin/execution/authorize",
+          { ...init, body: JSON.stringify({ ...payload, request_limit: 201 }) },
+          env,
+          stub,
+        )
+      ).status,
+    ).toBe(400);
+  });
+
+  it("keeps Commander session execution off the default handler and validates its private entrypoint", async () => {
+    const stub = fakeStub();
+    const scope = { session_id: "session", mission_epoch: 1, faction: "OPFOR" };
+    const init = {
+      method: "POST",
+      headers: { authorization: bearer, "x-stavka-execution-session": JSON.stringify(scope) },
+      body: "{}",
+    };
+    const direct = await request("/v1/responses", init, environment(), stub);
+    expect(direct.status).toBe(401);
+    expect(stub.fetchForSession).not.toHaveBeenCalled();
+    const invalid = await handleTestRequest(
+      commanderApp.handler,
+      new Request("https://inference.internal/v1/responses", { ...init, headers: {} }),
+      environment(),
+      { resolveGateway: () => stub },
+    );
+    expect(invalid.status).toBe(403);
+    expect(stub.fetchForSession).not.toHaveBeenCalled();
+    const denied = await handleTestRequest(
+      commanderApp.handler,
+      new Request("https://inference.internal/v1/responses", init),
+      environment(),
+      { resolveGateway: () => stub },
+    );
+    expect(denied.status).toBe(403);
+    expect(stub.fetchForSession).toHaveBeenCalledWith(scope, expect.any(Request));
+    vi.mocked(stub.fetchForSession).mockResolvedValue(Response.json({ id: "authorized-response" }));
+    const allowed = await handleTestRequest(
+      commanderApp.handler,
+      new Request("https://inference.internal/v1/responses", init),
+      environment(),
+      { resolveGateway: () => stub },
+    );
+    expect(allowed.status).toBe(200);
+    const admin = await handleTestRequest(
+      commanderApp.handler,
+      new Request("https://inference.internal/admin/execution/authorize", init),
+      environment(),
+      { resolveGateway: () => stub },
+    );
+    expect(admin.status).toBe(404);
+  });
   it("rejects service-token identities from the human account control plane", async () => {
     await expect(
       Effect.runPromise(

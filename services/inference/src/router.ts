@@ -12,6 +12,7 @@ import {
   type SignUpPayload,
 } from "@stavka/access-auth";
 import { Cause, Context, Effect, Layer, Schema } from "effect";
+import { ExecutionSession, type AuthorizeExecution, type ExecutionGrant } from "@stavka/protocol";
 import {
   HttpRouter,
   HttpServer,
@@ -25,6 +26,7 @@ import {
   AliasPayloadSchema,
   KillSwitchPayloadSchema,
   MaskirovkaGatewayApi,
+  CommanderExecutionApi,
   ProvisionProviderAccountPayloadSchema,
   ProviderSchema,
   SignUpPayloadSchema,
@@ -46,6 +48,19 @@ import type {
 import { ClaudeOAuthTokenSchema } from "@stavka/provider-auth";
 
 export interface GatewayStub {
+  readonly authorizeExecution: (
+    scope: AccountScope,
+    input: AuthorizeExecution,
+  ) => Promise<ExecutionGrant>;
+  readonly readExecution: (
+    scope: AccountScope,
+    session: ExecutionSession,
+  ) => Promise<ExecutionGrant | null>;
+  readonly revokeExecution: (
+    scope: AccountScope,
+    session: ExecutionSession,
+  ) => Promise<ExecutionGrant | null>;
+  readonly fetchForSession: (session: ExecutionSession, request: Request) => Promise<Response>;
   readonly fetchForAccount: (scope: AccountScope, request: Request) => Promise<Response>;
   readonly getGatewayStatus: (scope?: AccountScope) => Promise<GatewayStatus>;
   readonly getAccountSession: (principal: AccountAccessPrincipal) => Promise<AccountSession>;
@@ -335,8 +350,61 @@ const proxy = (
     return HttpServerResponse.fromWeb(upstream);
   });
 
+const executionAdministration = (
+  request: HttpServerRequest.HttpServerRequest,
+  operation: (gateway: GatewayStub, scope: AccountScope) => Promise<ExecutionGrant | null>,
+) =>
+  Effect.gen(function* () {
+    const runtime = yield* GatewayRuntime;
+    const web = yield* toWebRequest(request);
+    const origin = web.headers.get("origin");
+    if (
+      (origin !== null && origin !== new URL(web.url).origin) ||
+      web.headers.get("sec-fetch-site") === "cross-site"
+    )
+      return yield* Effect.fail(
+        new WorkerHttpError(
+          403,
+          "CROSS_ORIGIN_AUTHORIZATION",
+          "AI authorization requires a same-origin request",
+        ),
+      );
+    const identity = yield* requireAccess(web, runtime.env, "admin");
+    const session = yield* activeAccountSession(runtime, identity);
+    yield* requireOrganizationAdmin(session);
+    const grant = yield* Effect.tryPromise({
+      try: () => operation(gatewayFor(runtime), accountScope(session)),
+      catch: () =>
+        new WorkerHttpError(
+          403,
+          "EXECUTION_AUTHORIZATION_FAILED",
+          "AI authorization is unavailable or belongs to another user.",
+        ),
+    });
+    return { grant };
+  });
+
 const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (handlers) =>
   handlers
+    .handle("authorizeExecution", ({ payload, request }) =>
+      safe(
+        executionAdministration(request, (gateway, scope) =>
+          gateway.authorizeExecution(scope, payload),
+        ),
+      ),
+    )
+    .handle("readExecution", ({ payload, request }) =>
+      safe(
+        executionAdministration(request, (gateway, scope) => gateway.readExecution(scope, payload)),
+      ),
+    )
+    .handle("revokeExecution", ({ payload, request }) =>
+      safe(
+        executionAdministration(request, (gateway, scope) =>
+          gateway.revokeExecution(scope, payload),
+        ),
+      ),
+    )
     .handleRaw("health", ({ request }) =>
       safe(
         Effect.gen(function* () {
@@ -767,6 +835,46 @@ const Routes = HttpApiBuilder.layer(MaskirovkaGatewayApi, { openapiPath: "/opena
 
 const productionWebHandler = HttpRouter.toWebHandler(Routes, { disableLogger: true });
 
+const commanderProxy = (request: HttpServerRequest.HttpServerRequest) =>
+  safe(
+    Effect.gen(function* () {
+      const runtime = yield* GatewayRuntime;
+      const web = yield* toWebRequest(request);
+      const session = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ExecutionSession), {
+        onExcessProperty: "error",
+      })(web.headers.get("x-stavka-execution-session") ?? "").pipe(
+        Effect.mapError(
+          () =>
+            new WorkerHttpError(
+              403,
+              "EXECUTION_NOT_AUTHORIZED",
+              "Commander session authorization is required",
+            ),
+        ),
+      );
+      const response = yield* Effect.tryPromise({
+        try: () => gatewayFor(runtime).fetchForSession(session, web),
+        catch: () =>
+          new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Authorized inference is unavailable"),
+      });
+      return HttpServerResponse.fromWeb(response);
+    }),
+  );
+
+const CommanderHandlers = HttpApiBuilder.group(CommanderExecutionApi, "execution", (handlers) =>
+  handlers
+    .handleRaw("responses", ({ request }) => commanderProxy(request))
+    .handleRaw("messages", ({ request }) => commanderProxy(request)),
+);
+
+const CommanderRoutes = HttpApiBuilder.layer(CommanderExecutionApi).pipe(
+  Layer.provide(CommanderHandlers),
+  Layer.provide(HttpServer.layerServices),
+);
+const commanderWebHandler = HttpRouter.toWebHandler(CommanderRoutes, { disableLogger: true });
+export const createCommanderExecutionTestHandler = () =>
+  HttpRouter.toWebHandler(CommanderRoutes, { disableLogger: true });
+
 const defaultGatewayResolver = (env: GatewayEnv): GatewayStub =>
   env.MASKIROVKA_GATEWAY.getByName(env.GATEWAY_ID || "default-gateway");
 
@@ -787,6 +895,12 @@ export const handleRequest = (
   env: GatewayEnv,
   dependencies: GatewayRouterDependencies = {},
 ): Promise<Response> => productionWebHandler.handler(request, runtimeContext(env, dependencies));
+
+export const handleCommanderRequest = (
+  request: Request,
+  env: GatewayEnv,
+  dependencies: GatewayRouterDependencies = {},
+): Promise<Response> => commanderWebHandler.handler(request, runtimeContext(env, dependencies));
 
 export const handleTestRequest = (
   handler: ReturnType<typeof createGatewayTestHandler>["handler"],

@@ -13,6 +13,7 @@ import {
 } from "@stavka/provider-auth";
 
 import { gatewayProviders, gatewaySeats, gatewayTiers } from "./config";
+import { AuthorizeExecution, ExecutionSession, ExecutionStatus } from "@stavka/protocol";
 
 export const ProviderSchema = Schema.Literals(gatewayProviders);
 export const TierSchema = Schema.Literals(gatewayTiers);
@@ -38,6 +39,18 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
   HttpApiEndpoint.get("models", "/v1/models", { success: AnyResponse }),
   HttpApiEndpoint.post("responses", "/v1/responses", { success: AnyResponse }),
   HttpApiEndpoint.post("messages", "/v1/messages", { success: AnyResponse }),
+  HttpApiEndpoint.post("authorizeExecution", "/admin/execution/authorize", {
+    payload: AuthorizeExecution,
+    success: ExecutionStatus,
+  }),
+  HttpApiEndpoint.post("readExecution", "/admin/execution/status", {
+    payload: ExecutionSession,
+    success: ExecutionStatus,
+  }),
+  HttpApiEndpoint.post("revokeExecution", "/admin/execution/revoke", {
+    payload: ExecutionSession,
+    success: ExecutionStatus,
+  }),
   HttpApiEndpoint.get("accountSession", "/auth/session", { success: AccountSessionSchema }),
   HttpApiEndpoint.post("signUpAccount", "/auth/signup", {
     payload: SignUpPayloadSchema,
@@ -110,3 +123,11 @@ const GatewayApi = HttpApiGroup.make("gateway").add(
 );
 
 export const MaskirovkaGatewayApi = HttpApi.make("maskirovka-gateway").add(GatewayApi);
+
+/** Not mounted on the default/public gateway handler. */
+export const CommanderExecutionApi = HttpApi.make("commander-execution").add(
+  HttpApiGroup.make("execution").add(
+    HttpApiEndpoint.post("responses", "/v1/responses", { success: AnyResponse }),
+    HttpApiEndpoint.post("messages", "/v1/messages", { success: AnyResponse }),
+  ),
+);

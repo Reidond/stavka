@@ -274,6 +274,8 @@ const ProviderAccountsRootRoute = HttpRouter.route(
   inferenceAdmin,
 );
 
+const ExecutionAuthorizationRoute = HttpRouter.route("POST", "/admin/execution/*", inferenceAdmin);
+
 const AccountSessionRoute = HttpRouter.route("GET", "/auth/session", inferenceAdmin);
 
 const AccountSignUpRoute = HttpRouter.route("POST", "/auth/signup", inferenceAdmin);
@@ -310,6 +312,7 @@ const RawRoutesLive = HttpRouter.addAll([
   AccountSignUpRoute,
   OrganizationUsersRoute,
   ProviderAccountsRootRoute,
+  ExecutionAuthorizationRoute,
   PutProviderAccountRoute,
   PostProviderAccountRoute,
   DeleteProviderAccountRoute,

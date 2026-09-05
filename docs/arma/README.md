@@ -74,9 +74,11 @@ profile configuration. The Arland Game Master child world is for development.
 
 The new public `/api/connect`, `/api/map`, `/api/tick`, and `/api/disconnect`
 contracts forward through `COMMANDER_SERVICE`. Deploy the source explicitly
-before testing that path on Cloudflare. The established owner-account execution
-gap in [remaining work](../REMAINING_WORK.md) still applies to LLM decisions;
-game-server credentials do not grant provider execution.
+before testing that path on Cloudflare. Once the server session appears in
+Sessions, a signed-in owner/admin must explicitly enable AI for its exact mission
+epoch and faction. This authorizes up to 20 provider request attempts for one hour
+using that user's active provider accounts. Game-server credentials do not grant
+provider execution. See [remaining work](../REMAINING_WORK.md) for acceptance status.
 
 ## Native behavior
 

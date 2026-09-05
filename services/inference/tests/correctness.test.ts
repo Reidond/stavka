@@ -10,6 +10,7 @@ vi.mock("@cloudflare/containers", () => ({
 
 import { MaskirovkaGateway, limitStreamBytes } from "../src/gateway-container";
 import { isHtmlNavigation } from "../src/router";
+import { ExecutionAuthorizationError } from "../src/execution-grant-repository";
 
 const streamOf = (chunks: readonly string[]): ReadableStream<Uint8Array> =>
   new ReadableStream<Uint8Array>({
@@ -81,6 +82,51 @@ it("forwards without caller routing metadata and records only container response
     expect.objectContaining({ model: "resolved-model", provider: "codex", inputTokens: 12 }),
   );
   expect(append.mock.calls[0]?.[0]).not.toHaveProperty("seat");
+});
+
+it("never decrypts an account without a grant and rechecks revocation after container startup", async () => {
+  const decrypt = vi.fn(() => Effect.succeed([{}]));
+  const fetch = vi.fn(async () => new Response("ok"));
+  const scope = { organizationId: "org", userId: "owner" };
+  const session = { session_id: "native", mission_epoch: 1, faction: "OPFOR" };
+  let authorized = false;
+  let revoked = false;
+  const deny = () =>
+    Effect.fail(
+      new ExecutionAuthorizationError({
+        code: "EXECUTION_NOT_AUTHORIZED",
+        message: "Not authorized",
+      }),
+    );
+  const gateway: MaskirovkaGateway = Object.assign(Object.create(MaskirovkaGateway.prototype), {
+    env: {},
+    readConfig: () => Effect.succeed({ killed: false }),
+    activeProviderAccounts: decrypt,
+    executionGrants: {
+      consume: () => (authorized ? Effect.succeed({ scope, grantId: "grant" }) : deny()),
+      verifyReserved: () => (revoked ? deny() : Effect.void),
+    },
+    ensureContainerReady: () =>
+      Effect.sync(() => {
+        revoked = true;
+      }),
+    startLock: Semaphore.makeUnsafe(1),
+    containerFetch: fetch,
+    requests: { append: () => Effect.void },
+    window: { read: Effect.succeed(undefined), save: () => Effect.void },
+  });
+  expect(
+    (await gateway.fetchForSession(session, new Request("https://inference.internal/v1/responses")))
+      .status,
+  ).toBe(403);
+  expect(decrypt).not.toHaveBeenCalled();
+  authorized = true;
+  expect(
+    (await gateway.fetchForSession(session, new Request("https://inference.internal/v1/responses")))
+      .status,
+  ).toBe(403);
+  expect(decrypt).toHaveBeenCalledWith(scope);
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 describe("streamed byte limits", () => {

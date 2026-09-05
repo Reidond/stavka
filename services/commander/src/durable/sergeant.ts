@@ -1,5 +1,5 @@
 import { Agent, type FiberRecoveryContext } from "agents";
-import type { Command, GameSnapshot, SergeantReport } from "@stavka/protocol";
+import type { Command, GameSnapshot, SergeantReport, ExecutionSession } from "@stavka/protocol";
 import { Clock, Effect } from "effect";
 
 import { materializeCommandProposals, reassignCommandIds } from "../brain/command-validator";
@@ -21,6 +21,7 @@ import type { SeatRegistration } from "../state/types";
 const MAX_COMMANDS_PER_ASSESSMENT = 3;
 
 interface SergeantWork {
+  readonly executionSession?: ExecutionSession;
   readonly version: number;
   readonly decisionSequence: number;
   readonly commandStartSequence: number;
@@ -269,6 +270,7 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
     report: SergeantReport,
     snapshot?: GameSnapshot,
     seats: readonly SeatRegistration[] = [],
+    executionSession?: ExecutionSession,
   ): Promise<void> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
@@ -282,6 +284,7 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
           report,
           snapshot: snapshot ?? null,
           seats,
+          ...(executionSession ? { executionSession } : {}),
         };
         yield* Effect.sync(() =>
           this.setState({
@@ -433,6 +436,7 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
           {
             decisionSequence: work.decisionSequence,
             commandStartSequence: work.commandStartSequence,
+            ...(work.executionSession ? { executionSession: work.executionSession } : {}),
           },
         );
         yield* Effect.sync(() => {
@@ -470,6 +474,7 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
     assigned?: {
       readonly decisionSequence: number;
       readonly commandStartSequence: number;
+      readonly executionSession?: ExecutionSession;
     },
   ): Effect.Effect<SergeantAssessment, unknown> {
     return Effect.gen({ self: this }, function* () {
@@ -479,7 +484,10 @@ export class SergeantAgent extends Agent<Env, SergeantState> {
       const decision = yield* assessWithModel(
         report,
         snapshot,
-        config,
+        {
+          ...config,
+          ...(assigned?.executionSession ? { executionSession: assigned.executionSession } : {}),
+        },
         seats,
         this.env,
         commandStartSequence,

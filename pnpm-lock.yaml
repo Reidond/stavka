@@ -405,6 +405,9 @@ importers:
       '@stavka/maskirovka':
         specifier: workspace:*
         version: link:../../tools/maskirovka
+      '@stavka/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@stavka/provider-auth':
         specifier: workspace:*
         version: link:../../packages/provider-auth

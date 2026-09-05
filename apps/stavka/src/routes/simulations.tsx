@@ -37,7 +37,8 @@ import {
 import { SimulationStage } from "../components/simulation-stage";
 import { useOfflineSimHost } from "../offline-sim-host";
 import { useRememberSimulation } from "../recent-sessions";
-import { simWorldAgentName } from "../scenario-identity";
+import { simWorldAgentName, commanderSessionId } from "../scenario-identity";
+import { SessionAiAuthorization } from "../components/session-ai-authorization";
 import type { PoligonState, SimWorld } from "../sim-world";
 
 const SearchSeed = Schema.Union([Schema.Number, Schema.NumberFromString]).check(
@@ -603,6 +604,25 @@ function SimulationWorkspace({
             )}
           </div>
           <footer className="simulation-panel-foot" aria-label="Commander status">
+            {!offline && canOperate
+              ? factions.map((faction) => (
+                  <SessionAiAuthorization
+                    key={faction}
+                    session={{
+                      session_id: commanderSessionId({
+                        scenario: state.scenario,
+                        seed: state.seed,
+                        doctrine: state.doctrine,
+                        timeScale: state.timeScale,
+                        mode: state.mode,
+                        faction,
+                      }),
+                      mission_epoch: 1,
+                      faction,
+                    }}
+                  />
+                ))
+              : null}
             <SimulationCommanderStatus state={state} offline={offline} factions={factions} />
           </footer>
         </aside>

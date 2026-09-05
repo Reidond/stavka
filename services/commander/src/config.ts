@@ -1,5 +1,5 @@
 import type { AccessConfig, AccessPermission } from "@stavka/access-auth";
-import type { DoctrineId, LlmTierAlias } from "@stavka/protocol";
+import type { DoctrineId, LlmTierAlias, ExecutionSession } from "@stavka/protocol";
 import { Context, Data, Effect, Schema } from "effect";
 
 export type AiProvider = "mock" | "openai" | "anthropic";
@@ -73,6 +73,8 @@ export interface CommanderConfig {
   readonly aiKey?: string;
   /** Service binding fetch for inference; when set, traffic never leaves the private network. */
   readonly inferenceService?: Fetcher;
+  /** Exact owner-authorized mission; never supplied by a model or request header. */
+  readonly executionSession?: ExecutionSession;
   readonly seatExhaustionPolicy: "fallback" | "stretch";
   readonly seatStretchMultiplier: number;
   readonly seatHeartbeatTtlSeconds: number;

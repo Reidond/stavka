@@ -14,6 +14,11 @@ import {
   type ProvisionProviderAccountPayload,
 } from "@stavka/provider-auth";
 import { Effect, Semaphore } from "effect";
+import type { AuthorizeExecution, ExecutionGrant, ExecutionSession } from "@stavka/protocol";
+import {
+  DurableExecutionGrantRepository,
+  ExecutionAuthorizationError,
+} from "./execution-grant-repository";
 
 import type { GatewayAuthCheckpoint } from "./auth-checkpoint";
 import {
@@ -104,6 +109,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
   private readonly providerAccounts: DurableProviderAccountRepository;
   private readonly organizations: DurableOrganizationRepository;
+  private readonly executionGrants: DurableExecutionGrantRepository;
   private readonly config: GatewayConfigRepositoryService;
   private readonly requests: DurableRequestMetadataRepository;
   private readonly window: DurableWindowTrackerRepository;
@@ -112,6 +118,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   constructor(ctx: DurableObjectState<{}>, env: GatewayEnv) {
     super(ctx, env);
     this.organizations = new DurableOrganizationRepository(ctx.storage);
+    this.executionGrants = new DurableExecutionGrantRepository(ctx.storage);
     this.providerAccounts = new DurableProviderAccountRepository(
       ctx.storage.sql,
       env.STAVKA_PROVIDER_VAULT_KEY,
@@ -122,6 +129,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     Effect.runSync(
       Effect.all([
         this.organizations.initialize,
+        this.executionGrants.initialize,
         this.providerAccounts.initialize,
         this.config.initialize,
         this.requests.initialize,
@@ -272,7 +280,46 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
   }
 
   async fetchForAccount(scope: AccountScope, request: Request): Promise<Response> {
-    return Effect.runPromise(this.forwardEffect(scope, request), { signal: request.signal });
+    return Effect.runPromise(this.forwardEffect(Effect.succeed({ scope }), request), {
+      signal: request.signal,
+    });
+  }
+
+  async authorizeExecution(
+    scope: AccountScope,
+    input: AuthorizeExecution,
+  ): Promise<ExecutionGrant> {
+    return Effect.runPromise(this.executionGrants.authorize(scope, input, Date.now()));
+  }
+
+  async readExecution(
+    scope: AccountScope,
+    session: ExecutionSession,
+  ): Promise<ExecutionGrant | null> {
+    return Effect.runPromise(this.executionGrants.read(scope, session, Date.now()));
+  }
+
+  async revokeExecution(
+    scope: AccountScope,
+    session: ExecutionSession,
+  ): Promise<ExecutionGrant | null> {
+    return Effect.runPromise(this.executionGrants.revoke(scope, session, Date.now()));
+  }
+
+  /** Called only by the dedicated Commander service-binding entrypoint. */
+  async fetchForSession(session: ExecutionSession, request: Request): Promise<Response> {
+    const authorization = Effect.gen({ self: this }, function* () {
+      const permit = yield* this.executionGrants.consume(session, Date.now());
+      return {
+        scope: permit.scope,
+        verify: Effect.suspend(() =>
+          this.executionGrants.verifyReserved(session, permit.grantId, Date.now()),
+        ),
+      };
+    });
+    return Effect.runPromise(this.forwardEffect(authorization, request), {
+      signal: request.signal,
+    });
   }
 
   override async fetch(_request: Request): Promise<Response> {
@@ -425,35 +472,48 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     });
   }
 
-  private forwardEffect(scope: AccountScope, request: Request): Effect.Effect<Response, never> {
+  private forwardEffect(
+    authorization: Effect.Effect<
+      { readonly scope: AccountScope; readonly verify?: Effect.Effect<void, unknown> },
+      unknown
+    >,
+    request: Request,
+  ): Effect.Effect<Response, never> {
     return Effect.gen({ self: this }, function* () {
       const config = yield* this.readConfig().pipe(Effect.catch(() => Effect.succeed(undefined)));
       if (config?.killed) return errorResponse("GATEWAY_KILLED", "Gateway traffic is disabled");
-      const accounts = yield* this.activeProviderAccounts(scope).pipe(
-        Effect.catch(() => Effect.succeed([])),
-      );
-      if (accounts.length === 0)
-        return errorResponse(
-          "GATEWAY_AUTH_MISSING",
-          "No subscription credential is configured for this user",
-        );
       const headers = new Headers(request.headers);
       // Routing metadata is decided by the inference service, never by the
       // caller: strip every inbound x-maskirovka-* header before forwarding.
       const inboundHeaderNames = [...headers.keys()];
       for (const name of inboundHeaderNames) {
-        if (name.toLowerCase().startsWith("x-maskirovka-")) headers.delete(name);
+        if (
+          name.toLowerCase().startsWith("x-maskirovka-") ||
+          name.toLowerCase().startsWith("x-stavka-execution-")
+        )
+          headers.delete(name);
       }
       const requestId = crypto.randomUUID();
       headers.set("x-maskirovka-request-id", requestId);
       headers.delete("authorization");
       headers.delete("cf-access-jwt-assertion");
+      headers.delete("cf-access-client-id");
+      headers.delete("cf-access-client-secret");
       const started = Date.now();
       const internal = new Request(request, { headers });
       const response = yield* this.startLock
         .withPermit(
           Effect.gen({ self: this }, function* () {
+            // Authorization and credential decryption happen after queueing.
+            const permit = yield* authorization;
+            const accounts = yield* this.activeProviderAccounts(permit.scope);
+            if (accounts.length === 0)
+              return errorResponse(
+                "GATEWAY_AUTH_MISSING",
+                "No subscription credential is configured for this user",
+              );
             yield* this.ensureContainerReady(accounts);
+            if (permit.verify) yield* permit.verify;
             return yield* Effect.tryPromise({
               try: () => this.containerFetch(internal),
               catch: (cause) => cause,
@@ -463,11 +523,13 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         .pipe(
           Effect.catch((cause) =>
             Effect.succeed(
-              errorResponse(
-                "GATEWAY_DISCONNECTED",
-                cause instanceof Error ? cause.message : "Gateway container disconnected",
-                503,
-              ),
+              cause instanceof ExecutionAuthorizationError
+                ? errorResponse(cause.code, cause.message, 403)
+                : errorResponse(
+                    "GATEWAY_DISCONNECTED",
+                    cause instanceof Error ? cause.message : "Gateway container disconnected",
+                    503,
+                  ),
             ),
           ),
         );

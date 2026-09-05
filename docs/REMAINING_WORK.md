@@ -19,16 +19,16 @@ final release. Both providers also returned real responses locally. The legacy
 Claude token was replaced and revoked. See the audit for exact versions and
 verification limits.
 
-One functional integration gap was found during the signed-in browser audit:
-Commander submits machine-authenticated model requests, while the deployed
-inference boundary requires an owner-scoped human account. A direct model
-test can verify the subscription independently, but the full simulation loop
-still needs an explicit account-scoped execution path. Do not relax inference
-authorization or report a rule decision as a successful model decision.
+The account-scoped Commander execution path is implemented in source. An
+owner/admin explicitly grants a bounded session/epoch/faction authorization;
+Commander uses a private inference entrypoint to consume that grant against
+the owner's provider accounts. Human provider routes retain Access verification.
+Production deployment and successful tactical application still require the
+release checks below. Do not report rule fallback as a successful model decision.
 
 Still outstanding:
 
-- Complete a production account-scoped Commander execution path and verify
+- Deploy the account-scoped Commander execution path and verify
   successful tactical command application. A paused local simulation produced
   a model response, but all five proposed commands failed tactical validation;
   no successful application is claimed.

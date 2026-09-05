@@ -648,6 +648,11 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
                   report,
                   scopedSergeantSnapshot(this.state.snapshot, report),
                   this.state.seats,
+                  {
+                    session_id: this.state.sessionId,
+                    mission_epoch: this.state.missionEpoch,
+                    faction: this.state.faction,
+                  },
                 );
               },
               catch: (cause) =>
@@ -784,13 +789,21 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
           Effect.catch(() => Effect.succeed(this.state.seats)),
         );
         const planningState = { ...this.state, seats };
+        const executionConfig = {
+          ...config,
+          executionSession: {
+            session_id: planningState.sessionId,
+            mission_epoch: planningState.missionEpoch,
+            faction: planningState.faction,
+          },
+        };
         const trigger = planningState.pendingDecisionTrigger ?? "scheduled_alarm";
         const invocationId = `commander:${this.name}:${planningState.nextDecisionSequence}:${payload.version}`;
         const decision = yield* planDecision(planningState, config, trigger, (prompt) =>
           runRoutedAiDecision(
             this.env,
             planningState.seats,
-            config,
+            executionConfig,
             config.commanderModel,
             prompt,
             invocationId,

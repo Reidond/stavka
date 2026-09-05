@@ -139,11 +139,14 @@ const generatedDecision = (
 const httpClientLayer = (config: CommanderConfig): Layer.Layer<HttpClient.HttpClient> => {
   const service = config.inferenceService;
   if (service === undefined) return FetchHttpClient.layer;
-  const bindingFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    service.fetch(
-      input instanceof Request ? input : String(input),
-      init,
-    )) as unknown as typeof globalThis.fetch;
+  const bindingFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init);
+    const headers = new Headers(request.headers);
+    headers.delete("x-stavka-execution-session");
+    if (config.executionSession)
+      headers.set("x-stavka-execution-session", JSON.stringify(config.executionSession));
+    return service.fetch(new Request(request, { headers }));
+  }) as unknown as typeof globalThis.fetch;
   // Capture the binding in the client's merged context. A sibling layer would
   // disappear when the caller provides only the resulting HttpClient service.
   return FetchHttpClient.layer.pipe(

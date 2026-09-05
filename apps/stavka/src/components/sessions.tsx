@@ -15,6 +15,7 @@ import { scenarioTitles } from "./simulation-setup";
 import { ReplayDashboard } from "./replay-dashboard";
 import { Loading } from "./page-state";
 import { useAccountScope } from "../recent-sessions";
+import { SessionAiAuthorization } from "./session-ai-authorization";
 
 export type SessionView = "timeline" | "state" | "usage";
 type FileState =
@@ -260,6 +261,17 @@ export function SessionInspector({
           </div>
         )}
       </section>
+      {source === "commander" && replay && !session.isFetching && !session.error ? (
+        <section className="stavka-panel p-4">
+          <SessionAiAuthorization
+            session={{
+              session_id: replay.session.session_id,
+              faction: replay.session.faction,
+              mission_epoch: replay.session.mission_epoch,
+            }}
+          />
+        </section>
+      ) : null}
       {source === "commander" && session.isFetching ? (
         <Loading label="Loading session" />
       ) : source === "commander" && session.error ? (

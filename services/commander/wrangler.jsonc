@@ -7,7 +7,13 @@
   // Private service: no public workers.dev or preview origin.
   "workers_dev": false,
   "preview_urls": false,
-  "services": [{ "binding": "INFERENCE_SERVICE", "service": "stavka-inference" }],
+  "services": [
+    {
+      "binding": "INFERENCE_SERVICE",
+      "service": "stavka-inference",
+      "entrypoint": "CommanderInference",
+    },
+  ],
   "durable_objects": {
     "bindings": [{ "name": "ORCHESTRATOR", "class_name": "OrchestratorAgent" }],
   },

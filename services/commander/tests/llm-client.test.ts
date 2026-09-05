@@ -125,7 +125,7 @@ describe("Commander Anthropic gateway client", () => {
       throw new Error("Unexpected public fetch");
     });
     vi.stubGlobal("fetch", publicFetch);
-    const bindingFetch = vi.fn(async () =>
+    const bindingFetch = vi.fn(async (_request: Request) =>
       Response.json({
         id: "msg_binding",
         type: "message",
@@ -152,12 +152,16 @@ describe("Commander Anthropic gateway client", () => {
         {
           ...config,
           inferenceService: { fetch: bindingFetch } as unknown as Fetcher,
+          executionSession: { session_id: "owner-session", mission_epoch: 4, faction: "OPFOR" },
         },
         { model: "stavka/commander", prompt: "Hold position" },
       ),
     );
     expect(result.decision.summary).toBe("Private binding");
     expect(bindingFetch).toHaveBeenCalledOnce();
+    expect(
+      JSON.parse(bindingFetch.mock.calls[0]![0].headers.get("x-stavka-execution-session")!),
+    ).toEqual({ session_id: "owner-session", mission_epoch: 4, faction: "OPFOR" });
     expect(publicFetch).not.toHaveBeenCalled();
   });
 });
