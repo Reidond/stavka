@@ -1,6 +1,6 @@
 # Implementation and acceptance status
 
-Current evidence: [2026-09-05 audit](audits/2026-09-05.md) and
+Current evidence: [native Arma addon](arma/README.md), [2026-09-05 audit](audits/2026-09-05.md) and
 [remaining acceptance](REMAINING_WORK.md). The August final-run table below is
 historical and does not establish current cloud or deployment status.
 
@@ -14,8 +14,8 @@ live model entitlement, or an Arma dedicated server.
 | Status                       | Meaning                                                                                                                                       |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Implemented**              | The repository contains the intended feasible-now behavior and deterministic coverage. The aggregate final-run result is recorded separately. |
-| **External pending**         | Acceptance needs infrastructure, credentials, provider behavior, Windows Workbench, or a dedicated server not available in this pass.         |
-| **Not implemented by scope** | Deliberately excluded production Arma mod/server work. A research harness does not count as the product layer.                                |
+| **External pending**         | Acceptance needs deployed infrastructure, credentials, provider behavior, or a dedicated multiplayer server.                                  |
+| **Not implemented by scope** | Explicitly deferred features; the native addon now has its own implementation and acceptance record.                                          |
 
 ## Acceptance statement
 
@@ -36,13 +36,11 @@ The non-Arma product surface is implemented in the repository:
 - direct Kumo frontend components, app-local feature compositions,
   lint/editor parity, CI, and replay-only evaluation.
 
-The feasible-on-macOS surface is locally accepted on the revision recorded in
-the verification table below. The product is **not accepted for Arma Reforger
-or production operation**. The production addon and dedicated-server layer are
-outside this implementation scope. Worker/Container uploads, KV/R2 bindings, and
-machine secrets were prepared on the target account, but public workers.dev HTTP
-(`error code: 1042`), Access apps, and live provider tokens remain
-operator-owned external gates.
+The historical macOS verification table below remains a record of that revision.
+`mods/Stavka` now implements the native game bridge and has Windows Workbench
+compiler and runtime evidence. Dedicated multiplayer/JIP and the deployed game
+connection are **not yet accepted**. The current public application origin is
+`stavka.sands.red` behind Access; workers.dev is intentionally disabled.
 
 ## Enforced architecture
 
@@ -159,17 +157,16 @@ Only the following categories remain outside repository-only acceptance.
 
 ### Production Arma addon and dedicated server
 
-The production `CommanderLink`/`RestLink`, state/event extraction, native order
-execution, game-server secret configuration, Conflict integration, multiplayer
-and JIP behavior, Workshop packaging, and Workbench compilation are not part of
-this macOS implementation scope. `mods/StavkaTest` is historical research, not
-an installable product addon.
+`mods/Stavka` is a separate native addon with server-profile configuration,
+protocol-v1 REST transport, acknowledged snapshots, native orders, perception
+contacts, terrain extraction and Conflict base reporting. Workbench compiler
+checks and native JSON captures are covered by the [Arma record](arma/README.md).
+`mods/StavkaTest` remains unchanged historical research.
 
-When Windows and an Arma Reforger dedicated host are available, acceptance must
-cover protocol-v1 full/delta/config/resync/reconnect parity, supported native
-orders/results, server-authoritative fog/events/groups, mission restart/key
-rotation, BattlEye, two factions, 30/40/50-group performance, installation,
-upgrade, and rollback. No such validation is claimed now.
+Acceptance still needs a deployed protected game-server route, dedicated
+Conflict/JIP, transport/key-rotation drills, BattlEye, two-faction operation,
+30/40/50-group performance, Workshop installation, upgrade and rollback. Native
+smoke and local packaging do not establish those external outcomes.
 
 ## Current verification evidence
 

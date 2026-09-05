@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "enfusion-workbench": {
+      "command": "node",
+      "args": [
+        "--import",
+        "file:///C:/Users/reido/src/stavka/tools/tasks/node_modules/tsx/dist/loader.mjs",
+        "C:/Users/reido/src/stavka/tools/tasks/src/enfusion-mcp.ts"
+      ],
+      "env": {
+        "ENFUSION_PROJECT_ROOT": "C:/Users/reido/src/stavka"
+      }
+    }
+  }
+}

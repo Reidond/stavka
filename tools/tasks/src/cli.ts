@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Console, Data, Effect, Schema } from "effect";
 import { ChildProcess } from "effect/unstable/process";
+import { ArmaAction, runArmaTask } from "./arma";
+import { ArmaEnvironmentLive } from "./arma-environment";
+import { runArmaDocs } from "./arma-docs";
+import { runArmaInspect } from "./arma-inspect";
 
 import {
   evaluationTask,
@@ -20,8 +24,15 @@ const TaskName = Schema.Literals([
   "build-maskirovka-gateway",
   "deploy-production",
   "verify",
+  "arma-validate",
+  "arma-pack",
+  "arma-doctor",
+  "arma-smoke",
+  "arma-docs",
+  "arma-inspect",
+  "arma-resources",
 ]);
-type TaskName = Schema.Schema.Type<typeof TaskName>;
+type TaskName = Exclude<Schema.Schema.Type<typeof TaskName>, `arma-${string}`>;
 
 class TaskCommandFailed extends Data.TaggedError("TaskCommandFailed")<{
   readonly label: string;
@@ -82,8 +93,20 @@ const commandsForTask = (
 const program = Effect.gen(function* () {
   const task = yield* Schema.decodeUnknownEffect(TaskName)(process.argv[2]);
   const forwardedArguments = process.argv.slice(3).filter((argument) => argument !== "--");
+  if (task === "arma-docs") return yield* runArmaDocs(forwardedArguments);
+  if (task === "arma-inspect") return yield* runArmaInspect(repositoryRoot, forwardedArguments);
+  if (
+    task === "arma-validate" ||
+    task === "arma-pack" ||
+    task === "arma-doctor" ||
+    task === "arma-smoke" ||
+    task === "arma-resources"
+  ) {
+    const action = yield* Schema.decodeUnknownEffect(ArmaAction)(task.slice(5));
+    return yield* runArmaTask(repositoryRoot, action, forwardedArguments);
+  }
   const commands = commandsForTask(task, forwardedArguments);
   for (const command of commands) yield* runCommand(command);
-}).pipe(Effect.provide(NodeServices.layer));
+}).pipe(Effect.provide(ArmaEnvironmentLive), Effect.provide(NodeServices.layer));
 
 NodeRuntime.runMain(program);

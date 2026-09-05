@@ -7,7 +7,8 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
-import { verifyAccessRequest } from "@stavka/access-auth";
+import { authorizeMachine, verifyAccessRequest } from "@stavka/access-auth";
+import { ConnectRequest, DisconnectRequest, MapUploadRequest, TickRequest } from "@stavka/protocol";
 import handler from "@tanstack/react-start/server-entry";
 import { routeAgentRequest } from "agents";
 
@@ -65,6 +66,20 @@ const messagesEndpoint = HttpApiEndpoint.post("messages", "/v1/messages", {
 
 const healthGroup = HttpApiGroup.make("health").add(healthEndpoint);
 const inferenceGroup = HttpApiGroup.make("inference").add(responsesEndpoint, messagesEndpoint);
+// The private Commander validates these exact protocol schemas. Raw handlers keep
+// the original bytes intact for immutable tick retries and receipt hashing.
+const gameGroup = HttpApiGroup.make("game").add(
+  HttpApiEndpoint.post("connect", "/api/connect", {
+    payload: ConnectRequest,
+    success: Schema.Unknown,
+  }),
+  HttpApiEndpoint.post("tick", "/api/tick", { payload: TickRequest, success: Schema.Unknown }),
+  HttpApiEndpoint.post("map", "/api/map", { payload: MapUploadRequest, success: Schema.Unknown }),
+  HttpApiEndpoint.post("disconnect", "/api/disconnect", {
+    payload: DisconnectRequest,
+    success: Schema.Unknown,
+  }),
+);
 const operationsGroup = HttpApiGroup.make("operations").add(
   HttpApiEndpoint.get("inferenceStatus", "/admin/status", { success: Schema.Unknown }),
   HttpApiEndpoint.get("commanderHealth", "/api/system/commander", { success: Schema.Unknown }),
@@ -80,6 +95,7 @@ const operationsGroup = HttpApiGroup.make("operations").add(
 const poligonApi = HttpApi.make("poligon")
   .add(healthGroup)
   .add(inferenceGroup)
+  .add(gameGroup)
   .add(operationsGroup);
 
 const HealthHandlersLive = HttpApiBuilder.group(poligonApi, "health", (handlers) =>
@@ -179,6 +195,45 @@ const commanderUnavailable = HttpServerResponse.jsonUnsafe(
   { status: 503, headers: { "cache-control": "no-store" } },
 );
 
+const gameUnauthorized = HttpServerResponse.jsonUnsafe(
+  { error: { code: "MACHINE_AUTH_REQUIRED", message: "Game server authorization required" } },
+  { status: 401, headers: { "cache-control": "no-store" } },
+);
+
+const gameIngress = (request: HttpServerRequest.HttpServerRequest) =>
+  withAccess(request, (webRequest, env) =>
+    Effect.gen(function* () {
+      const authorized = yield* authorizeMachine(webRequest, env.COMMANDER_API_KEY ?? "").pipe(
+        Effect.catch(() => Effect.succeed(false)),
+      );
+      if (!authorized) return gameUnauthorized;
+      const service = env.COMMANDER_SERVICE;
+      if (!service) return commanderUnavailable;
+      // Forward the caller's machine bearer, epoch and body. Never turn an Access
+      // identity into a machine credential or forward the Access client secret.
+      const headers = new Headers(webRequest.headers);
+      headers.delete("cf-access-client-id");
+      headers.delete("cf-access-client-secret");
+      return yield* Effect.tryPromise({
+        try: (signal) => service.fetch(new Request(webRequest, { headers, signal })),
+        catch: (cause) => new AgentRoutingError({ cause }),
+      }).pipe(
+        Effect.match({
+          onFailure: () => commanderUnavailable,
+          onSuccess: HttpServerResponse.fromWeb,
+        }),
+      );
+    }),
+  ).pipe(Effect.catch(() => Effect.succeed(commanderUnavailable)));
+
+const GameHandlersLive = HttpApiBuilder.group(poligonApi, "game", (handlers) =>
+  handlers
+    .handleRaw("connect", ({ request }) => gameIngress(request))
+    .handleRaw("tick", ({ request }) => gameIngress(request))
+    .handleRaw("map", ({ request }) => gameIngress(request))
+    .handleRaw("disconnect", ({ request }) => gameIngress(request)),
+);
+
 const commanderRead = (
   request: HttpServerRequest.HttpServerRequest,
   path: "/healthz" | "/admin/export",
@@ -210,6 +265,7 @@ const HttpApiLive = HttpApiBuilder.layer(poligonApi).pipe(
   Layer.provide(HealthHandlersLive),
   Layer.provide(InferenceHandlersLive),
   Layer.provide(OperationsHandlersLive),
+  Layer.provide(GameHandlersLive),
 );
 
 const ProviderAccountsRootRoute = HttpRouter.route(

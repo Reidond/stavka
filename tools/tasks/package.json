@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "arma:mcp": "node --import tsx src/enfusion-mcp.ts",
+    "arma:resources": "node --import tsx src/cli.ts arma-resources",
+    "arma:docs": "node --import tsx src/cli.ts arma-docs",
+    "arma:inspect": "node --import tsx src/cli.ts arma-inspect",
+    "arma:doctor": "node --import tsx src/cli.ts arma-doctor",
+    "arma:smoke": "node --import tsx src/cli.ts arma-smoke",
+    "arma:validate": "node --import tsx src/cli.ts arma-validate",
+    "arma:pack": "node --import tsx src/cli.ts arma-pack",
     "eval": "node --import tsx src/cli.ts eval",
     "lint:tailwind": "node --import tsx src/cli.ts lint-tailwind",
     "build:maskirovka-gateway": "node --import tsx src/cli.ts build-maskirovka-gateway",
@@ -13,6 +21,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.102",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "effect": "4.0.0-beta.102"
   },
   "devDependencies": {

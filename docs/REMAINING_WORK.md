@@ -1,4 +1,4 @@
-# Remaining acceptance work — 2026-09-05
+# Remaining acceptance work — 2026-09-06
 
 The [September audit](audits/2026-09-05.md) records local changes, measured
 performance, and read-only Cloudflare evidence. The [agent workflow](AGENT_WORKFLOW.md)
@@ -36,8 +36,10 @@ Still outstanding:
   container start/restart/sleep, deployed R2 exports, and rollback/lifecycle drills.
 - Review GitHub `production` secrets, reviewers, and branch policy at release
   time. The Cloudflare audit does not inspect GitHub settings.
-- Real Arma addon, Workbench, dedicated-server, Conflict/JIP, BattlEye, Workshop,
-  and in-game profiling remain outside the requested local tests.
+- The native addon and local Workbench workflow are now implemented; see
+  [Arma setup and evidence](arma/README.md). Deploy the new game-server ingress
+  explicitly, then verify the protected Cloudflare connection, dedicated-server
+  Conflict/JIP, BattlEye, Workshop installation and in-game load behavior.
 
 The old workers.dev repair item is obsolete: the intended public origin is
 `stavka.sands.red`, protected by Access. workers.dev and preview URLs are

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "4d89d42a4508c67b81767cfff695f3a897496081",
+  "sourceState": "uncommitted working tree",
+  "computerUseActions": 0,
+  "runs": [
+    {
+      "runId": "ba503414-a8e6-4f7b-9746-cc2a008c19da",
+      "action": "smoke",
+      "status": "passed",
+      "startedAt": "2026-09-05T22:33:17.141Z",
+      "finishedAt": "2026-09-05T22:33:49.621Z",
+      "sourceHash": "b21992be52f3a5501cee5c80e8c69961927c46deb4f1769366b0bb2622c09c38",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 9
+    },
+    {
+      "runId": "36400e72-dba3-4c09-ae62-1ea1660c26d0",
+      "action": "smoke",
+      "status": "passed",
+      "startedAt": "2026-09-05T22:36:32.336Z",
+      "finishedAt": "2026-09-05T22:37:04.23Z",
+      "sourceHash": "b21992be52f3a5501cee5c80e8c69961927c46deb4f1769366b0bb2622c09c38",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 9
+    },
+    {
+      "runId": "d3a7c789-917c-45e0-bce4-2ae67ccd023f",
+      "action": "smoke",
+      "status": "failed",
+      "startedAt": "2026-09-05T22:38:33.06Z",
+      "finishedAt": "2026-09-05T22:39:04.466Z",
+      "sourceHash": "b21992be52f3a5501cee5c80e8c69961927c46deb4f1769366b0bb2622c09c38",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 9
+    },
+    {
+      "runId": "a0f10d41-dfd7-4e02-9801-e9da10b7b98d",
+      "action": "smoke",
+      "status": "timeout",
+      "startedAt": "2026-09-05T22:27:43.881Z",
+      "finishedAt": "2026-09-05T22:27:45.398Z",
+      "sourceHash": "acd0b6f650e6851c19782ff88cd3511e790a700073c6f4aa9d4c851e698575ce",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 1
+    },
+    {
+      "runId": "4195e8d8-a631-43b1-bfe3-b1d4cabda648",
+      "action": "resources",
+      "status": "passed",
+      "startedAt": "2026-09-05T22:29:27.141Z",
+      "finishedAt": "2026-09-05T22:29:32.784Z",
+      "sourceHash": "b21992be52f3a5501cee5c80e8c69961927c46deb4f1769366b0bb2622c09c38",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 2
+    },
+    {
+      "runId": "5a2cc1da-77e2-4370-a810-700a2ecdcb1e",
+      "action": "pack",
+      "status": "passed",
+      "startedAt": "2026-09-05T22:31:50.515Z",
+      "finishedAt": "2026-09-05T22:32:07.475Z",
+      "sourceHash": "c0dceec0bf6ccdcafadd28edb12719517950200960365aad201f50ce8618087c",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 5
+    },
+    {
+      "runId": "b2d3f3b4-89b9-4c83-8a9c-a85eda60ff84",
+      "action": "doctor",
+      "status": "passed",
+      "startedAt": "2026-09-05T22:22:49.554Z",
+      "finishedAt": "2026-09-05T22:22:50.081Z",
+      "sourceHash": "c0dceec0bf6ccdcafadd28edb12719517950200960365aad201f50ce8618087c",
+      "engineVersion": "1.8.0.13",
+      "artifactCount": 1
+    }
+  ],
+  "verification": {
+    "testsPassed": 516,
+    "testsFailed": 4,
+    "replay": "passed",
+    "toolingTypecheck": "passed",
+    "fullGate": "failed: existing Windows POSIX permission expectations"
+  }
+}

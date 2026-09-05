@@ -1,0 +1,58 @@
+{
+  "protocol_version": 1,
+  "session_id": "native-smoke",
+  "faction": "OPFOR",
+  "tick_id": 4,
+  "timestamp": 1788645142,
+  "full_snapshot_interval": 12,
+  "sergeant_reports": [],
+  "events": [
+    {
+      "id": "native-smoke:1:3",
+      "type": "group_despawned",
+      "timestamp": 1788645142,
+      "significance": "notable",
+      "group_id": "g-smoke-spawn",
+      "position": [2076.898, 42.187, 2046.2]
+    }
+  ],
+  "command_results": [
+    { "command_id": "smoke-attack", "status": "failed", "reason": "despawned" },
+    { "command_id": "smoke-despawn", "status": "completed" }
+  ],
+  "type": "delta",
+  "since_tick": 3,
+  "changes": {
+    "mission": {
+      "id": "native-arland",
+      "epoch": 1,
+      "name": "native-arland",
+      "map": "Arland",
+      "time_elapsed_seconds": 16.242,
+      "player_count": { "friendly": 0, "enemy": 0 }
+    },
+    "groups_upserted": [],
+    "groups_moved": [],
+    "groups_destroyed": ["g-smoke-spawn"],
+    "objectives_upserted": [],
+    "objectives_removed": [],
+    "known_enemies_upserted": [
+      {
+        "id": "contact-0x60000000000001E0 {}",
+        "reported_by": "g-smoke-spawn",
+        "type": "unknown",
+        "estimated_count": 1,
+        "last_known_position": [2107.461, 43.469, 2043.266],
+        "confidence": "confirmed",
+        "age_seconds": 0.0
+      }
+    ],
+    "known_enemies_expired": [],
+    "resources": {
+      "manpower": 42,
+      "vehicle_pool": 0,
+      "reinforcement_cooldown_seconds": 0,
+      "max_active_units": 12
+    }
+  }
+}

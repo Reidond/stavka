@@ -10,8 +10,12 @@ contracts, Commander orchestration, deterministic simulation and link behavior,
 Poligon's hosted and browser-local modes, Cloudflare-hosted Maskirovka code, the
 Kumo-based frontend surfaces, and deterministic verification/evaluation tooling.
 
-> **External boundary:** no production Arma addon or dedicated-server layer is
-> claimed. The CI-gated production workflow is implemented but no live deploy is
+The native [Stavka addon](docs/arma/README.md) now lives in `mods/Stavka` and is
+compiled and exercised with Windows Arma Reforger Tools. Use `pnpm mod:validate`
+and `pnpm mod:pack` for explicit local Tools operations.
+
+> **External boundary:** dedicated-server, multiplayer/JIP and deployed game-link
+> acceptance remain separate operator actions. No live deploy is
 > run by repository verification. Real Cloudflare bindings, Access policies,
 > Container lifecycle behavior, and live Claude/Codex/API accounts require
 > operator-owned infrastructure and credentials.

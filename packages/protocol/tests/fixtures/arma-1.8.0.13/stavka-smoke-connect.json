@@ -1,0 +1,9 @@
+{
+  "protocol_version": 1,
+  "session_id": "native-smoke",
+  "faction": "OPFOR",
+  "mission_id": "native-arland",
+  "mission_epoch": 1,
+  "map_name": "Arland",
+  "doctrine": "balanced"
+}

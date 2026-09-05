@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "origin": "https://stavka.sands.red",
+  "session_id": "my-conflict-session",
+  "mission_id": "conflict-everon",
+  "mission_epoch": 1,
+  "map_name": "Everon",
+  "engine_faction": "USSR",
+  "faction": "OPFOR",
+  "doctrine": "balanced",
+  "max_groups": 12,
+  "manpower": 48,
+  "adopt_existing_groups": false,
+  "upload_terrain": true,
+  "map_resolution_meters": 250,
+  "api_key": "REPLACE_IN_SERVER_PROFILE_ONLY",
+  "access_client_id": "REPLACE_IN_SERVER_PROFILE_ONLY",
+  "access_client_secret": "REPLACE_IN_SERVER_PROFILE_ONLY"
+}

@@ -1,0 +1,52 @@
+{
+  "protocol_version": 1,
+  "session_id": "native-smoke",
+  "faction": "OPFOR",
+  "tick_id": 1,
+  "timestamp": 1788645133,
+  "full_snapshot_interval": 12,
+  "sergeant_reports": [],
+  "events": [
+    {
+      "id": "native-smoke:1:1",
+      "type": "group_spawned",
+      "timestamp": 1788645133,
+      "significance": "notable",
+      "group_id": "g-smoke-spawn",
+      "position": [2059.0, 40.832, 2047.0]
+    }
+  ],
+  "command_results": [
+    { "command_id": "smoke-spawn", "status": "completed", "reason": "g-smoke-spawn" }
+  ],
+  "type": "full",
+  "snapshot": {
+    "mission": {
+      "id": "native-arland",
+      "epoch": 1,
+      "name": "native-arland",
+      "map": "Arland",
+      "time_elapsed_seconds": 7.22,
+      "player_count": { "friendly": 0, "enemy": 0 }
+    },
+    "objectives": [],
+    "friendly_groups": [
+      {
+        "id": "g-smoke-spawn",
+        "faction": "OPFOR",
+        "template": "infantry_squad",
+        "position": [2059.0, 40.832, 2047.0],
+        "strength": { "current": 6, "max": 6 },
+        "behavior": "native",
+        "status": "idle"
+      }
+    ],
+    "known_enemies": [],
+    "resources": {
+      "manpower": 42,
+      "vehicle_pool": 0,
+      "reinforcement_cooldown_seconds": 0,
+      "max_active_units": 12
+    }
+  }
+}

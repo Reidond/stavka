@@ -8,7 +8,7 @@ const sourceRoot = fileURLToPath(new URL("../src", import.meta.url));
 const sourceFiles = (directory: string): string[] =>
   readdirSync(directory)
     .flatMap((entry) => {
-      const path = resolve(directory, entry);
+      const path = resolve(directory, entry).replaceAll("\\", "/");
       return statSync(path).isDirectory() ? sourceFiles(path) : [path];
     })
     .filter((path) => path.endsWith(".ts") || path.endsWith(".tsx"));

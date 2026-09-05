@@ -1,0 +1,8 @@
+GameProject {
+ ID "Stavka"
+ GUID "6A4B4D6187F605E0"
+ TITLE "Stavka"
+ Dependencies {
+  "58D0FB3206B6F859"
+ }
+}

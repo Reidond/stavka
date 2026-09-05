@@ -1,0 +1,8 @@
+[mcp_servers.enfusion-workbench]
+command = "node"
+args = ["--import", "tsx", "src/enfusion-mcp.ts"]
+cwd = "tools/tasks"
+env_vars = ["ARMA_WORKBENCH_EXE", "ARMA_REFORGER_ADDONS"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+enabled = true

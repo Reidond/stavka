@@ -1,0 +1,46 @@
+{
+  "protocol_version": 1,
+  "session_id": "native-smoke",
+  "faction": "OPFOR",
+  "tick_id": 2,
+  "timestamp": 1788645141,
+  "full_snapshot_interval": 12,
+  "sergeant_reports": [],
+  "events": [],
+  "command_results": [{ "command_id": "smoke-move", "status": "accepted" }],
+  "type": "delta",
+  "since_tick": 1,
+  "changes": {
+    "mission": {
+      "id": "native-arland",
+      "epoch": 1,
+      "name": "native-arland",
+      "map": "Arland",
+      "time_elapsed_seconds": 15.237,
+      "player_count": { "friendly": 0, "enemy": 0 }
+    },
+    "groups_upserted": [
+      {
+        "id": "g-smoke-spawn",
+        "faction": "OPFOR",
+        "template": "infantry_squad",
+        "position": [2075.461, 42.078, 2046.266],
+        "strength": { "current": 6, "max": 6 },
+        "behavior": "native",
+        "status": "moving"
+      }
+    ],
+    "groups_moved": [],
+    "groups_destroyed": [],
+    "objectives_upserted": [],
+    "objectives_removed": [],
+    "known_enemies_upserted": [],
+    "known_enemies_expired": [],
+    "resources": {
+      "manpower": 42,
+      "vehicle_pool": 0,
+      "reinforcement_cooldown_seconds": 0,
+      "max_active_units": 12
+    }
+  }
+}

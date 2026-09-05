@@ -1,0 +1,11 @@
+MetaFileClass {
+ Name "{C535DC09ABDE4973}Missions/Stavka_Conflict.conf"
+ Configurations {
+  CONFResourceClass PC {}
+  CONFResourceClass XBOX_ONE : PC {}
+  CONFResourceClass XBOX_SERIES : PC {}
+  CONFResourceClass PS4 : PC {}
+  CONFResourceClass PS5 : PC {}
+  CONFResourceClass HEADLESS : PC {}
+ }
+}

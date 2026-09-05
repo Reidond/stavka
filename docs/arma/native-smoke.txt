@@ -1,0 +1,29 @@
+00:52:06.313   SCRIPT       : [StavkaSmoke] PASS connect decode
+00:52:06.313   SCRIPT       : [StavkaSmoke] PASS tick command array decode
+00:52:06.313   SCRIPT       : [StavkaSmoke] PASS reject wrong tick
+00:52:06.313   SCRIPT       : [StavkaSmoke] PASS spawn params decode
+00:52:06.316   SCRIPT       : [StavkaSmoke] PASS duplicate spawn has one group
+00:52:06.317   SCRIPT       : [StavkaSmoke] PASS open connect
+00:52:06.356   SCRIPT       : [StavkaSmoke] PASS open map
+00:52:06.357   SCRIPT       : [StavkaSmoke] PASS open initial
+00:52:06.571   SCRIPT       : [StavkaSmoke] phase=1 position=<2059, 41.1125, 2047> agents=0
+00:52:13.714   SCRIPT       : [StavkaSmoke] PASS spawn completes after agents initialize
+00:52:13.715   SCRIPT       : [StavkaSmoke] PASS open full
+00:52:13.716   SCRIPT       : [StavkaSmoke] PASS native waypoint accepted
+00:52:16.719   SCRIPT       : [StavkaSmoke] phase=2 position=<2059, 40.8319, 2047> agents=6
+00:52:16.719   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:16.719   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:16.720   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:16.720   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:16.720   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:16.720   SCRIPT       : [StavkaSmoke] perceived enemies=0
+00:52:21.732   SCRIPT       : [StavkaSmoke] PASS native AI moved over 15 metres
+00:52:21.733   SCRIPT       : [StavkaSmoke] PASS open delta
+00:52:21.733   SCRIPT       : [StavkaSmoke] PASS no invented enemy contacts
+00:52:21.734   SCRIPT       : [StavkaSmoke] PASS opposing native group spawned
+00:52:22.736   SCRIPT       : [StavkaSmoke] PASS native perception reports an observed enemy
+00:52:22.737   SCRIPT       : [StavkaSmoke] PASS open contacts
+00:52:22.746   SCRIPT       : [StavkaSmoke] PASS native group despawned
+00:52:22.746   SCRIPT       : [StavkaSmoke] PASS open removed
+00:52:22.751   SCRIPT       : [StavkaSmoke] PASS open result
+00:52:22.752   SCRIPT       : [StavkaSmoke] COMPLETE PASS

@@ -9,7 +9,7 @@ const sourceRoots = ["apps", "packages", "services", "tools"] as const;
 const walk = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (["dist", "node_modules", ".output"].includes(entry.name)) return [];
-    const path = join(directory, entry.name);
+    const path = join(directory, entry.name).replaceAll("\\", "/");
     return entry.isDirectory() ? walk(path) : [path];
   });
 

@@ -1,0 +1,8 @@
+GameProject {
+ ID "StavkaTools"
+ GUID "FC679038AE413B23"
+ TITLE "Stavka Tools (development only)"
+ Dependencies {
+  "6A4B4D6187F605E0"
+ }
+}

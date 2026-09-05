@@ -2,8 +2,6 @@
 name: arma-reforger
 description: |
   Arma Reforger modding with Enforce Script on the Enfusion engine. Use when: writing .c script files, creating game modes, components, AI logic, UI, replication/networking, prefabs, or debugging Arma Reforger mods. Covers the full scripted API: entities, components, weapons, vehicles, characters, AI, events, and multiplayer.
-user-invocable: true
-auto-invoke: true
 ---
 
 # Arma Reforger Modding - Enforce Script
@@ -11,6 +9,31 @@ auto-invoke: true
 **Engine**: Enfusion (Arma Reforger)
 **Language**: Enforce Script (.c files) - statically-typed, OOP, C#/C++ hybrid syntax
 **Base Game GUID**: `"58D0FB3206B6F859"`
+
+## Stavka CLI workflow
+
+For this repository, prefer the native CLI tooling over desktop automation.
+Read [the command guide](../../../docs/arma/cli-tooling.md) for options and
+evidence semantics. The following paths were exercised on Windows with 1.8.0.13:
+
+- `pnpm mod:doctor` checks the installed game/Tools and conflicting editors.
+- `pnpm mod:validate -- --target PC` provides fast native compilation;
+  `pnpm mod:validate` and `pnpm mod:pack` validate all supported targets.
+- `pnpm mod:smoke` loads the fixed world and runs native AI assertions without
+  clicks, then stops its owned editor. It makes no bridge/provider calls.
+- `pnpm mod:resources -- --query <name>` finds native resource GUIDs and paths.
+- `pnpm mod:docs <symbol>` searches the installed API; saved wiki text lives in
+  the adjacent versioned cache. Prefer these to another browser visit.
+- `pnpm mod:inspect <run-uuid>` checks saved result and artifact integrity.
+
+Use unique CLI run evidence; never infer success from a stale smoke file or exit
+zero alone. The native runner belongs to `mods/StavkaTools` and must remain out
+of the playable package. Reserve desktop interaction for visual editing,
+appearance checks or a specific unsupported operation. Workbench smoke is not
+proof of headless, multiplayer/JIP or deployed service behavior.
+
+In this Tools build, `-wbSilent` prevents the packer from running; use the task
+wrapper rather than copying validation flags into a packaging command.
 
 ---
 

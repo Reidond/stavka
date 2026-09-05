@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "testedAt": "2026-09-06",
+  "sourceState": "uncommitted",
+  "baselineCommit": "4d89d42a4508c67b81767cfff695f3a897496081",
+  "computerUseActions": 0,
+  "stdio": {
+    "transport": "stdio",
+    "runs": [
+      {
+        "runId": "1b086980-6640-4795-98b6-5b639f9f0b87",
+        "state": "finished",
+        "status": "passed",
+        "artifactIntegrity": "verified",
+        "sourceHash": "b21992be52f3a5501cee5c80e8c69961927c46deb4f1769366b0bb2622c09c38"
+      },
+      {
+        "runId": "ce8a48e8-aef9-4aaf-9af3-307351331a33",
+        "state": "cancelled",
+        "status": "cancelled",
+        "artifactIntegrity": "verified"
+      }
+    ],
+    "protocolErrors": [],
+    "tools": [
+      "enfusion_doctor",
+      "enfusion_docs",
+      "enfusion_start",
+      "enfusion_job",
+      "enfusion_cancel",
+      "enfusion_inspect"
+    ],
+    "engineVersion": "1.8.0.13",
+    "ready": true,
+    "docsMatches": 3,
+    "readyAfterCancel": true,
+    "stderr": ""
+  },
+  "disconnect": {
+    "runId": "e8733bab-245f-40a8-9718-6d8bfabec85d",
+    "status": "cancelled",
+    "lockPresent": false,
+    "protocolErrors": []
+  },
+  "noRemainingWorkbenchProcesses": true,
+  "checks": {
+    "focusedTestsPassed": 21,
+    "mcpTestsPassed": 4,
+    "fullTestsPassed": 519,
+    "fullTestsFailed": 5,
+    "knownWindowsPermissionFailures": 4,
+    "timeDependentAuthFixtureFailures": 1,
+    "authFixtureFocusedRerun": "passed",
+    "typecheck": "passed",
+    "formatting": "passed",
+    "lint": "passed",
+    "tailwind": "passed",
+    "replay": "passed",
+    "build": "two Docker-dependent dry-run failures",
+    "deployment": "not run"
+  }
+}

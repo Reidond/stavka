@@ -1,0 +1,1940 @@
+{
+  "protocol_version": 1,
+  "session_id": "native-smoke",
+  "faction": "OPFOR",
+  "mission_id": "native-arland",
+  "mission_epoch": 1,
+  "briefing": {
+    "map_name": "Arland",
+    "grid_size": 16,
+    "grid_width": 16,
+    "grid_height": 16,
+    "grid_resolution_meters": 250,
+    "source": "arma_extracted",
+    "classification_version": 1,
+    "content_hash": "stavka-map-v1-433c6e11655e0939",
+    "terrain_grid": [
+      {
+        "grid": [0, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -144,
+        "slope_degrees": 1,
+        "traversable": false
+      },
+      {
+        "grid": [1, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -141,
+        "slope_degrees": 1,
+        "traversable": false
+      },
+      {
+        "grid": [2, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -128,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [3, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -121,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [4, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -123,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [5, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -116,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [6, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -107,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [7, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -86,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [8, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -86,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [9, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -82,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [10, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -89,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [11, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -103,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [12, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -112,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [13, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -125,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [14, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -144,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [15, 0],
+        "type": "water",
+        "cover": "none",
+        "elevation": -157,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [0, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -135,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [1, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -125,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [2, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -107,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [3, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -99,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [4, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -89,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [5, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -93,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [6, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -82,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [7, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -60,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [8, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -37,
+        "slope_degrees": 12,
+        "traversable": false
+      },
+      {
+        "grid": [9, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -56,
+        "slope_degrees": 22,
+        "traversable": false
+      },
+      {
+        "grid": [10, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -69,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [11, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -85,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [12, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -98,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [13, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -104,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [14, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -134,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [15, 1],
+        "type": "water",
+        "cover": "none",
+        "elevation": -155,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [0, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -117,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [1, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -107,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [2, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -81,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [3, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -63,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [4, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -56,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [5, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -48,
+        "slope_degrees": 16,
+        "traversable": false
+      },
+      {
+        "grid": [6, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -30,
+        "slope_degrees": 12,
+        "traversable": false
+      },
+      {
+        "grid": [7, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -23,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [8, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -15,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [9, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -9,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [10, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -18,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [11, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -51,
+        "slope_degrees": 24,
+        "traversable": false
+      },
+      {
+        "grid": [12, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -48,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [13, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -78,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [14, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -107,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [15, 2],
+        "type": "water",
+        "cover": "none",
+        "elevation": -140,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [0, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -95,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [1, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -83,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [2, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -47,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [3, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -36,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [4, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -26,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [5, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -14,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [6, 3],
+        "type": "field",
+        "cover": "none",
+        "elevation": 5,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [7, 3],
+        "type": "field",
+        "cover": "none",
+        "elevation": 9,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [8, 3],
+        "type": "field",
+        "cover": "none",
+        "elevation": 26,
+        "slope_degrees": 12,
+        "traversable": true
+      },
+      {
+        "grid": [9, 3],
+        "type": "field",
+        "cover": "none",
+        "elevation": 25,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [10, 3],
+        "type": "field",
+        "cover": "none",
+        "elevation": 7,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [11, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -9,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [12, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -19,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [13, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -27,
+        "slope_degrees": 28,
+        "traversable": false
+      },
+      {
+        "grid": [14, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -75,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [15, 3],
+        "type": "water",
+        "cover": "none",
+        "elevation": -110,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [0, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -77,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [1, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -43,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [2, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -30,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [3, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -20,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [4, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -4,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [5, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 18,
+        "slope_degrees": 19,
+        "traversable": true
+      },
+      {
+        "grid": [6, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 46,
+        "slope_degrees": 10,
+        "traversable": true
+      },
+      {
+        "grid": [7, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 53,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [8, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 72,
+        "slope_degrees": 12,
+        "traversable": true
+      },
+      {
+        "grid": [9, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 57,
+        "slope_degrees": 22,
+        "traversable": true
+      },
+      {
+        "grid": [10, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 56,
+        "slope_degrees": 13,
+        "traversable": true
+      },
+      {
+        "grid": [11, 4],
+        "type": "field",
+        "cover": "none",
+        "elevation": 6,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [12, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -1,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [13, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -13,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [14, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -51,
+        "slope_degrees": 13,
+        "traversable": false
+      },
+      {
+        "grid": [15, 4],
+        "type": "water",
+        "cover": "none",
+        "elevation": -79,
+        "slope_degrees": 19,
+        "traversable": false
+      },
+      {
+        "grid": [0, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -75,
+        "slope_degrees": 14,
+        "traversable": false
+      },
+      {
+        "grid": [1, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -28,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [2, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -21,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [3, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 6,
+        "slope_degrees": 27,
+        "traversable": true
+      },
+      {
+        "grid": [4, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -6,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [5, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -28,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [6, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -10,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [7, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 30,
+        "slope_degrees": 17,
+        "traversable": true
+      },
+      {
+        "grid": [8, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 56,
+        "slope_degrees": 10,
+        "traversable": true
+      },
+      {
+        "grid": [9, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 86,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [10, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 57,
+        "slope_degrees": 22,
+        "traversable": true
+      },
+      {
+        "grid": [11, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 33,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [12, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 35,
+        "slope_degrees": 15,
+        "traversable": true
+      },
+      {
+        "grid": [13, 5],
+        "type": "field",
+        "cover": "none",
+        "elevation": 24,
+        "slope_degrees": 42,
+        "traversable": false
+      },
+      {
+        "grid": [14, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -7,
+        "slope_degrees": 16,
+        "traversable": false
+      },
+      {
+        "grid": [15, 5],
+        "type": "water",
+        "cover": "none",
+        "elevation": -73,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [0, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -81,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [1, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -37,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [2, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -22,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [3, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -6,
+        "slope_degrees": 13,
+        "traversable": false
+      },
+      {
+        "grid": [4, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -22,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [5, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -35,
+        "slope_degrees": 1,
+        "traversable": false
+      },
+      {
+        "grid": [6, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -26,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [7, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -4,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [8, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 13,
+        "slope_degrees": 11,
+        "traversable": true
+      },
+      {
+        "grid": [9, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 65,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [10, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 70,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [11, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 72,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [12, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 70,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [13, 6],
+        "type": "field",
+        "cover": "none",
+        "elevation": 15,
+        "slope_degrees": 25,
+        "traversable": true
+      },
+      {
+        "grid": [14, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -4,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [15, 6],
+        "type": "water",
+        "cover": "none",
+        "elevation": -76,
+        "slope_degrees": 12,
+        "traversable": false
+      },
+      {
+        "grid": [0, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -82,
+        "slope_degrees": 20,
+        "traversable": false
+      },
+      {
+        "grid": [1, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -23,
+        "slope_degrees": 1,
+        "traversable": false
+      },
+      {
+        "grid": [2, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -17,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [3, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": 0,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [4, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 8,
+        "slope_degrees": 15,
+        "traversable": true
+      },
+      {
+        "grid": [5, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 10,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [6, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -2,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [7, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 21,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [8, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 32,
+        "slope_degrees": 23,
+        "traversable": true
+      },
+      {
+        "grid": [9, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 85,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [10, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 86,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [11, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 63,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [12, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 61,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [13, 7],
+        "type": "field",
+        "cover": "none",
+        "elevation": 30,
+        "slope_degrees": 36,
+        "traversable": false
+      },
+      {
+        "grid": [14, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -15,
+        "slope_degrees": 31,
+        "traversable": false
+      },
+      {
+        "grid": [15, 7],
+        "type": "water",
+        "cover": "none",
+        "elevation": -86,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [0, 8],
+        "type": "water",
+        "cover": "none",
+        "elevation": -44,
+        "slope_degrees": 52,
+        "traversable": false
+      },
+      {
+        "grid": [1, 8],
+        "type": "water",
+        "cover": "none",
+        "elevation": -10,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [2, 8],
+        "type": "water",
+        "cover": "none",
+        "elevation": -6,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [3, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 11,
+        "slope_degrees": 1,
+        "traversable": true
+      },
+      {
+        "grid": [4, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 37,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [5, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 1,
+        "traversable": true
+      },
+      {
+        "grid": [6, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 36,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [7, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 42,
+        "slope_degrees": 10,
+        "traversable": true
+      },
+      {
+        "grid": [8, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 60,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [9, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 101,
+        "slope_degrees": 32,
+        "traversable": true
+      },
+      {
+        "grid": [10, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 108,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [11, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 65,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [12, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 32,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [13, 8],
+        "type": "field",
+        "cover": "none",
+        "elevation": 4,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [14, 8],
+        "type": "water",
+        "cover": "none",
+        "elevation": -27,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [15, 8],
+        "type": "water",
+        "cover": "none",
+        "elevation": -76,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [0, 9],
+        "type": "water",
+        "cover": "none",
+        "elevation": -78,
+        "slope_degrees": 13,
+        "traversable": false
+      },
+      {
+        "grid": [1, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 5,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [2, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 6,
+        "slope_degrees": 22,
+        "traversable": true
+      },
+      {
+        "grid": [3, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 22,
+        "slope_degrees": 25,
+        "traversable": true
+      },
+      {
+        "grid": [4, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [5, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 36,
+        "slope_degrees": 1,
+        "traversable": true
+      },
+      {
+        "grid": [6, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 41,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [7, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 61,
+        "slope_degrees": 1,
+        "traversable": true
+      },
+      {
+        "grid": [8, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 72,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [9, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 103,
+        "slope_degrees": 15,
+        "traversable": true
+      },
+      {
+        "grid": [10, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 113,
+        "slope_degrees": 19,
+        "traversable": true
+      },
+      {
+        "grid": [11, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 62,
+        "slope_degrees": 11,
+        "traversable": true
+      },
+      {
+        "grid": [12, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 42,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [13, 9],
+        "type": "field",
+        "cover": "none",
+        "elevation": 10,
+        "slope_degrees": 16,
+        "traversable": true
+      },
+      {
+        "grid": [14, 9],
+        "type": "water",
+        "cover": "none",
+        "elevation": -15,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [15, 9],
+        "type": "water",
+        "cover": "none",
+        "elevation": -79,
+        "slope_degrees": 14,
+        "traversable": false
+      },
+      {
+        "grid": [0, 10],
+        "type": "water",
+        "cover": "none",
+        "elevation": -78,
+        "slope_degrees": 19,
+        "traversable": false
+      },
+      {
+        "grid": [1, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 0,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [2, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [3, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [4, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [5, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 38,
+        "slope_degrees": 10,
+        "traversable": true
+      },
+      {
+        "grid": [6, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 38,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [7, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 41,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [8, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 50,
+        "slope_degrees": 5,
+        "traversable": true
+      },
+      {
+        "grid": [9, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 93,
+        "slope_degrees": 14,
+        "traversable": true
+      },
+      {
+        "grid": [10, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 103,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [11, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 52,
+        "slope_degrees": 18,
+        "traversable": true
+      },
+      {
+        "grid": [12, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 20,
+        "slope_degrees": 16,
+        "traversable": true
+      },
+      {
+        "grid": [13, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 41,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [14, 10],
+        "type": "field",
+        "cover": "none",
+        "elevation": 21,
+        "slope_degrees": 18,
+        "traversable": true
+      },
+      {
+        "grid": [15, 10],
+        "type": "water",
+        "cover": "none",
+        "elevation": -59,
+        "slope_degrees": 36,
+        "traversable": false
+      },
+      {
+        "grid": [0, 11],
+        "type": "water",
+        "cover": "none",
+        "elevation": -92,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [1, 11],
+        "type": "water",
+        "cover": "none",
+        "elevation": -20,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [2, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 32,
+        "slope_degrees": 14,
+        "traversable": true
+      },
+      {
+        "grid": [3, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [4, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 38,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [5, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 38,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [6, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 39,
+        "slope_degrees": 1,
+        "traversable": true
+      },
+      {
+        "grid": [7, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 42,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [8, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 54,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [9, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 62,
+        "slope_degrees": 24,
+        "traversable": true
+      },
+      {
+        "grid": [10, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 67,
+        "slope_degrees": 20,
+        "traversable": true
+      },
+      {
+        "grid": [11, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 57,
+        "slope_degrees": 19,
+        "traversable": true
+      },
+      {
+        "grid": [12, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 10,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [13, 11],
+        "type": "field",
+        "cover": "none",
+        "elevation": 0,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [14, 11],
+        "type": "water",
+        "cover": "none",
+        "elevation": -4,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [15, 11],
+        "type": "water",
+        "cover": "none",
+        "elevation": -45,
+        "slope_degrees": 40,
+        "traversable": false
+      },
+      {
+        "grid": [0, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -91,
+        "slope_degrees": 12,
+        "traversable": false
+      },
+      {
+        "grid": [1, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -24,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [2, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -12,
+        "slope_degrees": 3,
+        "traversable": false
+      },
+      {
+        "grid": [3, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -2,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [4, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 36,
+        "slope_degrees": 8,
+        "traversable": true
+      },
+      {
+        "grid": [5, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 35,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [6, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 47,
+        "slope_degrees": 7,
+        "traversable": true
+      },
+      {
+        "grid": [7, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 54,
+        "slope_degrees": 3,
+        "traversable": true
+      },
+      {
+        "grid": [8, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 36,
+        "slope_degrees": 18,
+        "traversable": true
+      },
+      {
+        "grid": [9, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 13,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [10, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 17,
+        "slope_degrees": 6,
+        "traversable": true
+      },
+      {
+        "grid": [11, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 40,
+        "slope_degrees": 14,
+        "traversable": true
+      },
+      {
+        "grid": [12, 12],
+        "type": "field",
+        "cover": "none",
+        "elevation": 1,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [13, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -8,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [14, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -31,
+        "slope_degrees": 10,
+        "traversable": false
+      },
+      {
+        "grid": [15, 12],
+        "type": "water",
+        "cover": "none",
+        "elevation": -99,
+        "slope_degrees": 11,
+        "traversable": false
+      },
+      {
+        "grid": [0, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -86,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [1, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -49,
+        "slope_degrees": 9,
+        "traversable": false
+      },
+      {
+        "grid": [2, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -22,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [3, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -7,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [4, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 1,
+        "slope_degrees": 0,
+        "traversable": true
+      },
+      {
+        "grid": [5, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 25,
+        "slope_degrees": 13,
+        "traversable": true
+      },
+      {
+        "grid": [6, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 19,
+        "slope_degrees": 2,
+        "traversable": true
+      },
+      {
+        "grid": [7, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 54,
+        "slope_degrees": 9,
+        "traversable": true
+      },
+      {
+        "grid": [8, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 14,
+        "slope_degrees": 14,
+        "traversable": true
+      },
+      {
+        "grid": [9, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -7,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [10, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -11,
+        "slope_degrees": 4,
+        "traversable": false
+      },
+      {
+        "grid": [11, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 2,
+        "slope_degrees": 5,
+        "traversable": true
+      },
+      {
+        "grid": [12, 13],
+        "type": "field",
+        "cover": "none",
+        "elevation": 2,
+        "slope_degrees": 4,
+        "traversable": true
+      },
+      {
+        "grid": [13, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -20,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [14, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -67,
+        "slope_degrees": 13,
+        "traversable": false
+      },
+      {
+        "grid": [15, 13],
+        "type": "water",
+        "cover": "none",
+        "elevation": -107,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [0, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -76,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [1, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -48,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [2, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -16,
+        "slope_degrees": 16,
+        "traversable": false
+      },
+      {
+        "grid": [3, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -4,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [4, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -8,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [5, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -3,
+        "slope_degrees": 13,
+        "traversable": false
+      },
+      {
+        "grid": [6, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -12,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [7, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -9,
+        "slope_degrees": 24,
+        "traversable": false
+      },
+      {
+        "grid": [8, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -14,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [9, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -24,
+        "slope_degrees": 2,
+        "traversable": false
+      },
+      {
+        "grid": [10, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -31,
+        "slope_degrees": 6,
+        "traversable": false
+      },
+      {
+        "grid": [11, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -42,
+        "slope_degrees": 7,
+        "traversable": false
+      },
+      {
+        "grid": [12, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -33,
+        "slope_degrees": 5,
+        "traversable": false
+      },
+      {
+        "grid": [13, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -29,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [14, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -69,
+        "slope_degrees": 8,
+        "traversable": false
+      },
+      {
+        "grid": [15, 14],
+        "type": "water",
+        "cover": "none",
+        "elevation": -97,
+        "slope_degrees": 6,
+        "traversable": false
+      }
+    ],
+    "key_features": []
+  }
+}

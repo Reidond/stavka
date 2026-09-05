@@ -1,0 +1,79 @@
+{
+  "baseline_commit": "4d89d42a4508c67b81767cfff695f3a897496081",
+  "source_state": "uncommitted addon working tree",
+  "game_version": "1.8.0.13",
+  "addon_guid": "6A4B4D6187F605E0",
+  "native_smoke_completed": "2026-09-06T00:52:22+03:00",
+  "files": [
+    {
+      "path": "addon.gproj",
+      "sha256": "e017dd40a8c36f1ecc3df52c355890e6495816dc9d31ac40142b634c0105018a",
+      "bytes": 109
+    },
+    {
+      "path": "Missions/Stavka_Conflict.conf",
+      "sha256": "0ffe8ff959eea1e3aca36b2f4c65b1e1ee036378246122ec0aa14ed1d0dcbc52",
+      "bytes": 271
+    },
+    {
+      "path": "Missions/Stavka_Conflict.conf.meta",
+      "sha256": "940de55a35da27377d63fe8bdea739f106dd8124c861fa5f383094fa9a5688b1",
+      "bytes": 299
+    },
+    {
+      "path": "README.md",
+      "sha256": "0c53f19bfc10ba3697cfbe3d0bf16b2912ff786d08fe1c1db131589eff8e825a",
+      "bytes": 363
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaConfig.c",
+      "sha256": "dc68a5179610078ab4fa554ed5ffa14540d349d436e3ce95028d66f985aefd4e",
+      "bytes": 4579
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaGroups.c",
+      "sha256": "a76945950b9c4da96836fdb5be26a334e3e11609c8b4e9adb9ef0d4c2b15086f",
+      "bytes": 19734
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaRuntime.c",
+      "sha256": "84d198563086352569cda790e5c34972184c54f3e87aed4a20abdb699fba6e67",
+      "bytes": 7088
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaSmoke.c",
+      "sha256": "41525db3b828588488713dc6a0219f491bf7d4a5f8f1a6821400f6bece7f4334",
+      "bytes": 8220
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaSnapshot.c",
+      "sha256": "8400065a5c71dbb16080dbfe42fca637c1b43d9d495df14e55732434b114b1a3",
+      "bytes": 6842
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaTerrain.c",
+      "sha256": "d2c9d6efb8a7ce86963963508d6d7b8772c2d98db073d0cff0535b3c57094b02",
+      "bytes": 4149
+    },
+    {
+      "path": "Scripts/Game/Stavka/StavkaWire.c",
+      "sha256": "76b60f21307e6ec1c1ae3536e8c31c459269c4025c986ff41b0a84e292d531bb",
+      "bytes": 10794
+    },
+    {
+      "path": "Worlds/StavkaGM_Arland_Layers/default.layer",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "Worlds/StavkaGM_Arland.ent",
+      "sha256": "0f89d1af2d744a27dec4921589717368851c8d32594ccb972f783b71d87ea4e8",
+      "bytes": 73
+    },
+    {
+      "path": "Worlds/StavkaGM_Arland.ent.meta",
+      "sha256": "2cf2e5313ae601e7ab005fd5eb7fe13cbaf77a613d809dce8a9812de168d7a73",
+      "bytes": 290
+    }
+  ]
+}
