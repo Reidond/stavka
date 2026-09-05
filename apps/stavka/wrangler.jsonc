@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  "routes": [{ "pattern": "stavka.sands.red", "custom_domain": true }],
   "durable_objects": {
     "bindings": [
       { "name": "SIM_WORLD", "class_name": "SimWorld" },

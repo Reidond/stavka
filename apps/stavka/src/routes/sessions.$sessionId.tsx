@@ -1,15 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-import { PlaceholderSection } from "../components/shell";
-
+import { Effect, Schema } from "effect";
+import { SessionInspector } from "../components/operations";
 export const Route = createFileRoute("/sessions/$sessionId")({
-  component: () => {
-    const { sessionId } = Route.useParams();
-    return (
-      <PlaceholderSection
-        title={`Session ${sessionId}`}
-        description="Map, objectives, groups, orders, and the live timeline for this session will appear here."
-      />
-    );
-  },
+  validateSearch: Schema.toStandardSchemaV1(
+    Schema.Struct({
+      faction: Schema.String.check(Schema.isNonEmpty()).pipe(
+        Schema.withDecodingDefaultType(Effect.succeed("OPFOR")),
+      ),
+    }),
+  ),
+  component: SessionPage,
 });
+function SessionPage() {
+  const { sessionId } = Route.useParams();
+  const { faction } = Route.useSearch();
+  return (
+    <SessionInspector
+      key={`${sessionId}:${faction}`}
+      initialSessionId={sessionId}
+      initialFaction={faction}
+    />
+  );
+}

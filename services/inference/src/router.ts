@@ -43,9 +43,10 @@ import type {
   ProviderId,
   ProvisionProviderAccountPayload,
 } from "@stavka/provider-auth";
+import { ClaudeOAuthTokenSchema } from "@stavka/provider-auth";
 
 export interface GatewayStub {
-  readonly fetch: (request: Request) => Promise<Response>;
+  readonly fetchForAccount: (scope: AccountScope, request: Request) => Promise<Response>;
   readonly getGatewayStatus: (scope?: AccountScope) => Promise<GatewayStatus>;
   readonly getAccountSession: (principal: AccountAccessPrincipal) => Promise<AccountSession>;
   readonly signUpAccount: (
@@ -295,7 +296,8 @@ const validateProvision = (
     provider === "codex"
       ? payload.authKind === "chatgpt-oauth" && payload.credential.kind === "codex-chatgpt-oauth"
       : (payload.authKind === "claude-subscription" &&
-          payload.credential.kind === "claude-subscription") ||
+          payload.credential.kind === "claude-subscription" &&
+          Schema.is(ClaudeOAuthTokenSchema)(payload.credential.oauthToken)) ||
         (payload.authKind === "anthropic-api-key" && payload.credential.kind === "api-key");
   return valid
     ? Effect.succeed(payload)
@@ -303,7 +305,7 @@ const validateProvision = (
         new WorkerHttpError(
           400,
           "CREDENTIAL_KIND_MISMATCH",
-          `Credential kind does not match the ${provider} account`,
+          `Credential kind or format is invalid for the ${provider} account`,
         ),
       );
 };
@@ -315,7 +317,10 @@ const proxy = (
   Effect.gen(function* () {
     const runtime = yield* GatewayRuntime;
     const webRequest = yield* toWebRequest(request);
-    yield* requireMachine(webRequest, runtime.env);
+    const identity = yield* requireAccess(webRequest, runtime.env, "admin");
+    const session = yield* activeAccountSession(runtime, identity);
+    yield* requireOrganizationAdmin(session);
+    const scope = accountScope(session);
     const headers = new Headers(webRequest.headers);
     headers.delete("authorization");
     headers.delete("cf-access-jwt-assertion");
@@ -323,7 +328,7 @@ const proxy = (
     headers.set("x-maskirovka-provider", dialect === "anthropic-messages" ? "claude" : "codex");
     headers.set("x-maskirovka-request-id", crypto.randomUUID());
     const upstream = yield* Effect.tryPromise({
-      try: () => gatewayFor(runtime).fetch(new Request(webRequest, { headers })),
+      try: () => gatewayFor(runtime).fetchForAccount(scope, new Request(webRequest, { headers })),
       catch: () =>
         new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Gateway container is unavailable"),
     });
@@ -343,8 +348,9 @@ const GatewayHandlers = HttpApiBuilder.group(MaskirovkaGatewayApi, "gateway", (h
             catch: () =>
               new WorkerHttpError(503, "GATEWAY_UNAVAILABLE", "Gateway status is unavailable"),
           });
-          // Health validates every active alias against its seat's provider
-          // credential — never merely "some credential exists".
+          // Machine health never selects or decrypts a user account. Scoped
+          // admin status is the credential-readiness view; this endpoint is
+          // deliberately degraded when it has no provider metadata.
           const configuredProviders = new Set(
             Object.values(status.auth)
               .filter((meta) => meta.configured)

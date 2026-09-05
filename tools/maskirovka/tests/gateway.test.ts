@@ -121,6 +121,20 @@ describe("Maskirovka Effect HttpApi router", () => {
       expect(openAi.status).toBe(200);
       expect(await openAi.json()).toMatchObject({ object: "response", status: "completed" });
       expect(openAi.headers.get("x-maskirovka-seat")).toBe("mock");
+      expect(openAi.headers.get("x-maskirovka-tier")).toBe("stavka/commander");
+      expect(openAi.headers.get("x-maskirovka-model")).toBeTruthy();
+      expect(openAi.headers.get("x-maskirovka-provider")).toBeTruthy();
+      for (const metric of [
+        "input-tokens",
+        "output-tokens",
+        "cost-actual-usd",
+        "cost-list-usd",
+        "cost-plan-credit-usd",
+      ]) {
+        const value = openAi.headers.get(`x-maskirovka-${metric}`);
+        expect(value, metric).not.toBeNull();
+        expect(Number(value), metric).toBeGreaterThanOrEqual(0);
+      }
 
       const anthropic = await request("/v1/messages?beta=true", {
         method: "POST",

@@ -1,5 +1,6 @@
 import type { LlmTierAlias } from "@stavka/protocol";
 import { Data, Effect, Schema } from "effect";
+import { resolveOrchestrator } from "../durable/resolve-orchestrator";
 
 import { AiDecisionResult, runAiDecision } from "./llm-client";
 import type { CommanderConfig, Env } from "../config";
@@ -146,21 +147,17 @@ export const invokeContributorSeat = (
   jobId?: string,
   leaseId?: string,
 ): Effect.Effect<AiDecisionResult, ContributorSeatError | ContributorResultError> =>
-  Effect.tryPromise({
-    // Durable Object RPC does not promise to preserve Error subclasses. The
-    // registry therefore returns known contributor failures as a data result,
-    // so the protocol retryable flag survives this boundary verbatim.
-    try: (): Promise<unknown> =>
-      env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).invokeContributorOutcome(
-        seatId,
-        tier,
-        prompt,
-        timeoutSeconds,
-        jobId,
-        leaseId,
-      ),
-    catch: (cause) => cause,
-  }).pipe(
+  resolveOrchestrator(env, SEAT_REGISTRY_NAME).pipe(
+    Effect.flatMap((registry) =>
+      Effect.tryPromise({
+        // Durable Object RPC does not promise to preserve Error subclasses. The
+        // registry therefore returns known contributor failures as a data result,
+        // so the protocol retryable flag survives this boundary verbatim.
+        try: (): Promise<unknown> =>
+          registry.invokeContributorOutcome(seatId, tier, prompt, timeoutSeconds, jobId, leaseId),
+        catch: (cause) => cause,
+      }),
+    ),
     Effect.mapError((cause) => new ContributorSeatError({ seatId, cause })),
     Effect.flatMap(Schema.decodeUnknownEffect(ContributorInvocationOutcome)),
     Effect.flatMap((outcome) => {
@@ -333,7 +330,9 @@ export const runRoutedAiDecision = (
           hasIsolatedCredential(seat, config),
       )
       .sort((left, right) => right.priority - left.priority);
-    const registry = env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME);
+    const registry = yield* resolveOrchestrator(env, SEAT_REGISTRY_NAME).pipe(
+      Effect.mapError((cause) => registryFailure("initialization", cause)),
+    );
     const reservationUsd = estimatedSeatReservationUsd(tier);
     const costAttributions: RoutedAiCostAttribution[] = [];
     let availabilityFailure = false;

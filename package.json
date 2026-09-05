@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:local": "pnpm --filter @stavka/tasks dev:local",
     "dev": "vp run --filter '@stavka/*' --parallel dev",
     "build": "vp run --filter '@stavka/*' --concurrency-limit 2 build",
     "test": "vp test --run",
@@ -11,7 +12,7 @@
     "typecheck": "vp run --filter '@stavka/*' typecheck",
     "check": "vp check",
     "lint:tailwind": "pnpm --filter @stavka/tasks lint:tailwind",
-    "verify": "vp run --filter '@stavka/*' --concurrency-limit 2 verify",
+    "verify": "pnpm --filter @stavka/tasks verify",
     "generate-key": "node scripts/generate-key.mjs",
     "ai:up": "vp run --no-cache --filter @stavka/maskirovka dev",
     "ai:doctor": "vp run --no-cache --filter @stavka/maskirovka doctor",
@@ -22,9 +23,13 @@
     "eval": "pnpm --filter @stavka/tasks eval",
     "warbench": "pnpm --filter @stavka/warbench-cli warbench",
     "stavka": "pnpm --filter @stavka/stavka-cli stavka",
-    "deploy:production": "pnpm --filter @stavka/tasks deploy:production"
+    "deploy:production": "pnpm --filter @stavka/tasks deploy:production",
+    "qa": "pnpm --filter @stavka/tasks qa",
+    "qa:serve": "pnpm --filter @stavka/tasks qa:serve",
+    "bench:sim": "pnpm --filter @stavka/tasks bench:sim"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^24.3.0",
     "@voidzero-dev/vite-plus-core": "0.2.7",
     "agents": "0.20.1",

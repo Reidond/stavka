@@ -9,8 +9,12 @@ import {
   type ModelStreamEvent,
   type UsageMetadata,
 } from "@stavka/model-provider";
-import type { ClaudeSubscriptionCredential, ProviderApiKeyCredential } from "@stavka/provider-auth";
-import { Effect } from "effect";
+import {
+  ClaudeOAuthTokenSchema,
+  type ClaudeSubscriptionCredential,
+  type ProviderApiKeyCredential,
+} from "@stavka/provider-auth";
+import { Effect, Schema } from "effect";
 
 export const STAVKA_CLAUDE_PROVIDER_VERSION = "1";
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
@@ -81,6 +85,14 @@ export class ClaudeAgentProvider implements ModelProvider {
   ): Effect.Effect<ModelCompletion, ModelProviderError> =>
     Effect.tryPromise({
       try: async (signal) => {
+        if (!Schema.is(ClaudeOAuthTokenSchema)(this.options.credential.oauthToken)) {
+          throw new ModelProviderError({
+            provider: "claude",
+            kind: "auth",
+            message:
+              "Claude subscription credential is malformed. Reconnect with only the setup-token value.",
+          });
+        }
         const startedAt = performance.now();
         const { query } = await import("@anthropic-ai/claude-agent-sdk");
         const controller = new AbortController();
@@ -113,10 +125,15 @@ export class ClaudeAgentProvider implements ModelProvider {
             prompt: request.input,
             options: {
               abortController: controller,
-              env: sanitizeClaudeSubscriptionEnvironment(
-                this.options.environment ?? process.env,
-                this.options.credential.oauthToken,
-              ),
+              env: {
+                ...sanitizeClaudeSubscriptionEnvironment(
+                  this.options.environment ?? process.env,
+                  this.options.credential.oauthToken,
+                ),
+                ...(request.maxOutputTokens
+                  ? { CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(request.maxOutputTokens) }
+                  : {}),
+              },
               model: request.model,
               maxTurns: 1,
               tools: [],
@@ -133,9 +150,6 @@ export class ClaudeAgentProvider implements ModelProvider {
                         ? ("low" as const)
                         : request.reasoningEffort,
                   }
-                : {}),
-              ...(request.maxOutputTokens
-                ? { taskBudget: { total: request.maxOutputTokens } }
                 : {}),
               ...(request.outputSchema
                 ? { outputFormat: { type: "json_schema" as const, schema: request.outputSchema } }
@@ -157,8 +171,11 @@ export class ClaudeAgentProvider implements ModelProvider {
               continue;
             }
             if (message.type !== "result") continue;
-            if (message.subtype !== "success") {
-              const failure = message.errors.join("; ") || message.subtype;
+            if (message.subtype !== "success" || message.is_error) {
+              const failure =
+                message.subtype === "success"
+                  ? message.result
+                  : message.errors.join("; ") || message.subtype;
               throw new ModelProviderError({
                 provider: "claude",
                 kind: /auth|login|oauth|token/iu.test(failure)

@@ -19,7 +19,8 @@ Production request flow:
 browser / stavka CLI -> stavka.sands.red (Access: Stavka)
                          |-- /auth/*, /account/* -> INFERENCE_SERVICE
                          |-- /admin/provider-accounts* -> INFERENCE_SERVICE
-                         `-- simulations -> COMMANDER_SERVICE -> INFERENCE_SERVICE
+                         |-- /v1/responses, /v1/messages -> INFERENCE_SERVICE
+                         `-- simulations -> COMMANDER_SERVICE
 ```
 
 ### Unified path map
@@ -36,11 +37,18 @@ browser / stavka CLI -> stavka.sands.red (Access: Stavka)
 | `/admin/provider-accounts/:provider/:name`          | Active owner      | Provision or delete an encrypted account             |
 | `/admin/provider-accounts/:provider/:name/test`     | Active owner      | Validate the caller-owned credential                 |
 | `/admin/provider-accounts/:provider/:name/activate` | Active owner      | Activate the caller-owned account                    |
+| `/v1/responses`                                     | Active owner      | Codex call using the caller-owned active account     |
+| `/v1/messages`                                      | Active owner      | Claude call using the caller-owned active account    |
 
 The account and provider routes are forwarded over `INFERENCE_SERVICE`; they
 never require a public inference hostname. User and provider-account data are
 scoped from the verified Access assertion. Service tokens cannot enter the
 human account control plane.
+
+The inference machine bearer is accepted only for non-decrypting health and
+model metadata. Provider execution requires the human Access assertion and an
+owner/admin account scope. Commander cannot turn its service binding or machine
+key into access to a user's Codex or Claude credential.
 
 ### Private bindings and storage
 

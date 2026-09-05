@@ -153,9 +153,19 @@ describe("encrypted provider account repository", () => {
         ),
       ),
     ).resolves.toBeUndefined();
-    await expect(Effect.runPromise(repository.activeForRuntime("codex"))).rejects.toMatchObject({
-      _tag: "GatewayRepositoryError",
+    await expect(Effect.runPromise(repository.active(scope, "codex"))).resolves.toMatchObject({
+      ownerUserId: "user-1",
+      credential: { accessToken: "owner" },
     });
+    await expect(Effect.runPromise(repository.active(otherScope, "codex"))).resolves.toMatchObject({
+      ownerUserId: "user-2",
+      credential: { accessToken: "other" },
+    });
+    await expect(
+      Effect.runPromise(
+        repository.active({ organizationId: "organization-1", userId: "missing-user" }, "codex"),
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("fails closed when the vault key is missing", async () => {

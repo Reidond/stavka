@@ -5,3 +5,4 @@ export * from "./llm";
 export * from "./messages";
 export * from "./replay";
 export * from "./state";
+export * from "./operations";

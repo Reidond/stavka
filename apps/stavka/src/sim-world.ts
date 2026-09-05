@@ -11,6 +11,7 @@ import {
   runCommanderTick,
 } from "./commander-bridge";
 import { accessConfig, type Env } from "./config";
+import { simulationControlAllowed } from "./simulation-access";
 import {
   commanderSessionId,
   parseSimWorldAgentName,
@@ -20,7 +21,6 @@ import {
   decodeConfigureSimWorldInput,
   decodePaused,
   decodeTimeScale,
-  hasControlPermission,
   type ConfigureSimWorldInput,
   type DoctrineName,
   type ScenarioName,
@@ -229,7 +229,10 @@ export class SimWorld extends Agent<Env, PoligonState> {
 
   override async onConnect(connection: Connection, { request }: ConnectionContext): Promise<void> {
     const identity = await Effect.runPromise(verifyAccessRequest(request, accessConfig(this.env)));
-    this.setConnectionReadonly(connection, !hasControlPermission(identity));
+    const canOperate = await Effect.runPromise(
+      simulationControlAllowed(identity, request, this.env),
+    );
+    this.setConnectionReadonly(connection, !canOperate);
   }
 
   override validateStateChange(_nextState: PoligonState, source: Connection | "server"): void {

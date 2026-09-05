@@ -5,6 +5,11 @@ export type ProviderId = typeof ProviderIdSchema.Type;
 
 const SecretSchema = Schema.String.pipe(Schema.check(Schema.isNonEmpty()));
 
+/** Validate setup-token input without accepting terminal transcripts or controls. */
+export const ClaudeOAuthTokenSchema = Schema.String.check(
+  Schema.isPattern(/^sk-ant-oat01-[A-Za-z0-9_-]{20,}$/u),
+);
+
 export const ProviderAccountNameSchema = Schema.String.pipe(
   Schema.check(
     Schema.isTrimmed(),

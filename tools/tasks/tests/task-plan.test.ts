@@ -61,13 +61,11 @@ describe("repository task plans", () => {
     ]);
   });
 
-  it("prebuilds every service before deploying in dependency order", () => {
+  it("prebuilds frontend assets before deploying exactly three services in dependency order", () => {
     expect(productionDeployTask.map((command) => command.arguments)).toEqual([
       ["--filter", "@stavka/inference", "build:dashboard"],
-      ["--filter", "@stavka/maskirovka-seat", "build:dashboard"],
       ["--filter", "@stavka/stavka", "build"],
       ["--filter", "@stavka/inference", "exec", "wrangler", "deploy"],
-      ["--filter", "@stavka/maskirovka-seat", "exec", "wrangler", "deploy"],
       ["--filter", "@stavka/commander", "exec", "wrangler", "deploy"],
       [
         "--filter",
@@ -83,7 +81,7 @@ describe("repository task plans", () => {
     const firstDeploy = productionDeployTask.findIndex((command) =>
       command.arguments.includes("deploy"),
     );
-    expect(firstDeploy).toBe(3);
+    expect(firstDeploy).toBe(2);
     expect(
       productionDeployTask
         .slice(0, firstDeploy)

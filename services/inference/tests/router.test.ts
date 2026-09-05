@@ -150,7 +150,7 @@ const fakeStub = (): GatewayStub => ({
     updatedAt: 9,
     ...accountOwner,
   })),
-  fetch: vi.fn(async () => Response.json({ proxied: true })),
+  fetchForAccount: vi.fn(async () => Response.json({ proxied: true })),
 });
 
 const app = createGatewayTestHandler();
@@ -217,7 +217,7 @@ describe("hosted gateway Worker router", () => {
         codex: { configured: false, persisted: false },
       },
     });
-    expect(stub.fetch).not.toHaveBeenCalled();
+    expect(stub.fetchForAccount).not.toHaveBeenCalled();
   });
 
   it("bootstraps the signed-in owner profile before exposing account data", async () => {
@@ -292,6 +292,29 @@ describe("hosted gateway Worker router", () => {
     });
   });
 
+  it("rejects a terminal transcript without persisting or echoing it", async () => {
+    const stub = fakeStub();
+    const transcript = "Welcome to setup\nprivate-token-output";
+    const response = await request(
+      "/admin/provider-accounts/claude/personal",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          label: "Personal",
+          authKind: "claude-subscription",
+          credential: { kind: "claude-subscription", oauthToken: transcript },
+          activate: true,
+        }),
+      },
+      { ...environment(), ENVIRONMENT: "local", DEV_ACCESS_EMAIL: "owner@example.test" },
+      stub,
+    );
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain("private-token-output");
+    expect(stub.putProviderAccount).not.toHaveBeenCalled();
+  });
+
   it("never echoes credentials from named-account put or delete routes", async () => {
     const stub = fakeStub();
     const env = {
@@ -299,7 +322,7 @@ describe("hosted gateway Worker router", () => {
       ENVIRONMENT: "local",
       DEV_ACCESS_EMAIL: "owner@example.test",
     };
-    const secret = "subscription-token-must-not-leak";
+    const secret = "sk-ant-oat01-" + "x".repeat(40);
 
     const put = await request(
       "/admin/provider-accounts/claude/personal",
@@ -407,13 +430,41 @@ describe("hosted gateway Worker router", () => {
     expect(stub.putProviderAccount).not.toHaveBeenCalled();
   });
 
-  it("forwards machine traffic with generated correlation ids and stripped credentials", async () => {
+  it("rejects machine-only provider invocation", async () => {
+    const stub = fakeStub();
+    const response = await request(
+      "/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          authorization: bearer,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ model: "stavka/sergeant", input: "Hold" }),
+      },
+      environment(),
+      stub,
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "ACCESS_REQUIRED" },
+    });
+    expect(stub.fetchForAccount).not.toHaveBeenCalled();
+  });
+
+  it("forwards authorized owner traffic with its account scope and stripped credentials", async () => {
     const stub = fakeStub();
     let forwarded: Request | undefined;
-    vi.mocked(stub.fetch).mockImplementation(async (request) => {
+    vi.mocked(stub.fetchForAccount).mockImplementation(async (_scope, request) => {
       forwarded = request;
       return Response.json({ proxied: true });
     });
+    const env = {
+      ...environment(),
+      ENVIRONMENT: "local",
+      DEV_ACCESS_EMAIL: "owner@example.test",
+    };
 
     const response = await request(
       "/v1/responses",
@@ -427,14 +478,50 @@ describe("hosted gateway Worker router", () => {
         },
         body: JSON.stringify({ model: "stavka/sergeant", input: "Hold" }),
       },
-      environment(),
+      env,
       stub,
     );
 
     expect(response.status).toBe(200);
+    expect(stub.fetchForAccount).toHaveBeenCalledWith(
+      { organizationId: "organization-1", userId: "user-1" },
+      expect.any(Request),
+    );
     expect(forwarded?.headers.get("authorization")).toBeNull();
     expect(forwarded?.headers.get("cf-access-jwt-assertion")).toBeNull();
     expect(forwarded?.headers.get("x-maskirovka-request-id")).toMatch(/^[0-9a-f-]{36}$/iu);
     expect(forwarded?.headers.get("x-maskirovka-dialect")).toBe("openai-responses");
+  });
+
+  it("rejects non-admin organization members from provider invocation", async () => {
+    const stub = fakeStub();
+    vi.mocked(stub.getAccountSession).mockResolvedValue({
+      ...activeSession(),
+      membership: { ...activeSession().membership, role: "member" },
+    });
+    const response = await request(
+      "/v1/messages",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "stavka/commander",
+          max_tokens: 64,
+          messages: [{ role: "user", content: "Hold" }],
+        }),
+      },
+      {
+        ...environment(),
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "owner@example.test",
+      },
+      stub,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "ORGANIZATION_ADMIN_REQUIRED" },
+    });
+    expect(stub.fetchForAccount).not.toHaveBeenCalled();
   });
 });

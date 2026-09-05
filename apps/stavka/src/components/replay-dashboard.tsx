@@ -87,21 +87,27 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
   const maximumX = Math.max(...xValues, 1);
   const minimumZ = Math.min(...zValues, 0);
   const maximumZ = Math.max(...zValues, 1);
+  const span = Math.max(100, maximumX - minimumX, maximumZ - minimumZ);
   const projectX = (value: number): number =>
-    8 + ((value - minimumX) / Math.max(1, maximumX - minimumX)) * 84;
+    300 + ((value - (minimumX + maximumX) / 2) / span) * 250;
   const projectZ = (value: number): number =>
-    92 - ((value - minimumZ) / Math.max(1, maximumZ - minimumZ)) * 84;
+    170 - ((value - (minimumZ + maximumZ) / 2) / span) * 250;
 
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
       <svg
-        viewBox="0 0 100 100"
+        viewBox="0 0 600 340"
         role="img"
         aria-label={`Reconstructed tactical state at tick ${frame.tickId}`}
-        className="min-h-72 w-full border border-kumo-hairline bg-kumo-base"
+        className="stavka-replay-map"
       >
         <title>{`Tick ${frame.tickId} reconstructed friendly, objective, and known-enemy positions`}</title>
-        <path d="M 8 92 H 92 M 8 92 V 8" fill="none" stroke={poligonVisualizationPalette.grid} />
+        <defs>
+          <pattern id="replay-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+            <path d="M 30 0 H 0 V 30" fill="none" stroke="#33475d" strokeWidth="0.6" />
+          </pattern>
+        </defs>
+        <rect width="600" height="340" fill="url(#replay-grid)" />
         {markers.map((marker) => {
           const x = projectX(marker.x);
           const y = projectZ(marker.z);
@@ -110,15 +116,18 @@ const ReplayTacticalState = ({ frame }: { readonly frame: ReplayFrame }) => {
             <g key={marker.key} data-marker={marker.key}>
               <title>{`${marker.label} · X ${marker.x.toFixed(0)} · Z ${marker.z.toFixed(0)} · ${marker.detail}`}</title>
               {marker.kind === "objective" ? (
-                <rect x={x - 2.5} y={y - 2.5} width={5} height={5} fill={color} />
+                <rect x={x - 9} y={y - 9} width={18} height={18} fill={color} />
               ) : marker.kind === "known_enemy" ? (
                 <path
-                  d={`M ${x} ${y - 3} L ${x + 3} ${y + 3} L ${x - 3} ${y + 3} Z`}
+                  d={`M ${x} ${y - 11} L ${x + 11} ${y + 9} L ${x - 11} ${y + 9} Z`}
                   fill={color}
                 />
               ) : (
-                <circle cx={x} cy={y} r={3} fill={color} />
+                <circle cx={x} cy={y} r={9} fill={color} />
               )}
+              <text x={x} y={y + 30} textAnchor="middle" fill="#e2e8f0" fontSize="13">
+                {marker.label}
+              </text>
             </g>
           );
         })}
@@ -328,9 +337,7 @@ export const ReplayDashboard = ({ replay }: { readonly replay: SessionExport }) 
       >
         <section className="space-y-3 p-3" aria-label="Cause to outcome replay timeline">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">
-              Decision timeline
-            </h2>
+            <h2 className="m-0 text-sm font-semibold text-kumo-strong">Decision timeline</h2>
             <div className="flex items-center gap-1 text-xs" aria-label="Timeline stages">
               <PoligonBadge>Cause</PoligonBadge>
               <span aria-hidden="true">→</span>
@@ -368,9 +375,7 @@ export const ReplayDashboard = ({ replay }: { readonly replay: SessionExport }) 
 
       <PoligonFigure caption="Grouped by session, faction, agent tier, and model">
         <section className="space-y-3 p-3" aria-label="Replay cost breakdown">
-          <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">
-            Calls, tokens, and cost
-          </h2>
+          <h2 className="m-0 text-sm font-semibold text-kumo-strong">Calls, tokens, and cost</h2>
           <PoligonDataTable
             data={costs}
             columns={costColumns}

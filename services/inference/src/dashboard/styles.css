@@ -27,6 +27,8 @@
 
 @layer components {
   .maskirovka-gateway-shell {
+    display: flex;
+    flex-direction: column;
     height: 100vh;
     height: 100dvh;
     min-height: 100vh;
@@ -36,8 +38,7 @@
   }
 
   .maskirovka-gateway-content {
-    height: calc(100vh - 8rem);
-    height: calc(100dvh - 8rem);
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-right: 0.5rem;

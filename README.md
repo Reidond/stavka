@@ -5,8 +5,7 @@ versioned battlefield protocol feeds a durable Commander, deterministic
 Sergeants, and bounded LLM seats; Poligon reproduces the same command loop on
 macOS without a game installation.
 
-Everything feasible without Arma Reforger Tools or operator-owned cloud/model
-accounts is implemented in this workspace: strict protocol and replay
+This workspace implements strict protocol and replay
 contracts, Commander orchestration, deterministic simulation and link behavior,
 Poligon's hosted and browser-local modes, local and hosted Maskirovka code, the
 Kumo-based frontend surfaces, and deterministic verification/evaluation tooling.
@@ -24,7 +23,7 @@ Requirements:
 - Node.js 22 (see `.node-version`)
 - pnpm 11.18.0 (pinned by `packageManager`)
 - Vite+ from the workspace; a global `vp` install is not required
-- Docker only for a local hosted-seat image build
+- Docker for Worker/Container builds and the isolated QA stack
 
 ```bash
 corepack enable
@@ -111,29 +110,24 @@ The tracked [Effect v4 skill](.agents/skills/effect-v4/SKILL.md) and
 | `services/commander`             | Private Effect HttpApi Worker, durable Commander/Sergeants, accounting, logs, and replay exports                       |
 | `services/inference`             | Private Maskirovka gateway, organization/user repository, owned provider vault, and operations dashboard               |
 | `apps/stavka`                    | Unified Access-protected dashboard with first-time account setup and private provider authorization                    |
-| `apps/maskirovka-seat`           | Private hosted single-seat Worker/Container deployed as part of the production stack                                   |
+| `apps/maskirovka-seat`           | Optional private hosted single-seat Worker/Container; excluded from production deployment                              |
 | `mods/StavkaTest`                | Preserved historical Workbench research harness; not the production mod                                                |
 
 ## Verification
 
-Run the repository gates before relying on a revision:
+Run the repository gates before relying on a revision. See the
+[agent workflow](docs/AGENT_WORKFLOW.md) for isolated worktrees, fast QA, and traces:
 
 ```bash
-pnpm check
-pnpm lint:tailwind
-pnpm test
-pnpm typecheck
-pnpm build
+pnpm exec playwright install chromium
 pnpm verify
-pnpm eval -- --replay
-pnpm ai:smoke
 ```
 
 Commander sessions are isolated by `(session_id, mission_epoch, faction)`.
 Exact gate results and the local browser acceptance evidence are recorded in
-[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+[the September audit](docs/audits/2026-09-05.md).
 
-These checks use mocks, fakes, and replay data. They do not prove a real
+These checks combine mocks/replay data with local workerd, SQLite, service bindings, and Chromium. They do not prove a real
 Cloudflare deployment, Access policy, subscription seat, production addon, or
 dedicated server. The manual production job deploys inference, Commander, then
 the unified app; upload success alone is not post-deploy HTTP health.

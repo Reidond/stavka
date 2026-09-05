@@ -119,4 +119,45 @@ describe("Commander Anthropic gateway client", () => {
       },
     });
   });
+
+  it("uses the private service binding even when platform fetch is unavailable", async () => {
+    const publicFetch = vi.fn(async () => {
+      throw new Error("Unexpected public fetch");
+    });
+    vi.stubGlobal("fetch", publicFetch);
+    const bindingFetch = vi.fn(async () =>
+      Response.json({
+        id: "msg_binding",
+        type: "message",
+        role: "assistant",
+        model: "claude-fable-5",
+        content: [
+          { type: "text", text: JSON.stringify({ summary: "Private binding", commands: [] }) },
+        ],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: {
+          cache_creation: null,
+          cache_creation_input_tokens: null,
+          cache_read_input_tokens: null,
+          inference_geo: null,
+          input_tokens: 12,
+          output_tokens: 5,
+          service_tier: "standard",
+        },
+      }),
+    );
+    const result = await Effect.runPromise(
+      runAiDecision(
+        {
+          ...config,
+          inferenceService: { fetch: bindingFetch } as unknown as Fetcher,
+        },
+        { model: "stavka/commander", prompt: "Hold position" },
+      ),
+    );
+    expect(result.decision.summary).toBe("Private binding");
+    expect(bindingFetch).toHaveBeenCalledOnce();
+    expect(publicFetch).not.toHaveBeenCalled();
+  });
 });

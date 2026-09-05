@@ -53,6 +53,70 @@ describe("Poligon HTTP routing", () => {
     expect(mocks.tanStackFetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "/admin/status",
+    "/api/system/commander",
+    "/api/commander/export?session_id=secret&faction=OPFOR",
+  ])("rejects unauthenticated operations reads: %s", async (path) => {
+    const fetch = vi.fn<Fetcher["fetch"]>();
+    const response = await handleRequest(
+      new Request(`https://poligon.test${path}`),
+      makeEnv({
+        INFERENCE_SERVICE: { fetch },
+        COMMANDER_SERVICE: { fetch, connect: vi.fn() },
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("preserves session identity, Access headers, and upstream failures across the Commander binding", async () => {
+    const fetch = vi.fn<Fetcher["fetch"]>(async () =>
+      Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 }),
+    );
+    const response = await handleRequest(
+      new Request(
+        "http://127.0.0.1/api/commander/export?session_id=match%2F42&faction=BLUFOR&epoch=7",
+        {
+          headers: { "cf-access-jwt-assertion": "forwarded-identity" },
+        },
+      ),
+      makeEnv({
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "qa@localhost",
+        COMMANDER_SERVICE: { fetch, connect: vi.fn() },
+      }),
+    );
+    expect(response.status).toBe(404);
+    const forwarded = fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.url).toBe(
+      "http://127.0.0.1/admin/export?session_id=match%2F42&faction=BLUFOR&epoch=7",
+    );
+    expect(forwarded.headers.get("cf-access-jwt-assertion")).toBe("forwarded-identity");
+    await expect(response.json()).resolves.toEqual({ error: { code: "NOT_FOUND" } });
+  });
+
+  it("reports an unavailable Commander binding as an uncached 503", async () => {
+    for (const binding of [
+      undefined,
+      { fetch: vi.fn<Fetcher["fetch"]>().mockRejectedValue(new Error("offline")) },
+    ]) {
+      const response = await handleRequest(
+        new Request("http://127.0.0.1/api/system/commander"),
+        makeEnv({
+          ENVIRONMENT: "local",
+          DEV_ACCESS_EMAIL: "qa@localhost",
+          ...(binding ? { COMMANDER_SERVICE: { ...binding, connect: vi.fn() } } : {}),
+        }),
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      await expect(response.json()).resolves.toEqual({
+        error: { code: "COMMANDER_UNAVAILABLE", message: "Commander service is unavailable" },
+      });
+    }
+  });
+
   it("protects the TanStack fallback with Cloudflare Access", async () => {
     const response = await handleRequest(new Request("https://poligon.test/operations"), makeEnv());
 
@@ -93,6 +157,53 @@ describe("Poligon HTTP routing", () => {
     expect(forwarded.url).toBe("http://127.0.0.1/admin/provider-accounts");
     expect(forwarded.headers.get("x-request-marker")).toBe("provider-control");
     expect(mocks.tanStackFetch).not.toHaveBeenCalled();
+  });
+
+  it("forwards model requests only after Cloudflare Access", async () => {
+    let forwarded: Request | undefined;
+    const inferenceFetch = vi.fn<Fetcher["fetch"]>(async (request) => {
+      forwarded = request instanceof Request ? request : new Request(request);
+      return Response.json({ id: "response-1" });
+    });
+    const response = await handleRequest(
+      new Request("http://127.0.0.1/v1/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "stavka/sergeant", input: "Hold" }),
+      }),
+      makeEnv({
+        ENVIRONMENT: "local",
+        DEV_ACCESS_EMAIL: "owner@example.test",
+        INFERENCE_SERVICE: { fetch: inferenceFetch },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(forwarded?.url).toBe("http://127.0.0.1/v1/responses");
+    expect(forwarded?.method).toBe("POST");
+    await expect(forwarded?.json()).resolves.toEqual({
+      model: "stavka/sergeant",
+      input: "Hold",
+    });
+    expect(mocks.tanStackFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects model requests without Cloudflare Access", async () => {
+    const inferenceFetch = vi.fn<Fetcher["fetch"]>();
+    const response = await handleRequest(
+      new Request("https://stavka.test/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "stavka/commander", messages: [] }),
+      }),
+      makeEnv({ INFERENCE_SERVICE: { fetch: inferenceFetch } }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "ACCESS_REQUIRED" },
+    });
+    expect(inferenceFetch).not.toHaveBeenCalled();
   });
 
   it("forwards first-time account setup to the private identity control plane", async () => {

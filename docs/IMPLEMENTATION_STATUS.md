@@ -1,5 +1,9 @@
 # Implementation and acceptance status
 
+Current evidence: [2026-09-05 audit](audits/2026-09-05.md) and
+[remaining acceptance](REMAINING_WORK.md). The August final-run table below is
+historical and does not establish current cloud or deployment status.
+
 This document reconciles the design in [`PRODUCT.md`](../PRODUCT.md) with the
 current workspace. It distinguishes repository implementation from external
 acceptance: deterministic code and tests cannot prove a Cloudflare account, a
@@ -27,7 +31,7 @@ The non-Arma product surface is implemented in the repository:
   classification, adaptive reports, and restore/replay behavior;
 - Poligon Agent, offline, single/versus, local replay, and cost surfaces;
 - local Maskirovka Node helpers (legacy/CI), hosted Maskirovka gateway
-  Container (`apps/maskirovka-gateway`), and optional single-seat leaf
+  Container (`services/inference`), and optional single-seat leaf
   Worker/Container/dashboard code;
 - direct Kumo frontend components, app-local feature compositions,
   lint/editor parity, CI, and replay-only evaluation.
@@ -149,13 +153,10 @@ Only the following categories remain outside repository-only acceptance.
 
 ### Cloudflare deployment and lifecycle
 
-- ~~create/bind Commander KV/R2 and gateway R2/Container; upload Workers~~ done
-  on account `Andrii Shafar` (see operator guide); **public workers.dev HTTP
-  still blocked by account-wide `1042`**;
-- configure Access applications, policies, audiences, team domains, and
-  least-privilege service tokens (dashboard — Wrangler OAuth lacks Access);
-- inject gateway subscription tokens via `/_/` (or recovery secrets) once Access
-  works; prove secrets never appear in source, bundles, logs, or browser state;
+- The 2026-09-05 read-only MCP audit confirms the custom domain, Access policy,
+  private bindings, KV/R2 resources, and disabled workers.dev/preview origins.
+- Deploy the current revision and verify authenticated application behavior.
+- Provision provider accounts through the CLI and test real entitlement.
 - verify DO/R2/KV state, queued work, exports, and session isolation across
   eviction/redeploy;
 - exercise Container start/sleep/restart, auth restoration, rotation,

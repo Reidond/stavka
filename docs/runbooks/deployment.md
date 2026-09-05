@@ -6,7 +6,7 @@ Commander and inference reachable only through Cloudflare service bindings.
 ## Preconditions
 
 - Branch `main` is green on the CI verify workflow (check, lint, tests,
-  typecheck, build, replay eval, offline smoke).
+  typecheck, build, replay eval, offline smoke, browser acceptance).
 - The GitHub `production` environment exists with `CLOUDFLARE_API_TOKEN`
   (Workers Scripts Edit, Containers Edit) and `CLOUDFLARE_ACCOUNT_ID`, and
   requires manual approval.
@@ -14,7 +14,7 @@ Commander and inference reachable only through Cloudflare service bindings.
 
 ## One-time Cloudflare setup
 
-1. **Custom domain**: attach `stavka.sands.red` to the `stavka` Worker
+1. **Custom domain**: attach `stavka.sands.red` to the `stavka-poligon` Worker
    (Custom Domains, not routes). No workers.dev or preview URLs are enabled —
    Commander and inference set `workers_dev: false` and `preview_urls: false`.
 2. **Cloudflare Access application** for `stavka.sands.red`:
@@ -25,22 +25,23 @@ Commander and inference reachable only through Cloudflare service bindings.
 3. **Machine namespace (future game bridge)**: `/machine/v1/*` routes use
    service tokens via `authorizeMachine`, not Access sessions.
 4. **Account control plane**: the unified app forwards `/auth/*`,
-   `/account/users`, and `/admin/provider-accounts*` to the private inference
-   Worker through `INFERENCE_SERVICE`. The verified human identity must be the
-   configured owner to create the first profile. Service tokens are rejected
-   from all user and provider-account routes.
+   `/account/users`, `/admin/provider-accounts*`, `/v1/responses`, and
+   `/v1/messages` to the private inference Worker through `INFERENCE_SERVICE`.
+   The verified human identity must be the configured owner to create the first
+   profile or invoke a provider. Service tokens and machine bearer tokens are
+   rejected from every credential-decrypting route.
 
 ## Deploy
 
-Deployment follows a successful `verify` job on a `main` push or a manual
-dispatch of `.github/workflows/ci.yml` from `main`:
+After CI passes on the exact `main` revision, manually dispatch
+`.github/workflows/deploy.yml`. CI never deploys. For an explicitly authorized
+local operator deployment, the equivalent command is:
 
 ```sh
 pnpm run deploy:production
 ```
 
-Order (handled by the task plan): inference → hosted seat → commander → unified
-app. The hosted seat, commander, and inference have no public workers.dev or
+Order (handled by the task plan): inference → Commander → unified app. The hosted seat is optional and excluded. The hosted seat, commander, and inference have no public workers.dev or
 preview origin.
 
 After deploy, record each service's version ID from the wrangler output in
@@ -52,20 +53,23 @@ the change log entry.
 # Unauthenticated browser request must be intercepted by Access (302 to Access).
 curl -sSI https://stavka.sands.red | head -n1
 
-# App health is public and must report ok.
-curl -sS https://stavka.sands.red/healthz
+# Health is also Access-protected; anonymous requests must redirect.
+curl -sSI https://stavka.sands.red/healthz | head -n1
 ```
 
-Then sign in through Access and verify:
+Then sign in through Access, verify `/healthz` and `/system`, and check:
 
 - The first visit shows setup, creates one organization and owner profile, and
   a second Access identity cannot self-register.
 - `/settings/providers` shows only the signed-in profile and accounts bound to it.
-- `/overview`, `/simulations` (run a rule-only scenario), `/replays` load.
+- `/`, `/simulations` (run a rule-only scenario), `/replays` load.
 - `/system` shows Commander + inference health as `live` (or `degraded`
   with the failing alias named).
-- A model call works end-to-end: run a simulation with the agent host; check
-  inference `/admin/requests` metadata shows resolved model, usage, and costs.
+- A model call works end-to-end through the signed-in owner's `/v1/responses`
+  or `/v1/messages` route; inference `/admin/requests` metadata shows the
+  resolved model, usage, and costs.
+- The same model request with only `MASKIROVKA_GATEWAY_KEY`, or with a service
+  token and no human Access assertion, fails with `ACCESS_REQUIRED`.
 
 If readiness fails: `wrangler rollback` per service in reverse dependency
 order (app → commander → inference).

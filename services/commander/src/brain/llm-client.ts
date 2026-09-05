@@ -144,8 +144,11 @@ const httpClientLayer = (config: CommanderConfig): Layer.Layer<HttpClient.HttpCl
       input instanceof Request ? input : String(input),
       init,
     )) as unknown as typeof globalThis.fetch;
-  // The Fetch reference is read per request; the concrete binding wins over the default.
-  return Layer.merge(FetchHttpClient.layer, Layer.succeed(FetchHttpClient.Fetch, bindingFetch));
+  // Capture the binding in the client's merged context. A sibling layer would
+  // disappear when the caller provides only the resulting HttpClient service.
+  return FetchHttpClient.layer.pipe(
+    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, bindingFetch)),
+  );
 };
 
 const withOpenAi = (

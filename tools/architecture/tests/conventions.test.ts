@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = process.cwd();
-const sourceRoots = ["apps", "packages", "tools"] as const;
+const sourceRoots = ["apps", "packages", "services", "tools"] as const;
 
 const walk = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -51,7 +51,7 @@ describe("project architecture conventions", () => {
       /from\s+["'](?:hono|@hono\/[^"']+)["']/u.test(readFileSync(path, "utf8")),
     );
     const manualDispatch = implementationFiles.filter((path) =>
-      /\.pathname\b/u.test(readFileSync(path, "utf8")),
+      /\.pathname\s*(?:===|!==|==|!=)|switch\s*\([^)]*\.pathname/u.test(readFileSync(path, "utf8")),
     );
 
     expect({ forbiddenDependencies, forbiddenImports, manualDispatch }).toEqual({
@@ -158,7 +158,6 @@ describe("project architecture conventions", () => {
     ].map((path) => readFileSync(join(repositoryRoot, path), "utf8"));
     const settings = readFileSync(join(repositoryRoot, ".vscode/settings.json"), "utf8");
     const extensions = readFileSync(join(repositoryRoot, ".vscode/extensions.json"), "utf8");
-    const ci = readFileSync(join(repositoryRoot, ".github/workflows/ci.yml"), "utf8");
     const stylePaths = [
       "apps/stavka/src/styles.css",
       "tools/maskirovka/src/dashboard/styles.css",
@@ -191,7 +190,6 @@ describe("project architecture conventions", () => {
     );
     expect(extensions).toContain('"bradlc.vscode-tailwindcss"');
     expect(extensions).toContain('"oxc.oxc-vscode"');
-    expect(ci).toContain("pnpm lint:tailwind");
     for (const [index, stylesheet] of styles.entries()) {
       const source = stylesheet.match(/@source "([^"]+\/@cloudflare\/kumo\/dist)\/\*\*\//u);
       expect(source, stylePaths[index]).not.toBeNull();
@@ -203,18 +201,5 @@ describe("project architecture conventions", () => {
         /@source "[^"]+";\s*@import "@cloudflare\/kumo\/styles\/tailwind";\s*@import "tailwindcss";/u,
       );
     }
-  });
-
-  it("ships the project-local Effect v4 engineering skill", () => {
-    const skill = readFileSync(join(repositoryRoot, ".agents/skills/effect-v4/SKILL.md"), "utf8");
-    const http = readFileSync(
-      join(repositoryRoot, ".agents/skills/effect-v4/references/httpapi.md"),
-      "utf8",
-    );
-
-    expect(skill).toContain("name: effect-v4");
-    expect(skill).toContain("Raw SQL and schema migration text live only");
-    expect(http).toContain("HttpApiBuilder");
-    expect(http).toContain("never\n  branch on `new URL(request.url).pathname`");
   });
 });

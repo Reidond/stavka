@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
   Agent: class {},
   routeAgentRequest: mocks.agentRoute,
 }));
@@ -108,6 +110,22 @@ class FakeR2Bucket implements R2BucketLike {
 }
 
 describe("Commander HTTP routing", () => {
+  it.each([null, makeExport()])(
+    "returns a missing-session 404 or the canonical export",
+    async (exported) => {
+      const exportSession = vi.fn().mockResolvedValue(exported);
+      const getByName = vi.fn(() => ({ exportSession }));
+      const response = await handleRequest(
+        new Request("http://127.0.0.1/admin/export?session_id=route-session&faction=OPFOR&epoch=3"),
+        makeEnv({ ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"] }),
+      );
+      expect(getByName).toHaveBeenCalledWith(JSON.stringify(["route-session", 3, "OPFOR"]));
+      expect(response.status).toBe(exported === null ? 404 : 200);
+      if (exported === null)
+        expect(await response.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
+      else expect(await response.json()).toEqual(exported);
+    },
+  );
   beforeEach(() => mocks.agentRoute.mockReset().mockResolvedValue(null));
 
   it("serves the public health contract through HttpApi", async () => {

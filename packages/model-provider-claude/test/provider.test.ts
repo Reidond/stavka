@@ -1,9 +1,84 @@
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import { ClaudeApiProvider, sanitizeClaudeSubscriptionEnvironment } from "../src/provider";
+import {
+  ClaudeAgentProvider,
+  ClaudeApiProvider,
+  sanitizeClaudeSubscriptionEnvironment,
+} from "../src/provider";
+
+const sdk = vi.hoisted(() => ({ query: vi.fn() }));
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({ query: sdk.query }));
 
 describe("Claude providers", () => {
+  it("passes a small output cap through the SDK output limit without creating a task budget", async () => {
+    sdk.query.mockClear();
+    sdk.query.mockReturnValue(
+      (async function* () {
+        yield {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          result: "STAVKA_READY",
+          uuid: "test-result",
+          modelUsage: { "claude-fable-5": { canonicalModel: "claude-fable-5" } },
+          usage: { input_tokens: 12, output_tokens: 4 },
+          total_cost_usd: 0,
+        };
+      })(),
+    );
+    const provider = new ClaudeAgentProvider({
+      credential: { kind: "claude-subscription", oauthToken: `sk-ant-oat01-${"x".repeat(24)}` },
+      environment: { CLAUDE_CODE_MAX_OUTPUT_TOKENS: "99999" },
+    });
+    const response = await Effect.runPromise(
+      provider.complete({ model: "claude-fable-5", input: "ready", maxOutputTokens: 64 }),
+    );
+    expect(response.text).toBe("STAVKA_READY");
+    expect(sdk.query.mock.calls[0]?.[0].options.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe("64");
+    expect(sdk.query.mock.calls[0]?.[0].options).not.toHaveProperty("taskBudget");
+  });
+
+  it("rejects a setup transcript before starting the SDK without echoing it", async () => {
+    sdk.query.mockClear();
+    const provider = new ClaudeAgentProvider({
+      credential: {
+        kind: "claude-subscription",
+        oauthToken: "Welcome to setup\nsecret-terminal-output",
+      },
+    });
+    await expect(
+      Effect.runPromise(provider.complete({ model: "claude-fable-5", input: "ready" })),
+    ).rejects.toMatchObject({
+      kind: "auth",
+      message:
+        "Claude subscription credential is malformed. Reconnect with only the setup-token value.",
+    });
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it("treats an SDK success envelope with is_error as a redacted failure", async () => {
+    const token = `sk-ant-oat01-${"x".repeat(24)}`;
+    sdk.query.mockReturnValue(
+      (async function* () {
+        yield {
+          type: "result",
+          subtype: "success",
+          is_error: true,
+          result: `API Error: invalid Authorization Bearer ${token}`,
+        };
+      })(),
+    );
+    const provider = new ClaudeAgentProvider({
+      credential: { kind: "claude-subscription", oauthToken: token },
+    });
+    await expect(
+      Effect.runPromise(provider.complete({ model: "claude-fable-5", input: "ready" })),
+    ).rejects.toMatchObject({
+      kind: "auth",
+      message: "API Error: invalid Authorization Bearer [redacted]",
+    });
+  });
   it("isolates subscription auth from metered provider credentials", () => {
     expect(
       sanitizeClaudeSubscriptionEnvironment(

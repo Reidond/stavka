@@ -282,30 +282,6 @@ export class DurableProviderAccountRepository {
     });
   }
 
-  activeForRuntime(
-    provider: ProviderId,
-  ): Effect.Effect<PersistedProviderAccount | undefined, GatewayRepositoryError> {
-    return Effect.gen({ self: this }, function* () {
-      const rows = yield* repositoryEffect("provider-accounts.runtime-active", () =>
-        this.rows("WHERE a.provider = ? AND active.name IS NOT NULL", provider),
-      );
-      if (rows.length > 1)
-        return yield* Effect.fail(
-          new GatewayRepositoryError({
-            operation: "provider-accounts.runtime-active",
-            message: `Multiple organizations have an active ${provider} account`,
-          }),
-        );
-      const row = rows[0];
-      if (!row) return undefined;
-      return yield* this.read(
-        { organizationId: row.organization_id, userId: row.owner_user_id },
-        provider,
-        row.name,
-      );
-    });
-  }
-
   put(
     scope: AccountScope,
     provider: ProviderId,

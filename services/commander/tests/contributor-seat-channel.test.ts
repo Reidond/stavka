@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
   Agent: class {},
   routeAgentRequest: mocks.agentRoute,
 }));

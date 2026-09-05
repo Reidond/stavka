@@ -85,9 +85,12 @@ export class DurableGatewayConfigRepository implements GatewayConfigRepositorySe
         )
         .toArray()[0];
       if (!row) return undefined;
-      const decoded = Schema.decodeUnknownSync(PersistedConfigSchema)(
-        JSON.parse(row.aliases_json) as unknown,
-      );
+      const decoded = Schema.decodeUnknownSync(PersistedConfigSchema)({
+        aliases: JSON.parse(row.aliases_json) as unknown,
+        killed: row.killed === 1,
+        revision: row.revision,
+        updatedAt: row.updated_at,
+      });
       return {
         aliases: decoded.aliases as GatewayAlias[],
         killed: row.killed === 1,

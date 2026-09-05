@@ -33,14 +33,10 @@ export const ReplayPage = ({ onReturn }: { readonly onReturn: () => void }) => {
 
   return (
     <main className="poligon-shell">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="stavka-page-heading">
         <div>
-          <p className="m-0 text-xs tracking-wider text-kumo-subtle uppercase">
-            Stavka / proving ground / local replay
-          </p>
-          <h1 className="m-0 text-5xl font-semibold tracking-tight text-kumo-strong uppercase">
-            Replay
-          </h1>
+          <h1>Replays</h1>
+          <p>Inspect recorded states, decisions, and outcomes from a session export.</p>
         </div>
         <Button onClick={onReturn}>Return to simulator</Button>
       </header>
@@ -49,9 +45,7 @@ export const ReplayPage = ({ onReturn }: { readonly onReturn: () => void }) => {
         <LayerCard className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">
-                Import commander export
-              </h2>
+              <h2 className="m-0 text-base font-semibold text-kumo-strong">Import a session</h2>
               <p id="replay-file-help" className="mt-1 mb-0 text-sm">
                 Choose a local JSON export. Nothing is uploaded and remote URLs are not accepted.
               </p>

@@ -3,12 +3,14 @@
 node_modules/
 dist/
 /out/
+/output/
 coverage/
-/out/
 .vite/
 .vite-plus/
 .wrangler/
 .playwright-mcp/
+playwright-report/
+test-results/
 .output/
 .tanstack/
 .maskirovka/

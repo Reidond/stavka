@@ -1,5 +1,3 @@
-import type { Vector3 } from "@stavka/protocol";
-
 import { createWorld, issueWaypoint, spawnGroup, spawnVehicle, stepWorldMany } from "./world";
 import type { SimWorldState } from "./types";
 
@@ -11,16 +9,6 @@ export interface ScenarioDefinition {
   readonly setup: (seed: number) => SimWorldState;
 }
 
-const readyGroup = (
-  world: SimWorldState,
-  id: string,
-  faction: string,
-  position: Vector3,
-  strength: number,
-): void => {
-  spawnGroup(world, { id, faction, template: "infantry_squad", position, strength });
-};
-
 export const scenarios: Record<string, ScenarioDefinition> = {
   movement: {
     id: "movement",
@@ -29,7 +17,13 @@ export const scenarios: Record<string, ScenarioDefinition> = {
     description: "A single squad crosses 250 metres under a ForcedMove order.",
     setup: (seed) => {
       const world = createWorld({ seed });
-      readyGroup(world, "blue_1", "BLUFOR", [0, 0, 0], 6);
+      spawnGroup(world, {
+        id: "blue_1",
+        faction: "BLUFOR",
+        template: "infantry_squad",
+        position: [0, 0, 0],
+        strength: 6,
+      });
       issueWaypoint(world, "blue_1", "forced_move", [250, 0, 0]);
       return world;
     },
@@ -41,8 +35,20 @@ export const scenarios: Record<string, ScenarioDefinition> = {
     description: "The Test 11 attritional combat baseline at 150 metres.",
     setup: (seed) => {
       const world = createWorld({ seed });
-      readyGroup(world, "blue_1", "BLUFOR", [0, 0, 0], 6);
-      readyGroup(world, "red_1", "OPFOR", [150, 0, 0], 4);
+      spawnGroup(world, {
+        id: "blue_1",
+        faction: "BLUFOR",
+        template: "infantry_squad",
+        position: [0, 0, 0],
+        strength: 6,
+      });
+      spawnGroup(world, {
+        id: "red_1",
+        faction: "OPFOR",
+        template: "infantry_squad",
+        position: [150, 0, 0],
+        strength: 4,
+      });
       issueWaypoint(world, "blue_1", "attack", [150, 0, 0]);
       issueWaypoint(world, "red_1", "attack", [0, 0, 0]);
       return world;
@@ -55,7 +61,13 @@ export const scenarios: Record<string, ScenarioDefinition> = {
     description: "A squad, UAZ469, and a 500 metre destination.",
     setup: (seed) => {
       const world = createWorld({ seed });
-      readyGroup(world, "red_1", "OPFOR", [0, 0, 0], 5);
+      spawnGroup(world, {
+        id: "red_1",
+        faction: "OPFOR",
+        template: "infantry_squad",
+        position: [0, 0, 0],
+        strength: 5,
+      });
       spawnVehicle(world, {
         id: "uaz_1",
         template: "UAZ469",

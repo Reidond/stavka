@@ -12,6 +12,8 @@ import { FileDevVarsRepository } from "../src/repositories/dev-vars-repository";
 import { DoctorService } from "../src/services/doctor-service";
 
 vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
   Agent: class {},
   routeAgentRequest: vi.fn(async () => null),
 }));

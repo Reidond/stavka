@@ -132,8 +132,6 @@ export const useOfflineSimHost = (identity: ScenarioIdentity): OfflineSimHost =>
     const base = stateRef.current;
     // Match one resume quantum (10 × timeScale fixed steps) and yield between
     // chunks so ×100 Step clicks cannot monopolize the browser event loop.
-    // Playwright locator actionability can still time out under WebGL load; DOM
-    // clicks and cooperative yielding keep the simulation itself responsive.
     void stepOfflineSimStateCooperatively(base, 10 * base.timeScale).then((next) => {
       setState((current) => (current === base ? { ...next, paused: true } : current));
     });

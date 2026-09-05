@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Effect, Semaphore } from "effect";
 
 vi.mock("cloudflare:workers", () => ({
   DurableObject: class {},
@@ -7,7 +8,7 @@ vi.mock("@cloudflare/containers", () => ({
   Container: class {},
 }));
 
-import { limitStreamBytes } from "../src/gateway-container";
+import { MaskirovkaGateway, limitStreamBytes } from "../src/gateway-container";
 import { isHtmlNavigation } from "../src/router";
 
 const streamOf = (chunks: readonly string[]): ReadableStream<Uint8Array> =>
@@ -26,6 +27,61 @@ const collect = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
   for await (const chunk of stream) text += decoder.decode(chunk);
   return text;
 };
+
+it("forwards without caller routing metadata and records only container response metadata", async () => {
+  const append = vi.fn((_metadata: unknown) => Effect.void);
+  const containerFetch = vi.fn(
+    async (_request: Request) =>
+      new Response("ok", {
+        headers: {
+          "x-maskirovka-model": "resolved-model",
+          "x-maskirovka-provider": "codex",
+          "x-maskirovka-input-tokens": "12",
+          "x-maskirovka-auth-checkpoint": "private-checkpoint",
+        },
+      }),
+  );
+  // Substitute infrastructure at the Container boundary; execute the real forwarding method.
+  const gateway: MaskirovkaGateway = Object.assign(Object.create(MaskirovkaGateway.prototype), {
+    env: {},
+    readConfig: () => Effect.succeed({ killed: false }),
+    activeProviderAccounts: () => Effect.succeed([{}]),
+    ensureContainerReady: () => Effect.void,
+    startLock: Semaphore.makeUnsafe(1),
+    containerFetch,
+    requests: { append },
+    window: { read: Effect.succeed(undefined), save: () => Effect.void },
+  });
+  const response = await gateway.fetchForAccount(
+    { organizationId: "org", userId: "user" },
+    new Request("https://gateway.test/v1/responses", {
+      headers: {
+        authorization: "Bearer caller-value",
+        "cf-access-jwt-assertion": "caller-assertion",
+        "x-maskirovka-model": "forged-model",
+        "x-maskirovka-input-tokens": "99999",
+        "x-maskirovka-seat": "forged-seat",
+        "content-type": "application/json",
+      },
+    }),
+  );
+  expect(await response.text()).toBe("ok");
+  expect(response.headers.has("x-maskirovka-auth-checkpoint")).toBe(false);
+  const forwarded = containerFetch.mock.calls[0]![0];
+  for (const name of [
+    "authorization",
+    "cf-access-jwt-assertion",
+    "x-maskirovka-model",
+    "x-maskirovka-input-tokens",
+    "x-maskirovka-seat",
+  ])
+    expect(forwarded.headers.has(name), name).toBe(false);
+  expect(forwarded.headers.get("x-maskirovka-request-id")).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(append).toHaveBeenCalledWith(
+    expect.objectContaining({ model: "resolved-model", provider: "codex", inputTokens: 12 }),
+  );
+  expect(append.mock.calls[0]?.[0]).not.toHaveProperty("seat");
+});
 
 describe("streamed byte limits", () => {
   it("passes responses below the byte limit through intact", async () => {
@@ -74,36 +130,5 @@ describe("html navigation detection for SPA fallback", () => {
         "sessions",
       ),
     ).toBe(true);
-  });
-});
-
-describe("trusted routing metadata sources", () => {
-  it("strips caller-supplied x-maskirovka-* headers before the container sees them", async () => {
-    const source = await import("node:fs").then((fs) =>
-      fs.readFileSync(new URL("../src/gateway-container.ts", import.meta.url), "utf8"),
-    );
-    expect(source).toContain('name.toLowerCase().startsWith("x-maskirovka-")');
-    // Metadata must be read from the container response, not the request.
-    expect(source).toContain("new Headers(response.headers)");
-    expect(source).not.toMatch(/headers\.get\("x-maskirovka-(provider|seat|model|queue-depth)"\)/u);
-  });
-
-  it("emits provider, resolved model, usage, and cost metadata from the gateway", async () => {
-    const source = await import("node:fs").then((fs) =>
-      fs.readFileSync(new URL("../../../tools/maskirovka/src/router.ts", import.meta.url), "utf8"),
-    );
-    for (const header of [
-      '"x-maskirovka-tier"',
-      '"x-maskirovka-seat"',
-      '"x-maskirovka-provider"',
-      '"x-maskirovka-model"',
-      '"x-maskirovka-input-tokens"',
-      '"x-maskirovka-output-tokens"',
-      '"x-maskirovka-cost-actual-usd"',
-      '"x-maskirovka-cost-list-usd"',
-      '"x-maskirovka-cost-plan-credit-usd"',
-    ]) {
-      expect(source).toContain(header);
-    }
   });
 });

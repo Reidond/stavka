@@ -1,5 +1,9 @@
+vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
+}));
 import { Effect } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   chargeSeat,

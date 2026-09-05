@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { createScenario } from "@stavka/sim-core";
+import * as THREE from "three";
 
 const controlsRuntime = vi.hoisted(() => ({
   camera: {},
@@ -8,6 +9,8 @@ const controlsRuntime = vi.hoisted(() => ({
   instances: [] as unknown[],
   invalidate: vi.fn(),
 }));
+
+vi.mock("@react-three/drei/web/Html", () => ({ Html: () => null }));
 
 vi.mock("three/examples/jsm/controls/OrbitControls.js", () => ({
   OrbitControls: class {
@@ -62,10 +65,11 @@ vi.mock("@react-three/fiber", () => ({
     camera: controlsRuntime.camera,
     gl: { domElement: controlsRuntime.domElement },
     invalidate: controlsRuntime.invalidate,
+    size: { width: 1000, height: 600 },
   }),
 }));
 
-const { Battlefield, attachEventDrivenOrbitControls } =
+const { Battlefield, attachEventDrivenOrbitControls, fitBattlefieldCamera, battlefieldFocus } =
   await import("../src/components/battlefield");
 
 interface MockOrbitControls {
@@ -82,6 +86,45 @@ interface MockOrbitControls {
 }
 
 describe("Poligon battlefield rendering", () => {
+  it("centers unit positions within the focused view", () => {
+    const world = createScenario("engagement", 12);
+    const camera = new THREE.PerspectiveCamera(48);
+    fitBattlefieldCamera(
+      camera,
+      { width: 800, height: 460 },
+      world.terrain,
+      battlefieldFocus(world),
+    );
+    for (const group of Object.values(world.groups)) {
+      const point = new THREE.Vector3(
+        group.position[0] - ((world.terrain.width - 1) * world.terrain.cellSizeMeters) / 2,
+        12,
+        group.position[2] - ((world.terrain.height - 1) * world.terrain.cellSizeMeters) / 2,
+      ).project(camera);
+      expect(Math.abs(point.x)).toBeLessThan(0.7);
+      expect(Math.abs(point.y)).toBeLessThan(0.7);
+    }
+  });
+  it("keeps terrain corners in the frustum after desktop and mobile resize", () => {
+    const terrain = createScenario("engagement", 12).terrain;
+    const x = ((terrain.width - 1) * terrain.cellSizeMeters) / 2;
+    const z = ((terrain.height - 1) * terrain.cellSizeMeters) / 2;
+    for (const camera of [new THREE.PerspectiveCamera(48), new THREE.OrthographicCamera()]) {
+      for (const size of [
+        { width: 1000, height: 400 },
+        { width: 340, height: 360 },
+      ]) {
+        fitBattlefieldCamera(camera, size, terrain);
+        for (const px of [-x, x])
+          for (const pz of [-z, z]) {
+            const projected = new THREE.Vector3(px, 0, pz).project(camera);
+            expect(Math.abs(projected.x)).toBeLessThan(1);
+            expect(Math.abs(projected.y)).toBeLessThan(1);
+            expect(Math.abs(projected.z)).toBeLessThan(1);
+          }
+      }
+    }
+  });
   it("renders on demand instead of running a permanent animation loop", () => {
     const markup = renderToStaticMarkup(
       <Battlefield world={createScenario("engagement", 12)} faction="OPFOR" camera="ortho" />,

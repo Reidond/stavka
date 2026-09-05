@@ -1,0 +1,50 @@
+[
+  {
+    "workload": "movement",
+    "beforeMs": 2.62,
+    "afterMs": 2.56,
+    "speedup": 1.02,
+    "identicalStates": true,
+    "digest": "9ffbaa2a322e4e56b7080fdd356d16c32f9b5c92295ef1fe6608dec566c78b28"
+  },
+  {
+    "workload": "engagement",
+    "beforeMs": 6.4,
+    "afterMs": 4.71,
+    "speedup": 1.36,
+    "identicalStates": true,
+    "digest": "60967a5fbd5a2b4c920a629a23ff47c2f555f5792c99dc14773a9d48cc19ae84"
+  },
+  {
+    "workload": "mechanized",
+    "beforeMs": 1.94,
+    "afterMs": 1.87,
+    "speedup": 1.04,
+    "identicalStates": true,
+    "digest": "7df2028fb8e31e35abef6668fb79f355286cbf9fbe6a9476e1af2924c9988759"
+  },
+  {
+    "workload": "groups-30",
+    "beforeMs": 342.41,
+    "afterMs": 147.45,
+    "speedup": 2.32,
+    "identicalStates": true,
+    "digest": "4d25592cbba8bd718d6d9e325aff23232f8c6cdcf521ce9b8b7844d29f3d90ea"
+  },
+  {
+    "workload": "groups-40",
+    "beforeMs": 548.28,
+    "afterMs": 226.88,
+    "speedup": 2.42,
+    "identicalStates": true,
+    "digest": "884d4a199eabb0eb6b6e1146902445307f5d3de67907009ee2123637ebcbf78a"
+  },
+  {
+    "workload": "groups-50",
+    "beforeMs": 720.14,
+    "afterMs": 282.77,
+    "speedup": 2.55,
+    "identicalStates": true,
+    "digest": "185a88d65500af2f4b9c1582766e7e8705dd5e6a737d86461262a5dd741759c1"
+  }
+]

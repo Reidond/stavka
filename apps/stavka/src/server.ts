@@ -55,8 +55,32 @@ const healthEndpoint = HttpApiEndpoint.get("health", "/healthz", {
   success: HealthResponse,
 });
 
+const responsesEndpoint = HttpApiEndpoint.post("responses", "/v1/responses", {
+  success: Schema.Unknown,
+});
+
+const messagesEndpoint = HttpApiEndpoint.post("messages", "/v1/messages", {
+  success: Schema.Unknown,
+});
+
 const healthGroup = HttpApiGroup.make("health").add(healthEndpoint);
-const poligonApi = HttpApi.make("poligon").add(healthGroup);
+const inferenceGroup = HttpApiGroup.make("inference").add(responsesEndpoint, messagesEndpoint);
+const operationsGroup = HttpApiGroup.make("operations").add(
+  HttpApiEndpoint.get("inferenceStatus", "/admin/status", { success: Schema.Unknown }),
+  HttpApiEndpoint.get("commanderHealth", "/api/system/commander", { success: Schema.Unknown }),
+  HttpApiEndpoint.get("sessionExport", "/api/commander/export", {
+    query: {
+      session_id: Schema.String,
+      faction: Schema.String,
+      epoch: Schema.optional(Schema.NumberFromString),
+    },
+    success: Schema.Unknown,
+  }),
+);
+const poligonApi = HttpApi.make("poligon")
+  .add(healthGroup)
+  .add(inferenceGroup)
+  .add(operationsGroup);
 
 const HealthHandlersLive = HttpApiBuilder.group(poligonApi, "health", (handlers) =>
   handlers.handle("health", () =>
@@ -68,8 +92,6 @@ const HealthHandlersLive = HttpApiBuilder.group(poligonApi, "health", (handlers)
     }),
   ),
 );
-
-const HttpApiLive = HttpApiBuilder.layer(poligonApi).pipe(Layer.provide(HealthHandlersLive));
 
 const accessRequired = HttpServerResponse.schemaJson(AccessRequiredResponse)(
   {
@@ -144,7 +166,51 @@ const inferenceAdmin = (request: HttpServerRequest.HttpServerRequest) =>
         onSuccess: HttpServerResponse.fromWeb,
       }),
     );
-  });
+  }).pipe(Effect.catch(() => Effect.succeed(inferenceUnavailable)));
+
+const InferenceHandlersLive = HttpApiBuilder.group(poligonApi, "inference", (handlers) =>
+  handlers
+    .handleRaw("responses", ({ request }) => inferenceAdmin(request))
+    .handleRaw("messages", ({ request }) => inferenceAdmin(request)),
+);
+
+const commanderUnavailable = HttpServerResponse.jsonUnsafe(
+  { error: { code: "COMMANDER_UNAVAILABLE", message: "Commander service is unavailable" } },
+  { status: 503, headers: { "cache-control": "no-store" } },
+);
+
+const commanderRead = (
+  request: HttpServerRequest.HttpServerRequest,
+  path: "/healthz" | "/admin/export",
+) =>
+  withAccess(request, (webRequest, env) => {
+    const service = env.COMMANDER_SERVICE;
+    if (!service) return Effect.succeed(commanderUnavailable);
+    const url = new URL(webRequest.url);
+    url.pathname = path;
+    return Effect.tryPromise({
+      try: (signal) => service.fetch(new Request(url, { headers: webRequest.headers, signal })),
+      catch: () => undefined,
+    }).pipe(
+      Effect.match({
+        onFailure: () => commanderUnavailable,
+        onSuccess: HttpServerResponse.fromWeb,
+      }),
+    );
+  }).pipe(Effect.catch(() => Effect.succeed(commanderUnavailable)));
+
+const OperationsHandlersLive = HttpApiBuilder.group(poligonApi, "operations", (handlers) =>
+  handlers
+    .handleRaw("inferenceStatus", ({ request }) => inferenceAdmin(request))
+    .handleRaw("commanderHealth", ({ request }) => commanderRead(request, "/healthz"))
+    .handleRaw("sessionExport", ({ request }) => commanderRead(request, "/admin/export")),
+);
+
+const HttpApiLive = HttpApiBuilder.layer(poligonApi).pipe(
+  Layer.provide(HealthHandlersLive),
+  Layer.provide(InferenceHandlersLive),
+  Layer.provide(OperationsHandlersLive),
+);
 
 const ProviderAccountsRootRoute = HttpRouter.route(
   "GET",

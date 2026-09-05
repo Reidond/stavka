@@ -112,7 +112,7 @@ export const CommanderCostDashboard = ({
       </p>
       <section aria-label="Commander session cost dashboard" className="space-y-3 p-3">
         <header className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="m-0 text-2xl font-semibold text-kumo-strong uppercase">Session cost</h2>
+          <h2 className="m-0 text-sm font-semibold text-kumo-strong">Session cost</h2>
           <div className="flex flex-wrap gap-1.5">
             <Badge variant="secondary">{formatInteger(totals.calls)} calls</Badge>
             <Badge variant="secondary">{formatInteger(totals.tokens)} tokens</Badge>

@@ -1,3 +1,7 @@
+vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
+}));
 import {
   ConnectRequest as ConnectRequestSchema,
   PROTOCOL_VERSION,
@@ -7,7 +11,7 @@ import {
   type TickResponse,
 } from "@stavka/protocol";
 import { Effect, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createWorld,

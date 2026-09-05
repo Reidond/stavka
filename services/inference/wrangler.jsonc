@@ -35,8 +35,9 @@
     "MODEL_ALIASES": "{\"stavka/commander\":{\"seat\":\"claude\",\"model\":\"claude-fable-5\"},\"stavka/sergeant\":{\"seat\":\"codex\",\"model\":\"gpt-5.6-luna\"},\"stavka/heavy\":{\"seat\":\"codex\",\"model\":\"gpt-5.6-terra\"}}",
     "CONTAINER_SLEEP_AFTER": "15m",
     "MASKIROVKA_MODE": "live",
-    "MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD": "0",
-    "MASKIROVKA_CODEX_WINDOW_CALL_LIMIT": "0",
+    // Small explicit subscription allowances for owner-initiated verification.
+    "MASKIROVKA_CLAUDE_MONTHLY_CREDIT_USD": "1",
+    "MASKIROVKA_CODEX_WINDOW_CALL_LIMIT": "20",
     "MASKIROVKA_CODEX_WINDOW_TOKEN_LIMIT": "0",
     "MASKIROVKA_CODEX_WINDOW_HOURS": "5",
     "MASKIROVKA_MAX_RESPONSE_BYTES": "10485760",

@@ -271,8 +271,16 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     );
   }
 
-  override async fetch(request: Request): Promise<Response> {
-    return Effect.runPromise(this.forwardEffect(request), { signal: request.signal });
+  async fetchForAccount(scope: AccountScope, request: Request): Promise<Response> {
+    return Effect.runPromise(this.forwardEffect(scope, request), { signal: request.signal });
+  }
+
+  override async fetch(_request: Request): Promise<Response> {
+    return errorResponse(
+      "USER_AUTHORIZATION_REQUIRED",
+      "Provider execution requires an authorized Stavka user",
+      403,
+    );
   }
 
   override onStart(): void {
@@ -334,11 +342,13 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     });
   }
 
-  private activeProviderAccounts(): Effect.Effect<readonly PersistedProviderAccount[], unknown> {
+  private activeProviderAccounts(
+    scope: AccountScope,
+  ): Effect.Effect<readonly PersistedProviderAccount[], unknown> {
     return Effect.gen({ self: this }, function* () {
       const accounts: PersistedProviderAccount[] = [];
       for (const provider of gatewayProviders) {
-        let account = yield* this.providerAccounts.activeForRuntime(provider);
+        let account = yield* this.providerAccounts.active(scope, provider);
         if (!account) continue;
         if (
           provider === "codex" &&
@@ -348,10 +358,6 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
           const refreshed = yield* refreshCodexCredential(account.credential).pipe(
             Effect.mapError((error) => new Error(error.message)),
           );
-          const scope = {
-            organizationId: account.organizationId,
-            userId: account.ownerUserId,
-          };
           yield* this.providerAccounts.put(scope, provider, account.name, {
             label: account.label,
             authKind: account.authKind,
@@ -360,7 +366,7 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
             ...(account.remoteWorkspaceId ? { remoteWorkspaceId: account.remoteWorkspaceId } : {}),
             activate: true,
           });
-          account = yield* this.providerAccounts.activeForRuntime(provider);
+          account = yield* this.providerAccounts.active(scope, provider);
         }
         if (account) accounts.push(account);
       }
@@ -370,11 +376,10 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
   private statusEffect(scope?: AccountScope): Effect.Effect<GatewayStatus, unknown> {
     return Effect.gen({ self: this }, function* () {
-      const [config, accounts, activeAccounts, runtime, snapshot, count, state] = yield* Effect.all(
+      const [config, accounts, runtime, snapshot, count, state] = yield* Effect.all(
         [
           this.readConfig(),
           scope ? this.providerAccounts.list(scope) : Effect.succeed([]),
-          this.activeProviderAccounts(),
           this.config.runtime,
           this.window.read,
           this.requests.count,
@@ -387,14 +392,17 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
       );
       const authMetadata = Object.fromEntries(
         gatewayProviders.map((provider) => {
-          const persisted = activeAccounts.find((entry) => entry.provider === provider);
+          const persisted = accounts.find((entry) => entry.provider === provider && entry.active);
           return [provider, persisted ? metadataFromAccount(persisted) : emptyMetadata(provider)];
         }),
       ) as Record<GatewayProvider, GatewayAuthMetadata>;
       const configured = gatewayProviders.some((provider) => authMetadata[provider].configured);
       const currentWindow = snapshot ?? initialGatewayWindowSnapshot();
       return {
-        ok: configured && !config.killed,
+        // Machine health has no account scope and must never decrypt or expose
+        // user credentials. It reports gateway liveness; scoped admin status
+        // additionally reports whether that user's providers are configured.
+        ok: !config.killed && (scope === undefined || configured),
         service: "stavka-maskirovka-gateway" as const,
         mode: readGatewayConfig(this.env).mode,
         killed: config.killed,
@@ -417,20 +425,23 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
     });
   }
 
-  private forwardEffect(request: Request): Effect.Effect<Response, never> {
+  private forwardEffect(scope: AccountScope, request: Request): Effect.Effect<Response, never> {
     return Effect.gen({ self: this }, function* () {
       const config = yield* this.readConfig().pipe(Effect.catch(() => Effect.succeed(undefined)));
       if (config?.killed) return errorResponse("GATEWAY_KILLED", "Gateway traffic is disabled");
-      const accounts = yield* this.activeProviderAccounts().pipe(
+      const accounts = yield* this.activeProviderAccounts(scope).pipe(
         Effect.catch(() => Effect.succeed([])),
       );
       if (accounts.length === 0)
-        return errorResponse("GATEWAY_AUTH_MISSING", "No subscription credential is configured");
-      yield* this.ensureContainerReady(accounts);
+        return errorResponse(
+          "GATEWAY_AUTH_MISSING",
+          "No subscription credential is configured for this user",
+        );
       const headers = new Headers(request.headers);
       // Routing metadata is decided by the inference service, never by the
       // caller: strip every inbound x-maskirovka-* header before forwarding.
-      for (const name of headers.keys()) {
+      const inboundHeaderNames = [...headers.keys()];
+      for (const name of inboundHeaderNames) {
         if (name.toLowerCase().startsWith("x-maskirovka-")) headers.delete(name);
       }
       const requestId = crypto.randomUUID();
@@ -439,20 +450,27 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
       headers.delete("cf-access-jwt-assertion");
       const started = Date.now();
       const internal = new Request(request, { headers });
-      const response = yield* Effect.tryPromise({
-        try: () => this.containerFetch(internal),
-        catch: (cause) => cause,
-      }).pipe(
-        Effect.catch((cause) =>
-          Effect.succeed(
-            errorResponse(
-              "GATEWAY_DISCONNECTED",
-              cause instanceof Error ? cause.message : "Gateway container disconnected",
-              503,
+      const response = yield* this.startLock
+        .withPermit(
+          Effect.gen({ self: this }, function* () {
+            yield* this.ensureContainerReady(accounts);
+            return yield* Effect.tryPromise({
+              try: () => this.containerFetch(internal),
+              catch: (cause) => cause,
+            });
+          }),
+        )
+        .pipe(
+          Effect.catch((cause) =>
+            Effect.succeed(
+              errorResponse(
+                "GATEWAY_DISCONNECTED",
+                cause instanceof Error ? cause.message : "Gateway container disconnected",
+                503,
+              ),
             ),
           ),
-        ),
-      );
+        );
       // Persist only metadata returned by the inference service itself.
       const trusted = new Headers(response.headers);
       const seatHeader = trusted.get("x-maskirovka-seat") ?? undefined;
@@ -517,38 +535,26 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         statusText: response.statusText,
         headers: outputHeaders,
       });
-    }).pipe(
-      Effect.catch((cause) =>
-        Effect.succeed(
-          errorResponse(
-            "GATEWAY_UNAVAILABLE",
-            cause instanceof Error ? cause.message : "Gateway request failed",
-            503,
-          ),
-        ),
-      ),
-    );
+    });
   }
 
   private ensureContainerReady(
     accounts: readonly PersistedProviderAccount[],
   ): Effect.Effect<void, unknown> {
-    return this.startLock.withPermit(
-      Effect.gen({ self: this }, function* () {
-        const fingerprint = yield* this.combinedFingerprint(accounts);
-        const [state, runtime] = yield* Effect.all(
-          [
-            Effect.tryPromise({ try: () => this.getState(), catch: (cause) => cause }),
-            this.config.runtime,
-          ] as const,
-          { concurrency: "unbounded" },
-        );
-        if (isRunning(state.status) && runtime.fingerprint === fingerprint) return;
-        if (isRunning(state.status))
-          yield* Effect.tryPromise({ try: () => this.stop("SIGTERM"), catch: (cause) => cause });
-        yield* this.startContainer(accounts, fingerprint);
-      }),
-    );
+    return Effect.gen({ self: this }, function* () {
+      const fingerprint = yield* this.combinedFingerprint(accounts);
+      const [state, runtime] = yield* Effect.all(
+        [
+          Effect.tryPromise({ try: () => this.getState(), catch: (cause) => cause }),
+          this.config.runtime,
+        ] as const,
+        { concurrency: "unbounded" },
+      );
+      if (isRunning(state.status) && runtime.fingerprint === fingerprint) return;
+      if (isRunning(state.status))
+        yield* Effect.tryPromise({ try: () => this.stop("SIGTERM"), catch: (cause) => cause });
+      yield* this.startContainer(accounts, fingerprint);
+    });
   }
 
   private startContainer(
@@ -634,7 +640,10 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
 
   private combinedFingerprintSync(accounts: readonly PersistedProviderAccount[]): string {
     return accounts
-      .map((entry) => `${entry.provider}:${entry.name}:${entry.revision}`)
+      .map(
+        (entry) =>
+          `${entry.organizationId}:${entry.ownerUserId}:${entry.provider}:${entry.name}:${entry.revision}`,
+      )
       .sort()
       .join("|");
   }
@@ -699,7 +708,7 @@ export const limitStreamBytes = (
 const withDefined = <T, R>(value: T | undefined, project: (defined: T) => R): Partial<R> =>
   value === undefined ? {} : project(value);
 
-const metadataFromAccount = (persisted: PersistedProviderAccount): GatewayAuthMetadata => ({
+const metadataFromAccount = (persisted: OwnedProviderAccountPublic): GatewayAuthMetadata => ({
   provider: persisted.provider,
   configured: true,
   persisted: true,

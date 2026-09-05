@@ -1,0 +1,673 @@
+/*
+ * Simulations workspace.
+ *
+ * Battlefield-first layout: two compact bars on top, the map filling the rest,
+ * and one inspector panel that docks to the side (wide), the bottom (laptop),
+ * or becomes a focused view on phones. Every rule lives in the Tailwind
+ * `components` layer so utilities can still win on the same element, and the
+ * legacy `.poligon-*` / `.stavka-panel` hooks that the browser QA relies on are
+ * neutralised here with higher specificity instead of being depended on.
+ */
+@layer components {
+  .simulation-workspace {
+    --simulation-panel-width: 360px;
+    --simulation-panel-height: clamp(200px, 36vh, 380px);
+    --simulation-gutter: 16px;
+    --simulation-map-surface: #101d2c;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+    background: var(--color-kumo-base);
+    color: var(--text-color-kumo-default);
+    container-type: inline-size;
+    container-name: simulation;
+  }
+  .simulation-workspace.poligon-shell {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* ---------------------------------------------------------------- bars */
+  .simulation-topbar {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px var(--simulation-gutter);
+    padding: 10px var(--simulation-gutter);
+    border-bottom: 1px solid var(--color-kumo-hairline);
+  }
+  .simulation-identity {
+    min-width: 0;
+    flex: 1 1 260px;
+  }
+  .simulation-identity h1 {
+    margin: 0;
+    color: var(--text-color-kumo-strong);
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.2px;
+  }
+  .simulation-identity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 7px;
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-identity-meta [aria-hidden="true"] {
+    opacity: 0.45;
+  }
+  .simulation-topbar-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .simulation-notices {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px var(--simulation-gutter) 0;
+  }
+  .simulation-runbar {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px var(--simulation-gutter);
+    border-bottom: 1px solid var(--color-kumo-hairline);
+    background: var(--color-kumo-canvas);
+  }
+  .simulation-runstate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-runstate strong {
+    color: var(--text-color-kumo-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .simulation-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-color-kumo-default);
+  }
+  .simulation-runcontrols {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .simulation-runbar-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .simulation-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--color-kumo-recessed);
+  }
+  .simulation-modebar {
+    display: none;
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+  }
+
+  /* ---------------------------------------------------------------- body */
+  .simulation-workspace .simulation-body {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) var(--simulation-panel-width);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .simulation-workspace .simulation-body > section,
+  .simulation-workspace .simulation-body > aside {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: auto;
+    scrollbar-gutter: auto;
+  }
+  .simulation-workspace[data-panel="collapsed"] .simulation-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .simulation-workspace[data-panel="collapsed"] .simulation-panel {
+    display: none;
+  }
+
+  /* --------------------------------------------------------------- stage */
+  .simulation-workspace .simulation-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--simulation-map-surface);
+  }
+  .simulation-workspace .simulation-map-frame {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background: var(--simulation-map-surface);
+  }
+  .simulation-map-view {
+    position: absolute;
+    inset: 0;
+  }
+  .simulation-map-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .simulation-map-viewport[data-dragging="true"] {
+    cursor: grabbing;
+  }
+  .simulation-map-viewport:focus-visible {
+    outline-offset: -3px;
+  }
+  .simulation-map-overlay {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-kumo-base) 94%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-kumo-contrast) 14%, transparent),
+      0 2px 6px color-mix(in srgb, var(--color-kumo-contrast) 22%, transparent);
+  }
+  .simulation-map-overlay-start {
+    top: 12px;
+    left: 12px;
+  }
+  .simulation-map-overlay-end {
+    top: 12px;
+    right: 12px;
+  }
+  .simulation-map-loading {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    color: var(--text-color-kumo-inverse);
+    font-size: 13px;
+    opacity: 0.8;
+  }
+  .simulation-workspace .simulation-map-callout {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(300px, calc(100% - 24px));
+    padding: 10px 12px;
+    border: 1px solid var(--color-kumo-line);
+    border-radius: 10px;
+    background: var(--color-kumo-base);
+    color: var(--text-color-kumo-default);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-kumo-contrast) 28%, transparent);
+  }
+  .simulation-workspace .simulation-map-callout strong {
+    color: var(--text-color-kumo-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .simulation-callout-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .simulation-callout-head > :last-child {
+    margin-left: auto;
+  }
+  .simulation-callout-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-callout-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* --------------------------------------------------------------- panel */
+  .simulation-workspace .simulation-panel {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-kumo-hairline);
+    background: var(--color-kumo-base);
+  }
+  .simulation-panel-head {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+  }
+  .simulation-panel-head > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .simulation-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-color-kumo-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .simulation-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .simulation-panel-body:focus-visible {
+    outline-offset: -3px;
+  }
+  .simulation-panel-foot {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--color-kumo-hairline);
+  }
+  .simulation-count {
+    margin-left: 5px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--color-kumo-fill);
+    color: var(--text-color-kumo-badge-neutral-subtle);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-panel-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+    font-size: 12px;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-panel-summary strong {
+    margin-right: 4px;
+    color: var(--text-color-kumo-strong);
+    font-weight: 600;
+  }
+  .simulation-panel-section {
+    padding: 12px;
+  }
+  .simulation-section-label {
+    margin: 0;
+    padding: 10px 12px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--text-color-kumo-subtle);
+  }
+
+  /* ----------------------------------------------------------------- lists */
+  .simulation-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .simulation-list > li {
+    border-bottom: 1px solid var(--color-kumo-hairline);
+  }
+  .simulation-unit-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .simulation-unit-row:hover {
+    background: var(--color-kumo-tint);
+  }
+  .simulation-unit-row:focus-visible {
+    outline-offset: -3px;
+  }
+  .simulation-unit-row[aria-pressed="true"] {
+    background: var(--color-kumo-tint);
+    box-shadow: inset 3px 0 0 var(--text-color-kumo-strong);
+  }
+  .simulation-unit-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--text-color-kumo-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .simulation-unit-status {
+    font-size: 12px;
+    color: var(--text-color-kumo-default);
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+  .simulation-unit-status[data-status="engaged"] {
+    color: var(--text-color-kumo-danger);
+    font-weight: 600;
+  }
+  .simulation-unit-sub {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    gap: 2px 8px;
+    font-size: 12px;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-unit-detail {
+    padding: 0 12px 12px;
+  }
+  .simulation-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 12px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .simulation-facts dt {
+    color: var(--text-color-kumo-subtle);
+  }
+  .simulation-facts dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--text-color-kumo-default);
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-objective-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+  .simulation-objective-row strong {
+    color: var(--text-color-kumo-strong);
+    font-weight: 600;
+  }
+  .simulation-objective-row span {
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-entry {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .simulation-entry-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    font-size: 11px;
+    color: var(--text-color-kumo-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+  .simulation-entry p {
+    margin: 4px 0 0;
+    color: var(--text-color-kumo-default);
+    overflow-wrap: anywhere;
+  }
+  .simulation-entry[data-level="warning"] .simulation-entry-level {
+    color: var(--text-color-kumo-warning);
+    font-weight: 600;
+  }
+  .simulation-entry[data-level="error"] .simulation-entry-level {
+    color: var(--text-color-kumo-danger);
+    font-weight: 600;
+  }
+  .simulation-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-color-kumo-subtle);
+  }
+  .simulation-empty strong {
+    color: var(--text-color-kumo-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .simulation-empty p {
+    max-width: 320px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  /* ------------------------------------------------------------ commander */
+  .simulation-commander-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 12px;
+    border-top: 1px solid var(--color-kumo-hairline);
+  }
+  .simulation-commander-row:first-child {
+    border-top: 0;
+  }
+  .simulation-commander-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .simulation-commander-status > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .simulation-commander-status strong {
+    color: var(--text-color-kumo-strong);
+    font-weight: 600;
+  }
+  .simulation-commander-note {
+    color: var(--text-color-kumo-subtle);
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------------------------------------------------------------- setup */
+  .simulation-setup {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 12px;
+  }
+  .simulation-setup fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .simulation-setup input,
+  .simulation-setup select {
+    width: 100%;
+    min-width: 0;
+  }
+  .simulation-setup-note {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-color-kumo-subtle);
+  }
+  .simulation-setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-kumo-hairline);
+  }
+
+  /* -------------------------------------------------------- connecting */
+  .simulation-connecting {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-color-kumo-subtle);
+  }
+  .simulation-connecting strong {
+    color: var(--text-color-kumo-strong);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .simulation-connecting p {
+    max-width: 360px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  /* ----------------------------------------------------------- responsive */
+  @container simulation (min-width: 1300px) {
+    .simulation-workspace {
+      --simulation-panel-width: 400px;
+    }
+  }
+
+  /* Laptop and narrow desktop: the inspector docks below the battlefield. */
+  @container simulation (max-width: 999px) {
+    .simulation-workspace .simulation-body {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+    .simulation-workspace .simulation-panel {
+      height: var(--simulation-panel-height);
+      border-top: 1px solid var(--color-kumo-hairline);
+      border-left: 0;
+    }
+    .simulation-workspace[data-panel="collapsed"] .simulation-body {
+      grid-template-rows: minmax(0, 1fr);
+    }
+  }
+
+  /* Phones: one focused view at a time, run controls within thumb reach. */
+  @container simulation (max-width: 639px) {
+    .simulation-workspace {
+      --simulation-gutter: 12px;
+    }
+    .simulation-desktop-only {
+      display: none;
+    }
+    .simulation-modebar {
+      display: block;
+    }
+    .simulation-runbar {
+      order: 10;
+      border-top: 1px solid var(--color-kumo-hairline);
+      border-bottom: 0;
+    }
+    .simulation-runbar-end {
+      display: none;
+    }
+    .simulation-workspace .simulation-body {
+      display: flex;
+      flex-direction: column;
+    }
+    .simulation-workspace .simulation-panel {
+      height: auto;
+      border: 0;
+    }
+    .simulation-workspace[data-view="map"] .simulation-panel {
+      display: none;
+    }
+    .simulation-workspace[data-view="panel"] .simulation-panel {
+      display: flex;
+    }
+    .simulation-workspace[data-view="panel"] .simulation-stage {
+      display: none;
+    }
+    .simulation-map-overlay-start {
+      top: 8px;
+      left: 8px;
+    }
+    .simulation-map-overlay-end {
+      top: 8px;
+      right: 8px;
+    }
+    .simulation-workspace .simulation-map-callout {
+      right: 8px;
+      bottom: 8px;
+      left: 8px;
+      width: auto;
+    }
+  }
+}

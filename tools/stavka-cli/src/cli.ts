@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { LocalProfileStore, loginCodexWithBrowser } from "@stavka/provider-auth/node";
 import {
   CODEX_DEVICE_VERIFICATION_URL,
+  ClaudeOAuthTokenSchema,
   ProviderAccountNameSchema,
   ProviderAuthError,
   pollCodexDeviceAuthorization,
@@ -174,6 +175,11 @@ const claudeLogin = (args: readonly string[]): Effect.Effect<void, Error | Provi
       return yield* Effect.fail(new Error("Use --token-stdin or --api-key-stdin"));
     }
     const value = yield* readSecretFromStdin();
+    if (args.includes("--token-stdin") && !Schema.is(ClaudeOAuthTokenSchema)(value)) {
+      return yield* Effect.fail(
+        new Error("Expected only the Claude setup-token value, not terminal output."),
+      );
+    }
     const credential = args.includes("--api-key-stdin")
       ? ({ kind: "api-key", apiKey: value } as const)
       : ({ kind: "claude-subscription", oauthToken: value } as const);

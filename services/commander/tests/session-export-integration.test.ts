@@ -25,6 +25,8 @@ const logPayload = (sequence: number): string =>
   });
 
 vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
   Agent: class {
     state: unknown;
     env: unknown;

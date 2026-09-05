@@ -1,59 +1,48 @@
-# Remaining work — completion snapshot (2026-08-05)
+# Remaining acceptance work — 2026-09-05
 
-The feasible-on-macOS product work from the 2026-08-02 pause handoff is
-complete on this revision. Production Arma Reforger addon / dedicated-server
-work and real Cloudflare / live-provider acceptance remain external.
+The [September audit](audits/2026-09-05.md) records local changes, measured
+performance, and read-only Cloudflare evidence. The [agent workflow](AGENT_WORKFLOW.md)
+provides repeatable acceptance. Repository verification does not deploy the
+working tree or invoke a live provider.
 
-## Locally done
+Addressed: operational pages and session navigation; real Chromium checks for
+all four browser surfaces; configuration reload and header-filtering regressions;
+measured simulation hot-loop improvements; isolated QA setup; verification-only
+CI and separate manual three-service deployment.
 
-1. Pause-boundary edits reviewed and focused-green:
-   - Commander DO / terrain indexes key by
-     `(session_id, mission_epoch, faction)` via `JSON.stringify([...])`;
-   - protocol duplicate IDs, destructive group conflicts, replay metadata
-     identity, and excess-property rejection verified;
-   - sim-core boarding reservation / reciprocal mounted / combat wipe skips
-     verified.
-2. Deterministic gates green on one frozen tree after the final source edits
-   (see `docs/IMPLEMENTATION_STATUS.md` for exact counts).
-3. Local Commander + Poligon browser acceptance evidenced:
-   connect → map → full/delta ticks → bounded commands; versus isolation;
-   Agent reload checkpoint restore; Commander wipe + reconnect/full resync;
-   offline zero-network stepping; `/replay` import timeline + cost table;
-   desktop/mobile viewport metrics for Poligon and both Maskirovka dashboards;
-   ×100 Step uses cooperative resume quanta (Playwright locator stalls under
-   WebGL load are automation bookkeeping when they occur; DOM/cooperative
-   Step advances).
-4. Temporary `apps/commander/.dev.vars` and `apps/poligon/.dev.vars` removed;
-   Poligon rebuilt with no `.dev.vars` copy under `dist/server`.
-5. Final PRODUCT gap audit found no remaining feasible-local P0/P1 product
-   gaps (only external Arma / Cloudflare / live-provider gates).
-6. Documentation refreshed with exact results and explicit external gates.
-7. A single CI workflow now gates automatic production deployment on successful
-   `main` verification; its Effect task prebuilds all four services and deploys
-   gateway → hosted seat → Commander → Poligon sequentially. No live deploy was
-   run for this change.
+The dashboard follow-up replaces the navigation and simulation workspace,
+adds a fitted tactical map and explicit model tests, and resolves simulation
+control permissions from verified owner/admin membership. The user authorized
+deployment and the three-service production task completed. The signed-in
+production dashboard and real Codex/Claude requests were verified after the
+final release. Both providers also returned real responses locally. The legacy
+Claude token was replaced and revoked. See the audit for exact versions and
+verification limits.
 
-## Still external-only
+One functional integration gap was found during the signed-in browser audit:
+Commander submits machine-authenticated model requests, while the deployed
+inference boundary requires an owner-scoped human account. A direct model
+test can verify the subscription independently, but the full simulation loop
+still needs an explicit account-scoped execution path. Do not relax inference
+authorization or report a rule decision as a successful model decision.
 
-- production Enforce Script addon, Workbench, dedicated server, Conflict/JIP,
-  BattlEye, Workshop, and in-game 30/40/50-group profiling;
-- **repair account workers.dev** (`andrii-shafar` returns `error code: 1042` for
-  all Workers; uploads succeeded; `wrangler dev --remote` works);
-- harden the GitHub `production` environment (secrets
-  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are present; add required
-  reviewers / deployment branch policy if desired);
-- Cloudflare Access apps + `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` (dashboard;
-  Wrangler OAuth lacks Access scopes);
-- live Claude / Codex tokens via gateway `/_/` after Access + HTTP routing work;
-- full deployed lifecycle drills (sleep/restart, R2 export, Access WS).
+Still outstanding:
 
-An automatic deploy success proves upload and Wrangler configuration only while
-workers.dev returns 1042; it does not prove HTTP availability. Worker secrets
-and provider credentials remain out of band. Rollback is `wrangler rollback`
-per service in reverse dependency order (Poligon, Commander, hosted seat,
-gateway), or an equivalent documented version rollback.
+- Complete a production account-scoped Commander execution path and verify
+  successful tactical command application. A paused local simulation produced
+  a model response, but all five proposed commands failed tactical validation;
+  no successful application is claimed.
+- Verify provider refresh, streaming, billing/budget behavior,
+  container start/restart/sleep, deployed R2 exports, and rollback/lifecycle drills.
+- Review GitHub `production` secrets, reviewers, and branch policy at release
+  time. The Cloudflare audit does not inspect GitHub settings.
+- Real Arma addon, Workbench, dedicated-server, Conflict/JIP, BattlEye, Workshop,
+  and in-game profiling remain outside the requested local tests.
 
-Posture B / home-Mac dial-in remains permanently unsupported.
+The old workers.dev repair item is obsolete: the intended public origin is
+`stavka.sands.red`, protected by Access. workers.dev and preview URLs are
+intentionally disabled. Provider accounts are provisioned through the CLI;
+browser token pasting is not part of the current design.
 
-The Test-12 corpus remains intentionally derived and must not be presented as
-a missing raw Workbench capture.
+Posture B / home-Mac dial-in remains unsupported. The historical Test-12 corpus
+is derived evidence, not a raw Workbench capture.

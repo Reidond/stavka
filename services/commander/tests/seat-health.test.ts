@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/config";
 import type { SeatRegistration } from "../src/state/types";
 
-vi.mock("agents", () => ({ Agent: class {} }));
+vi.mock("agents", () => ({
+  getAgentByName: async (namespace: { getByName: (name: string) => unknown }, name: string) =>
+    namespace.getByName(name),
+  Agent: class {},
+}));
 
 const { probeHttpSeat } = await import("../src/durable/orchestrator");
 

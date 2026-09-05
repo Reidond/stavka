@@ -91,10 +91,9 @@ const updateAdvancingDispersion = (world: SimWorldState, group: SimGroup): void 
   }
 };
 
-const detectsForCombat = (observer: SimGroup, target: SimGroup): boolean => {
+const detectsForCombat = (observer: SimGroup, target: SimGroup, range: number): boolean => {
   const order = observer.order;
   if (order?.kind !== "attack" && order?.kind !== "sweep") return false;
-  const range = distance2d(observer.position, target.position);
   if (order.kind === "attack") return range <= 80;
   if (range > 200) return false;
   const forwardX = order.destination[0] - observer.position[0];
@@ -429,23 +428,14 @@ const updateMovement = (world: SimWorldState, group: SimGroup): void => {
   }
 
   if (order.kind === "attack" || order.kind === "sweep") {
-    const nearestEnemy = Object.values(world.groups)
-      .filter(
-        (candidate) =>
-          candidate.faction !== group.faction &&
-          candidate.agents.length > 0 &&
-          detectsForCombat(group, candidate),
-      )
-      .reduce<SimGroup | undefined>((nearest, candidate) => {
-        if (!nearest) return candidate;
-        return distance2d(group.position, candidate.position) <
-          distance2d(group.position, nearest.position)
-          ? candidate
-          : nearest;
-      }, undefined);
-    if (nearestEnemy && distance2d(group.position, nearestEnemy.position) <= 80) {
-      group.status = "engaged";
-      return;
+    for (const id in world.groups) {
+      const candidate = world.groups[id]!;
+      if (candidate.faction === group.faction || candidate.agents.length === 0) continue;
+      const range = distance2d(group.position, candidate.position);
+      if (range <= 80 && detectsForCombat(group, candidate, range)) {
+        group.status = "engaged";
+        return;
+      }
     }
   }
 
@@ -499,11 +489,11 @@ const updateCombat = (world: SimWorldState): void => {
       if (world.groups[first.id] !== first) break;
       if (!second || world.groups[second.id] !== second || first.faction === second.faction)
         continue;
-      const firstDetects = detectsForCombat(first, second);
-      const secondDetects = detectsForCombat(second, first);
-      if (!firstDetects && !secondDetects) continue;
       const range = distance2d(first.position, second.position);
-      const key = [first.id, second.id].sort().join(":");
+      const firstDetects = detectsForCombat(first, second, range);
+      const secondDetects = detectsForCombat(second, first, range);
+      if (!firstDetects && !secondDetects) continue;
+      const key = first.id < second.id ? `${first.id}:${second.id}` : `${second.id}:${first.id}`;
       const exchange = (world.engagements[key] ??= {
         key,
         groupA: first.id,

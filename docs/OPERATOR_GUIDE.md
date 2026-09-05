@@ -23,7 +23,8 @@ flowchart LR
   A["Future Arma addon/server<br/>not implemented by scope"] -.-> C
   PA -->|"protocol v1 + machine bearer"| C["Commander<br/>Effect HttpApi + durable agents"]
   C --> D["Commander and Sergeant state<br/>SQLite logs/archive + R2 export layer"]
-  C -->|"Bearer GATEWAY_KEY"| MG["Maskirovka gateway<br/>Worker + Container"]
+  PA -->|"owner Access identity + account scope"| MG["Maskirovka gateway<br/>Worker + Container"]
+  C -.->|"no human grant: denied"| MG
   MG --> CL["Claude Agent SDK + Stavka Codex<br/>in-process seats"]
   C -.->|"optional experiment"| MH["Hosted leaf<br/>apps/maskirovka-seat"]
   H["Human operator"] -->|"Cloudflare Access"| PA
@@ -34,13 +35,16 @@ flowchart LR
 The boundaries are deliberately separate:
 
 - simulator/game traffic uses an opaque machine bearer on Commander `/api/*`;
-- Maskirovka model traffic uses `MASKIROVKA_GATEWAY_KEY` (gateway) or
-  `MASKIROVKA_SEAT_KEY` (optional leaf);
+- Maskirovka health/model metadata may use `MASKIROVKA_GATEWAY_KEY`; Codex and
+  Claude execution requires the verified owner Access identity and that
+  owner's active provider-account scope;
 - human pages, admin APIs, and Agent WebSocket upgrades use Cloudflare Access;
 - exact local mode may synthesize a development identity only when both
   `ENVIRONMENT=local` and `DEV_ACCESS_EMAIL` are configured.
 
-An Access identity never substitutes for a model/game machine credential.
+An inference machine credential never substitutes for a human account grant.
+Commander can call deterministic paths through its service binding, but cannot
+use a user's provider subscription without an explicitly propagated human grant.
 
 ## Primary path: four Cloudflare services
 
@@ -132,12 +136,18 @@ Provision named accounts with the secret-safe CLI; `/_/` shows metadata only:
 
 ```bash
 pnpm stavka -- codex login work
-claude setup-token | pnpm stavka -- claude login max --token-stdin
+pnpm stavka -- claude login max --token-stdin
 pnpm stavka -- cloudflare local dev --url http://127.0.0.1:8787
 pnpm stavka -- auth push --account codex/work --cloudflare dev
 pnpm stavka -- auth push --account claude/max --cloudflare dev
 pnpm stavka -- auth activate --account codex/work --cloudflare dev
 ```
+
+For Claude, generate a fresh credential with `claude setup-token` and supply
+only the token value to `--token-stdin` through your secure secret-handling
+workflow. Do not pipe the complete interactive setup transcript: it contains
+terminal text and is rejected. Revocation is available under Claude Settings →
+Claude Code → Authorization tokens.
 
 Production provider provisioning uses a human `cloudflare login` profile.
 Credentials are encrypted with `STAVKA_PROVIDER_VAULT_KEY` in Durable Object
@@ -161,11 +171,11 @@ On account `Andrii Shafar` (`3f5946e8e68fa04a86d36a5f83617f4b`):
 
 Machine secrets were uploaded with `wrangler secret put` (never commit):
 
-| Worker                      | Secrets                                                 |
-| --------------------------- | ------------------------------------------------------- |
-| `stavka-maskirovka-gateway` | `MASKIROVKA_GATEWAY_KEY`                                |
-| `stavka-commander`          | `API_KEY`, `STAVKA_AI_KEY` (same value as gateway key)  |
-| `stavka-poligon`            | `COMMANDER_API_KEY` (same value as Commander `API_KEY`) |
+| Worker                      | Secrets                                                     |
+| --------------------------- | ----------------------------------------------------------- |
+| `stavka-maskirovka-gateway` | `MASKIROVKA_GATEWAY_KEY`                                    |
+| `stavka-commander`          | `API_KEY`; legacy `STAVKA_AI_KEY` grants no provider access |
+| `stavka-poligon`            | `COMMANDER_API_KEY` (same value as Commander `API_KEY`)     |
 
 Rotate with `pnpm generate-key` and another interactive `secret put`.
 
@@ -211,9 +221,10 @@ curl --silent --output /dev/null --write-out '%{http_code}\n' \
 curl --fail "$POL/healthz"
 ```
 
-Then: Access login to gateway `/_/`, store Claude + Codex tokens, confirm
-`/healthz` seat headroom; Poligon Agent → Commander → gateway; unauthenticated
-human routes fail closed; Container sleep/restart keeps DO auth checkpoints.
+Then: sign in to `https://stavka.sands.red`, store Claude + Codex tokens, and
+invoke `/v1/responses` or `/v1/messages` through that same owner session.
+Confirm machine-only and service-token requests fail with `ACCESS_REQUIRED`,
+and that container sleep/restart preserves the encrypted account records.
 
 ### Known blocker: account workers.dev returns error 1042
 
@@ -409,6 +420,39 @@ The supported hosted Maskirovka is `apps/maskirovka-gateway`: one Worker +
 Container running Claude and Codex seats in-process (PRODUCT Posture A). Prefer
 `wrangler dev` / deploy for that app. Leaf `apps/maskirovka-seat` remains an
 optional single-provider Cloudflare experiment only.
+
+### Local development with your own subscription accounts
+
+Run `pnpm ai:up` for the native loopback gateway, then `pnpm dev:local` in
+another terminal for the unified app at `http://127.0.0.1:5173`. The latter
+runs Vite with hot reload and local Commander/inference Workers, service
+bindings, SQLite, R2 emulation, and the inference container. Docker must be
+running. Remote bindings are disabled in this mode.
+
+Create your local Stavka profile in the browser, then connect named accounts:
+
+```bash
+pnpm stavka cloudflare local development --url http://127.0.0.1:5173
+pnpm stavka auth push --account codex/production --cloudflare development
+pnpm stavka auth push --account claude/production --cloudflare development
+```
+
+Replace the account names with those listed by `pnpm stavka accounts`.
+Credentials stay in the named account store and encrypted local inference
+storage; they are never copied to frontend files. Local storage persists in
+the app's ignored `.wrangler` directory. It is separate from production.
+The generated, owner-readable `services/inference/.dev.vars` contains the
+local vault key and an explicit development allowance: 20 Codex calls per
+five-hour window and $1 of Claude plan credit. Existing variables are preserved.
+These are gateway admission limits, not a purchase or a statement of your
+provider subscription balance. Live sergeant execution retains its separate
+explicit operator gate; use the heavy alias for a standalone Codex connection
+test. System → Test model performs a real request only when clicked.
+
+Local identity uses `DEV_ACCESS_EMAIL` (default `developer@localhost`) and
+accepts loopback HTTP only. It does not authenticate through Cloudflare Access;
+the deployed application continues to require verified Access identity.
+Keep `pnpm qa:serve` for isolated mock-provider acceptance checks.
 
 ### Legacy Node `:4141` helpers (CI / offline only)
 

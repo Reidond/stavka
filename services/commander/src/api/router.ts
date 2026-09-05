@@ -23,7 +23,7 @@ import {
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import { accessConfig, CommanderEnvironment, readConfigEffect, type Env } from "../config";
-import type { OrchestratorAgent } from "../durable/orchestrator";
+import { resolveOrchestrator } from "../durable/resolve-orchestrator";
 import { authorizeSeatRequest } from "../brain/seat-auth";
 import { SEAT_REGISTRY_NAME } from "../brain/seat-router";
 import type { DecisionLogEntry } from "../logging/types";
@@ -147,7 +147,7 @@ const webRequest = (request: HttpServerRequest.HttpServerRequest) =>
 const withMachineAuth = <A, E, R>(
   request: HttpServerRequest.HttpServerRequest,
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A | HttpServerResponse.HttpServerResponse, E, R | CommanderEnvironment> =>
+): Effect.Effect<A | HttpServerResponse.HttpServerResponse, never, R | CommanderEnvironment> =>
   Effect.gen(function* () {
     const env = yield* CommanderEnvironment;
     if (!env.API_KEY) {
@@ -161,13 +161,13 @@ const withMachineAuth = <A, E, R>(
     return authorized
       ? yield* effect
       : errorResponse(401, "UNAUTHORIZED", "Invalid machine bearer token");
-  });
+  }).pipe(Effect.catch((cause) => Effect.succeed(internalFailure(cause))));
 
 const withAccess = <A, E, R>(
   request: HttpServerRequest.HttpServerRequest,
   permission: AccessPermission,
   effect: (identity: AccessIdentity) => Effect.Effect<A, E, R>,
-): Effect.Effect<A | HttpServerResponse.HttpServerResponse, E, R | CommanderEnvironment> =>
+): Effect.Effect<A | HttpServerResponse.HttpServerResponse, never, R | CommanderEnvironment> =>
   Effect.gen(function* () {
     const env = yield* CommanderEnvironment;
     const raw = yield* webRequest(request).pipe(Effect.catch(() => Effect.succeed(undefined)));
@@ -184,7 +184,7 @@ const withAccess = <A, E, R>(
       return errorResponse(403, "FORBIDDEN", `${permission} permission required`);
     }
     return yield* effect(verified.success);
-  });
+  }).pipe(Effect.catch((cause) => Effect.succeed(internalFailure(cause))));
 
 const sessionName = (sessionId: string, epoch: number, faction: string): string =>
   JSON.stringify([sessionId, epoch, faction]);
@@ -199,8 +199,7 @@ const sessionStub = (
     readonly faction: string;
     readonly epoch?: number | undefined;
   },
-): DurableObjectStub<OrchestratorAgent> =>
-  env.ORCHESTRATOR.getByName(sessionName(query.session_id, query.epoch ?? 1, query.faction));
+) => resolveOrchestrator(env, sessionName(query.session_id, query.epoch ?? 1, query.faction));
 
 const rpc = <A>(
   operation: string,
@@ -273,7 +272,8 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
         request,
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          const stub = env.ORCHESTRATOR.getByName(
+          const stub = yield* resolveOrchestrator(
+            env,
             sessionName(payload.session_id, payload.mission_epoch, payload.faction),
           );
           const connected = yield* rpc<ConnectResponse>("connect", () =>
@@ -317,10 +317,12 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
             payload.type === "full"
               ? payload.snapshot.mission.epoch
               : (headers["x-stavka-mission-epoch"] ?? 1);
-          const stub = env.ORCHESTRATOR.getByName(
+          const stub = yield* resolveOrchestrator(
+            env,
             sessionName(payload.session_id, epoch, payload.faction),
           );
           const response = yield* rpc<unknown>("tick", () => stub.handleTick(payload));
+          if (HttpServerResponse.isHttpServerResponse(response)) return response;
           const decoded = yield* Effect.result(Schema.decodeUnknownEffect(TickResponse)(response));
           return decoded._tag === "Success" ? decoded.success : internalFailure(decoded.failure);
         }),
@@ -332,7 +334,8 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
           const epoch = headers["x-stavka-mission-epoch"] ?? 1;
-          const stub = env.ORCHESTRATOR.getByName(
+          const stub = yield* resolveOrchestrator(
+            env,
             sessionName(payload.session_id, epoch, payload.faction),
           );
           const result = yield* rpc<void>("disconnect", () =>
@@ -394,7 +397,8 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
             catch: (cause) => cause,
           }).pipe(Effect.result);
           if (stored._tag === "Failure") return internalFailure(stored.failure);
-          const stub = env.ORCHESTRATOR.getByName(
+          const stub = yield* resolveOrchestrator(
+            env,
             sessionName(payload.session_id, session.epoch, session.faction),
           );
           const applied = yield* rpc<void>("apply map briefing", () =>
@@ -413,9 +417,8 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "read", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          return yield* rpc<CommanderSessionState>("get session", () =>
-            sessionStub(env, query).getSessionState(),
-          );
+          const stub = yield* sessionStub(env, query);
+          return yield* rpc<CommanderSessionState>("get session", () => stub.getSessionState());
         }),
       ),
     )
@@ -423,8 +426,9 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "read", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
+          const stub = yield* sessionStub(env, query);
           return yield* rpc<DecisionLogEntry[]>("list logs", () =>
-            sessionStub(env, query).listDecisionLogs(query.limit ?? 100),
+            stub.listDecisionLogs(query.limit ?? 100),
           );
         }),
       ),
@@ -433,9 +437,8 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "read", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          return yield* rpc<SeatRegistration[]>("get seats", () =>
-            env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).refreshSeats(),
-          );
+          const stub = yield* resolveOrchestrator(env, SEAT_REGISTRY_NAME);
+          return yield* rpc<SeatRegistration[]>("get seats", () => stub.refreshSeats());
         }),
       ),
     )
@@ -443,9 +446,8 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "admin", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          return yield* rpc<SeatRegistration[]>("register seat", () =>
-            env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).registerSeat(payload),
-          );
+          const stub = yield* resolveOrchestrator(env, SEAT_REGISTRY_NAME);
+          return yield* rpc<SeatRegistration[]>("register seat", () => stub.registerSeat(payload));
         }),
       ),
     )
@@ -453,8 +455,9 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "admin", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
+          const stub = yield* resolveOrchestrator(env, SEAT_REGISTRY_NAME);
           return yield* rpc<SeatRegistration[]>("remove seat", () =>
-            env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).removeSeat(params.seatId),
+            stub.removeSeat(params.seatId),
           );
         }),
       ),
@@ -463,9 +466,13 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
       withAccess(request, "admin", () =>
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          return yield* rpc<SessionExport>("export session", () =>
-            sessionStub(env, query).exportSession(),
+          const stub = yield* sessionStub(env, query);
+          const exported = yield* rpc<SessionExport | null>("export session", () =>
+            stub.exportSession(),
           );
+          return exported === null
+            ? errorResponse(404, "NOT_FOUND", "Session not found")
+            : exported;
         }),
       ),
     )
@@ -480,8 +487,9 @@ const AdminLive = HttpApiBuilder.group(CommanderApi, "admin", (handlers) =>
               "SESSION_EXPORTS R2 binding is not configured",
             );
           }
+          const stub = yield* sessionStub(env, query);
           return yield* rpc<SessionExportMetadata>("persist session export", () =>
-            sessionStub(env, query).persistSessionExport(query.export_id),
+            stub.persistSessionExport(query.export_id),
           );
         }),
       ),
@@ -600,8 +608,9 @@ const SeatRoute = HttpRouter.add("GET", "/seats", (request) =>
     if (principal === undefined) {
       return errorResponse(401, "UNAUTHORIZED", "Invalid seat bearer token");
     }
+    const stub = yield* resolveOrchestrator(env, SEAT_REGISTRY_NAME);
     const response = yield* Effect.tryPromise({
-      try: () => env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).fetch(raw),
+      try: () => stub.fetch(raw),
       catch: (cause) => cause,
     }).pipe(Effect.catch((cause) => Effect.succeed(internalFailure(cause))));
     if (HttpServerResponse.isHttpServerResponse(response)) return response;

@@ -12,14 +12,15 @@ export const Route = createFileRoute("/settings/providers")({
   component: ProviderSettings,
 });
 
+const cloudflareProfile = import.meta.env.MODE === "local-account" ? "development" : "production";
 const setupCommands = {
   codex: [
     "pnpm stavka -- codex login production",
-    "pnpm stavka -- auth push --account codex/production --cloudflare production",
+    `pnpm stavka -- auth push --account codex/production --cloudflare ${cloudflareProfile}`,
   ],
   claude: [
     "claude setup-token | pnpm stavka -- claude login production --token-stdin",
-    "pnpm stavka -- auth push --account claude/production --cloudflare production",
+    `pnpm stavka -- auth push --account claude/production --cloudflare ${cloudflareProfile}`,
   ],
 } as const;
 
@@ -69,12 +70,12 @@ export function ProviderSettings() {
 
   return (
     <div className="stavka-pane space-y-4">
-      <div className="space-y-1">
-        <h1 className="m-0 text-xl font-semibold text-kumo-strong">Provider authorization</h1>
-        <p className="m-0 text-sm text-kumo-subtle">
-          Codex and Claude subscription credentials are private to your Stavka profile.
-        </p>
-      </div>
+      <header className="stavka-page-heading">
+        <div>
+          <h1>Providers</h1>
+          <p>Codex and Claude subscription credentials are private to your Stavka profile.</p>
+        </div>
+      </header>
 
       {active ? <ProfileCard session={active} userCount={users.data?.length} /> : null}
       {session.error || users.error || accounts.error ? (
@@ -84,11 +85,6 @@ export function ProviderSettings() {
           description={(session.error ?? users.error ?? accounts.error)?.message ?? "Unknown error"}
         />
       ) : null}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ConnectionGuide provider="codex" />
-        <ConnectionGuide provider="claude" />
-      </div>
 
       <section className="space-y-3" aria-labelledby="connected-accounts-title">
         <div className="flex items-center justify-between gap-3">
@@ -106,7 +102,8 @@ export function ProviderSettings() {
         {accounts.data?.length === 0 ? (
           <LayerCard className="p-4">
             <p className="m-0 text-sm text-kumo-default">
-              No provider account is connected yet. Complete either authorization flow above.
+              No provider account is connected yet. Open the connection instructions below to get
+              started.
             </p>
           </LayerCard>
         ) : null}
@@ -136,6 +133,15 @@ export function ProviderSettings() {
           ))}
         </div>
       </section>
+      <details className="stavka-panel">
+        <summary className="cursor-pointer p-5 text-sm font-medium text-kumo-strong">
+          Connect a provider account
+        </summary>
+        <div className="grid gap-4 p-5 pt-0 lg:grid-cols-2">
+          <ConnectionGuide provider="codex" />
+          <ConnectionGuide provider="claude" />
+        </div>
+      </details>
     </div>
   );
 }

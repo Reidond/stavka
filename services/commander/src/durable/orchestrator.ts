@@ -64,6 +64,7 @@ import {
   type SeatRegistration,
 } from "../state/types";
 import { scopedSergeantSnapshot, SergeantAgent } from "./sergeant";
+import { resolveOrchestrator } from "./resolve-orchestrator";
 
 interface SeatConnectionState {
   readonly channel: "seat";
@@ -633,10 +634,9 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
         // still leaves the local mirror correct, then replace the mirror with
         // registry truth. Refreshing first would make the attribution below
         // charge the same provider attempt a second time for this tick.
-        const registrySeats = yield* Effect.tryPromise({
-          try: () => this.env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).refreshSeats(),
-          catch: (cause) => repositoryFailure("seat registry refresh", cause),
-        }).pipe(Effect.catch(() => Effect.succeed(this.state.seats)));
+        const registrySeats = yield* this.refreshRegistrySeats().pipe(
+          Effect.catch(() => Effect.succeed(this.state.seats)),
+        );
         yield* Effect.sync(() => this.setState({ ...this.state, seats: registrySeats }));
         yield* Effect.forEach(
           request.sergeant_reports,
@@ -754,6 +754,11 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
         if (!this.state.connected || !this.state.snapshot) return;
+        if (
+          this.state.decisionPending ||
+          this.state.snapshot.mission.time_elapsed_seconds <= this.state.lastDecisionAt
+        )
+          return;
         const requested = requestCommanderDecision(this.state, "scheduled_alarm");
         yield* Effect.sync(() => this.setState(requested));
         yield* this.enqueueDecisionRun(requested.pendingDecisionVersion);
@@ -775,10 +780,9 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
         )
           return;
         const config = yield* readConfigEffect(this.env);
-        const seats = yield* Effect.tryPromise({
-          try: () => this.env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).refreshSeats(),
-          catch: (cause) => repositoryFailure("seat registry refresh", cause),
-        }).pipe(Effect.catch(() => Effect.succeed(this.state.seats)));
+        const seats = yield* this.refreshRegistrySeats().pipe(
+          Effect.catch(() => Effect.succeed(this.state.seats)),
+        );
         const planningState = { ...this.state, seats };
         const trigger = planningState.pendingDecisionTrigger ?? "scheduled_alarm";
         const invocationId = `commander:${this.name}:${planningState.nextDecisionSequence}:${payload.version}`;
@@ -817,12 +821,7 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
             // Routing has already reconciled the provider reservation in the
             // registry. Refresh first so the session mirror does not charge it
             // twice, while still recording its real per-attempt aggregates.
-            const refreshedSeats = yield* Effect.result(
-              Effect.tryPromise({
-                try: () => this.env.ORCHESTRATOR.getByName(SEAT_REGISTRY_NAME).refreshSeats(),
-                catch: (cause) => repositoryFailure("stale decision seat refresh", cause),
-              }),
-            );
+            const refreshedSeats = yield* Effect.result(this.refreshRegistrySeats());
             const accountingBase =
               refreshedSeats._tag === "Success" ? refreshedSeats.success : latest.seats;
             const accounted = accountCostAttributions(
@@ -1864,27 +1863,23 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
     });
   }
 
-  exportSession(): Promise<SessionExport> {
+  exportSession(): Promise<SessionExport | null> {
     return Effect.runPromise(
-      Effect.all({
-        logs: this.decisionLogs().list(500),
-        archive: this.sessionArchive().export(10_000),
-        exportedAt: Clock.currentTimeMillis,
-      }).pipe(
-        Effect.map(({ archive, exportedAt, logs }): SessionExport => {
-          const state = this.state;
-          const header = sessionExportHeader(state, exportedAt);
-          return {
-            ...header,
-            logs: [...logs].reverse(),
-            archive: {
-              ticks: archive.ticks,
-              events: archive.events,
-              snapshots: archive.snapshots,
-            },
-          };
-        }),
-      ),
+      Effect.gen({ self: this }, function* () {
+        // A lookup can reach a fresh Durable Object before a session is connected.
+        if (this.state.sessionId === "") return null;
+        const { archive, exportedAt, logs } = yield* Effect.all({
+          logs: this.decisionLogs().list(500),
+          archive: this.sessionArchive().export(10_000),
+          exportedAt: Clock.currentTimeMillis,
+        });
+        const header = sessionExportHeader(this.state, exportedAt);
+        return {
+          ...header,
+          logs: [...logs].reverse(),
+          archive: { ticks: archive.ticks, events: archive.events, snapshots: archive.snapshots },
+        } satisfies SessionExport;
+      }),
     );
   }
 
@@ -1989,6 +1984,17 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
 
   private decisionLogs(): SqlDecisionLogRepository {
     return new SqlDecisionLogRepository(this);
+  }
+
+  private refreshRegistrySeats() {
+    return resolveOrchestrator(this.env, SEAT_REGISTRY_NAME).pipe(
+      Effect.flatMap((registry) =>
+        Effect.tryPromise({
+          try: () => registry.refreshSeats(),
+          catch: (cause) => repositoryFailure("seat registry refresh", cause),
+        }),
+      ),
+    );
   }
 
   private sessionArchive(): SqlSessionArchiveRepository {

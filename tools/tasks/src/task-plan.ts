@@ -5,7 +5,6 @@ export interface TaskCommand {
 }
 
 const gatewayFilter = "@stavka/inference";
-const seatFilter = "@stavka/maskirovka-seat";
 const commanderFilter = "@stavka/commander";
 const appFilter = "@stavka/stavka";
 
@@ -35,17 +34,11 @@ export const maskirovkaGatewayBuildTask: ReadonlyArray<TaskCommand> = [
 
 export const productionDeployTask: ReadonlyArray<TaskCommand> = [
   filterScript(gatewayFilter, "build:dashboard"),
-  filterScript(seatFilter, "build:dashboard"),
   filterScript(appFilter, "build"),
   {
     label: "Deploy inference (private)",
     executable: "pnpm",
     arguments: ["--filter", gatewayFilter, "exec", "wrangler", "deploy"],
-  },
-  {
-    label: "Deploy hosted seat (private)",
-    executable: "pnpm",
-    arguments: ["--filter", seatFilter, "exec", "wrangler", "deploy"],
   },
   {
     label: "Deploy Commander (private)",
@@ -167,4 +160,42 @@ export const tailwindLintTask: ReadonlyArray<TaskCommand> = [
       "services/inference",
     ],
   },
+];
+
+export const verificationTask: ReadonlyArray<TaskCommand> = [
+  ...["check", "lint:tailwind", "test"].map(
+    (script): TaskCommand => ({
+      label: script,
+      executable: "pnpm",
+      arguments: [script],
+    }),
+  ),
+  ...["typecheck", "build"].map(
+    (script): TaskCommand => ({
+      label: script,
+      executable: "pnpm",
+      arguments: [
+        "exec",
+        "vp",
+        "run",
+        "--no-cache",
+        "--filter",
+        "@stavka/*",
+        "--concurrency-limit",
+        "2",
+        script,
+      ],
+    }),
+  ),
+  { label: "deterministic replay", executable: "pnpm", arguments: ["eval", "--", "--replay"] },
+  { label: "offline gateway smoke", executable: "pnpm", arguments: ["ai:smoke"] },
+  { label: "browser acceptance", executable: "pnpm", arguments: ["exec", "playwright", "test"] },
+];
+
+export const browserQaTask: ReadonlyArray<TaskCommand> = [
+  filterScript(appFilter, "build"),
+  filterScript(gatewayFilter, "build:dashboard"),
+  filterScript("@stavka/maskirovka-seat", "build:dashboard"),
+  filterScript("@stavka/maskirovka", "build:dashboard"),
+  { label: "browser acceptance", executable: "pnpm", arguments: ["exec", "playwright", "test"] },
 ];

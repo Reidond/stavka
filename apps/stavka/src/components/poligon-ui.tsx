@@ -11,7 +11,7 @@ import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tan
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useForm } from "@tanstack/react-form";
 import { Schema } from "effect";
-import { useRef, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 
 export const poligonVisualizationPalette = {
   canvas: "#f9fafb",
@@ -90,9 +90,11 @@ export const PoligonDataTable = <TData,>({
   emptyLabel = "No records",
   getRowId,
 }: PoligonTableProps<TData>) => {
+  const tableData = useMemo(() => [...data], [data]);
+  const tableColumns = useMemo(() => [...columns], [columns]);
   const table = useReactTable({
-    data: [...data],
-    columns: [...columns],
+    data: tableData,
+    columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     ...(getRowId ? { getRowId } : {}),
   });
@@ -162,11 +164,16 @@ export const PoligonLogFeed = <T,>({
   return (
     <div
       ref={parent}
-      className="overflow-auto rounded-sm border border-kumo-line bg-kumo-contrast text-kumo-inverse"
-      style={{ height }}
+      className="overflow-auto rounded-lg border border-kumo-hairline bg-kumo-base text-kumo-default"
+      style={{ height: items.length ? height : 120 }}
       role="log"
       aria-live="polite"
     >
+      {items.length === 0 ? (
+        <div className="stavka-empty min-h-0">
+          <p>No events recorded yet.</p>
+        </div>
+      ) : null}
       <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const item = items[virtualRow.index];
@@ -174,7 +181,9 @@ export const PoligonLogFeed = <T,>({
           return (
             <div
               key={getKey(item, virtualRow.index)}
-              className="absolute top-0 left-0 w-full border-b border-kumo-base/20 px-3 py-2 text-xs"
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute top-0 left-0 w-full border-b border-kumo-hairline p-4 text-xs/5"
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
               {renderItem(item, virtualRow.index)}

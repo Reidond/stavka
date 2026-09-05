@@ -49,10 +49,10 @@ describe("Poligon offline host UI", () => {
       <PoligonHost search={search} navigate={vi.fn() as never} />,
     );
 
-    expect(markup).toContain("browser offline");
-    expect(markup).toContain("no commander / no network");
-    expect(markup).toContain("Agent WebSocket and Commander networking are disabled");
-    expect(markup).toContain("Deterministic battlefield");
+    expect(markup).toContain("Browser offline");
+    expect(markup).toContain("Paused offline");
+    expect(markup).toContain('data-unit="blue_1"');
+    expect(markup).toContain('data-unit="red_1"');
     expect(agents.useAgent).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(webSocketSpy).not.toHaveBeenCalled();
