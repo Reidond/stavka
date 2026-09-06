@@ -85,6 +85,12 @@ class StavkaWire
       && context.ReadValue("tick_rate_hint", interval) && IsFinite(interval) && interval > 0;
   }
 
+  static float TickIntervalSeconds(float milliseconds)
+  {
+    // Protocol hints use milliseconds; native world time uses seconds.
+    return Math.Clamp(milliseconds / 1000, 0.1, 60);
+  }
+
   static StavkaTickReply DecodeTick(string body, int expectedTick)
   {
     if (body.Length() > MAX_BYTES) return null;

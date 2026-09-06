@@ -56,6 +56,10 @@ class StavkaSmoke
       camera.SetDirty(true);
     }
     float interval;
+    Check(StavkaWire.TickIntervalSeconds(2000) == 2, "idle tick milliseconds become seconds");
+    Check(Math.AbsFloat(StavkaWire.TickIntervalSeconds(750) - 0.75) < 0.001, "active tick milliseconds become seconds");
+    Check(Math.AbsFloat(StavkaWire.TickIntervalSeconds(300) - 0.3) < 0.001, "burst tick milliseconds become seconds");
+    Check(StavkaWire.TickIntervalSeconds(90000) == 60, "tick interval remains bounded");
     Check(StavkaWire.DecodeConnect("{\"protocol_version\":1,\"accepted\":true,\"request_full_snapshot\":true,\"tick_rate_hint\":5}", interval), "connect decode");
     string command = "{\"command_id\":\"smoke-spawn\",\"type\":\"spawn_group\",\"params\":{\"template\":\"infantry_squad\",\"position\":[2059,0,2047]}}";
     string replyBody = "{\"protocol_version\":1,\"tick_id\":0,\"tick_rate_hint\":5,\"request_full_snapshot\":false,\"config_updates\":{},";

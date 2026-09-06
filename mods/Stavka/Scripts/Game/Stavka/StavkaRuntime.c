@@ -124,7 +124,7 @@ class StavkaRuntime
     {
       float interval;
       if (!StavkaWire.DecodeConnect(body, interval)) { Fail(0); return; }
-      config.interval = Math.Clamp(interval, 1, 60);
+      config.interval = StavkaWire.TickIntervalSeconds(interval);
       connected = true;
       Print("[Stavka] Commander connected.", LogLevel.NORMAL);
     }
@@ -133,16 +133,22 @@ class StavkaRuntime
       StavkaTickReply reply = StavkaWire.DecodeTick(body, tick);
       if (!reply) { Fail(0); return; }
       snapshot.Acknowledge(tick);
-      config.interval = Math.Clamp(reply.interval, 1, 60);
+      config.interval = StavkaWire.TickIntervalSeconds(reply.interval);
       if (reply.fullInterval > 0) config.fullInterval = Math.ClampInt(reply.fullInterval, 1, 120);
       if (reply.movementThreshold >= 0) config.movementThreshold = Math.Clamp(reply.movementThreshold, 0, 100);
       if (reply.contactExpiry > 0) config.contactExpiry = Math.Clamp(reply.contactExpiry, 1, 1800);
       if (reply.detectionRange > 0) config.detectionRange = Math.Clamp(reply.detectionRange, 1, 10000);
       forceFull = reply.full;
+      if (tick == 0) Print("[Stavka] First snapshot acknowledged.", LogLevel.NORMAL);
+      if (reply.commands.Count() > 0) Print("[Stavka] Commander orders received: " + reply.commands.Count().ToString(), LogLevel.NORMAL);
       tick++;
       foreach (StavkaCommand command : reply.commands) registry.Execute(command);
     }
-    else if (pendingPath == "/api/map") mapUploaded = true;
+    else if (pendingPath == "/api/map")
+    {
+      mapUploaded = true;
+      Print("[Stavka] Native terrain accepted.", LogLevel.NORMAL);
+    }
     pendingBody = "";
     busy = false;
     failures = 0;
