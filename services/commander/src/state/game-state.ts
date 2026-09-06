@@ -337,30 +337,6 @@ export const requestCommanderDecision = (
   };
 };
 
-/**
- * Give an already-pending decision a new durable owner without lowering the
- * trigger that caused it. This is used when an asynchronous planner observes
- * that its snapshot is stale after the model returns: the old callback must
- * not settle the newer state, but the same-priority work still needs a new
- * scheduled run.
- */
-export const requeueCommanderDecision = (
-  state: CommanderSessionState,
-  trigger = state.pendingDecisionTrigger ?? "scheduled_alarm",
-): CommanderSessionState => {
-  const pendingDecisionTrigger =
-    state.pendingDecisionTrigger === undefined ||
-    triggerPriority(trigger) > triggerPriority(state.pendingDecisionTrigger)
-      ? trigger
-      : state.pendingDecisionTrigger;
-  return {
-    ...state,
-    decisionPending: true,
-    pendingDecisionTrigger,
-    pendingDecisionVersion: state.pendingDecisionVersion + 1,
-  };
-};
-
 export const recoverPendingDecision = (state: CommanderSessionState): CommanderSessionState => {
   if (!state.decisionPending && state.pendingDecisionTrigger === undefined) return state;
   const { pendingDecisionTrigger: _pendingDecisionTrigger, ...rest } = state;

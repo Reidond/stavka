@@ -39,6 +39,25 @@ export interface PlannedDecision {
   readonly stretched: boolean;
 }
 
+/** Validate completed work against current ownership, terrain and resources. */
+export const revalidateDecision = (
+  decision: PlannedDecision,
+  state: CommanderSessionState,
+): PlannedDecision => {
+  const proposed = reassignCommandIds(decision.commands, state.nextCommandSequence);
+  const validated = validateCommands(proposed, state);
+  return {
+    ...decision,
+    commands: validated.commands,
+    manpowerSpent: validated.manpowerSpent,
+    vehiclesReserved: validated.vehiclesReserved,
+    summary:
+      validated.rejected.length === 0
+        ? decision.summary
+        : `${decision.summary} Rejected ${validated.rejected.length} command(s) after validating the latest state.`,
+  };
+};
+
 export const planDecision = (
   state: CommanderSessionState,
   config: CommanderConfig,

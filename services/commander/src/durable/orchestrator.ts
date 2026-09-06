@@ -15,7 +15,7 @@ import { Clock, Effect, Schema } from "effect";
 
 import { decodeContributorDecision, isActiveSeatConnection } from "../brain/contributor-channel";
 import { estimateCost, type AiDecisionResult } from "../brain/llm-client";
-import { planDecision, type PlannedDecision } from "../brain/planner";
+import { planDecision, revalidateDecision, type PlannedDecision } from "../brain/planner";
 import { authorizeSeatRequest } from "../brain/seat-auth";
 import {
   reconcileSeatBudgetState,
@@ -51,7 +51,6 @@ import { decisionId, type DecisionLogEntry } from "../logging/types";
 import {
   applyTick,
   cachedTickResponse,
-  requeueCommanderDecision,
   requestCommanderDecision,
   SHORT_TERM_WINDOW_SECONDS,
   withConnect,
@@ -152,6 +151,7 @@ const appendDecision = (
   decision: PlannedDecision,
   trigger: string,
   timestamp: string,
+  planningState: CommanderSessionState,
 ): { readonly state: CommanderSessionState; readonly log: DecisionLogEntry } => {
   const { pendingDecisionTrigger: _pendingDecisionTrigger, ...settledState } = state;
   const id = decisionId(state.nextDecisionSequence);
@@ -162,8 +162,8 @@ const appendDecision = (
     agent: "commander",
     trigger,
     input: {
-      stateSnapshot: state.snapshot ?? null,
-      events: state.memory.shortTerm.events.slice(-30),
+      stateSnapshot: planningState.snapshot ?? null,
+      events: planningState.memory.shortTerm.events.slice(-30),
       prompt: decision.prompt,
     },
     output: {
@@ -367,6 +367,7 @@ export const probeHttpSeat = (
 export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
   override initialState = initialCommanderState();
   private readonly contributorJobs = new Map<string, PendingContributorJob>();
+  private readonly runningDecisions = new Set<number>();
 
   override validateStateChange(nextState: CommanderSessionState): void {
     try {
@@ -784,10 +785,29 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
           this.state.pendingDecisionVersion !== payload.version
         )
           return;
+        const acquired = yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            if (this.runningDecisions.has(payload.version)) return false;
+            this.runningDecisions.add(payload.version);
+            return true;
+          }),
+          (owned) =>
+            Effect.sync(() => {
+              if (owned) this.runningDecisions.delete(payload.version);
+            }),
+        );
+        if (!acquired) return;
         const config = yield* readConfigEffect(this.env);
         const seats = yield* this.refreshRegistrySeats().pipe(
           Effect.catch(() => Effect.succeed(this.state.seats)),
         );
+        if (
+          !this.state.connected ||
+          !this.state.snapshot ||
+          !this.state.decisionPending ||
+          this.state.pendingDecisionVersion !== payload.version
+        )
+          return;
         const planningState = { ...this.state, seats };
         const executionConfig = {
           ...config,
@@ -809,6 +829,10 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
             invocationId,
           ),
         );
+        // Provider routing settles registry reservations. Refresh before reading
+        // current state so ticks during the RPC cannot be overwritten, and so
+        // local seat mirrors do not charge the same attempt twice.
+        const refreshedSeats = yield* Effect.result(this.refreshRegistrySeats());
         const now = yield* Clock.currentTimeMillis;
         const latest = this.state;
         const stale =
@@ -818,7 +842,7 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
           latest.pendingDecisionVersion !== payload.version ||
           latest.sessionId !== planningState.sessionId ||
           latest.missionEpoch !== planningState.missionEpoch ||
-          latest.lastTickId !== planningState.lastTickId;
+          latest.faction !== planningState.faction;
         if (stale) {
           const staleLog = staleDecisionAuditLog(
             planningState,
@@ -829,12 +853,12 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
           );
           const sameMission =
             latest.sessionId === planningState.sessionId &&
-            latest.missionEpoch === planningState.missionEpoch;
+            latest.missionEpoch === planningState.missionEpoch &&
+            latest.faction === planningState.faction;
           if (sameMission) {
             // Routing has already reconciled the provider reservation in the
             // registry. Refresh first so the session mirror does not charge it
             // twice, while still recording its real per-attempt aggregates.
-            const refreshedSeats = yield* Effect.result(this.refreshRegistrySeats());
             const accountingBase =
               refreshedSeats._tag === "Success" ? refreshedSeats.success : latest.seats;
             const accounted = accountCostAttributions(
@@ -850,29 +874,9 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
               costAggregates: accounted.costAggregates,
               recentLogs: [...latest.recentLogs, staleLog].slice(-100),
             };
-            if (latest.connected && latest.snapshot && latest.decisionPending) {
-              const followUp = requeueCommanderDecision(
-                auditedState,
-                latest.pendingDecisionTrigger ?? trigger,
-              );
-              yield* Effect.sync(() => this.setState(followUp));
-              yield* this.decisionLogs()
-                .save(staleLog)
-                .pipe(
-                  Effect.catch((cause) =>
-                    Effect.logWarning(
-                      cause instanceof Error
-                        ? cause.message
-                        : "Could not save stale commander audit log",
-                    ),
-                  ),
-                );
-              yield* this.enqueueDecisionRun(followUp.pendingDecisionVersion);
-              return;
-            }
             yield* Effect.sync(() => this.setState(auditedState));
           }
-          // A disconnected/replaced mission must not inherit old spend into its
+          // A replaced mission must not inherit old spend into its
           // state, but the durable audit record still preserves the provider
           // call that was discarded.
           yield* this.decisionLogs()
@@ -886,20 +890,30 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
                 ),
               ),
             );
-          if (latest.connected && latest.snapshot && latest.decisionPending) {
-            const followUp = requeueCommanderDecision(
-              latest,
-              latest.pendingDecisionTrigger ?? trigger,
-            );
-            yield* Effect.sync(() => this.setState(followUp));
-            yield* this.enqueueDecisionRun(followUp.pendingDecisionVersion);
-          }
+          // The request which superseded this callback owns any follow-up.
+          // An older result must not invalidate or reschedule that newer work.
           return;
         }
-        const appended = appendDecision(latest, decision, trigger, new Date(now).toISOString());
+        // Ordinary ticks do not invalidate a slow model call. Revalidate its
+        // commands using the newest state and allocate IDs at commit, while
+        // retaining the actual planning snapshot in the audit log.
+        const currentDecision = revalidateDecision(decision, latest);
+        const appended = appendDecision(
+          latest,
+          currentDecision,
+          trigger,
+          new Date(now).toISOString(),
+          planningState,
+        );
         // Commit synchronously before the log write. This keeps the durable
         // game state authoritative if a tick arrives during repository I/O.
-        yield* Effect.sync(() => this.setState(appended.state));
+        yield* Effect.sync(() =>
+          this.setState({
+            ...appended.state,
+            seats:
+              refreshedSeats._tag === "Success" ? refreshedSeats.success : appended.state.seats,
+          }),
+        );
         yield* this.decisionLogs()
           .save(appended.log)
           .pipe(
@@ -909,7 +923,7 @@ export class OrchestratorAgent extends Agent<Env, CommanderSessionState> {
               ),
             ),
           );
-      }),
+      }).pipe(Effect.scoped),
     );
   }
 

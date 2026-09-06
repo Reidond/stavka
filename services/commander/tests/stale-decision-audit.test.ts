@@ -1,5 +1,5 @@
 import type { GameSnapshot } from "@stavka/protocol";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Env } from "../src/config";
 import type { PlannedDecision } from "../src/brain/planner";
@@ -12,6 +12,8 @@ import {
 const mocks = vi.hoisted(() => ({
   mutateDuringPlan: undefined as undefined | (() => void),
   plannedDecision: undefined as unknown,
+  waitDuringPlan: undefined as undefined | (() => Promise<void>),
+  planCalls: vi.fn(),
   scheduled: vi.fn(async (..._args: unknown[]) => undefined),
   sqlCalls: [] as unknown[][],
 }));
@@ -39,12 +41,16 @@ vi.mock("agents", () => ({
   },
 }));
 
-vi.mock("../src/brain/planner", async () => {
+vi.mock("../src/brain/planner", async (importOriginal) => {
   const { Effect } = await import("effect");
+  const original = await importOriginal<typeof import("../src/brain/planner")>();
   return {
+    ...original,
     planDecision: () =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
+        mocks.planCalls();
         mocks.mutateDuringPlan?.();
+        if (mocks.waitDuringPlan) yield* Effect.promise(mocks.waitDuringPlan);
         return mocks.plannedDecision;
       }),
   };
@@ -120,7 +126,169 @@ const plannedDecision: PlannedDecision = {
   stretched: false,
 };
 
+const createAgent = () => {
+  type TestAgent = InstanceType<typeof OrchestratorAgent> & {
+    state: CommanderSessionState;
+    env: Env;
+  };
+  const Constructor = OrchestratorAgent as unknown as new () => TestAgent;
+  const agent = new Constructor();
+  agent.state = {
+    ...initialCommanderState(),
+    connected: true,
+    sessionId: "session",
+    faction: "OPFOR",
+    missionEpoch: 1,
+    snapshot,
+    lastTickId: 1,
+    decisionPending: true,
+    pendingDecisionVersion: 4,
+    pendingDecisionTrigger: "scheduled_tick",
+    seats: [seat],
+  };
+  const refreshSeats = vi
+    .fn()
+    .mockResolvedValueOnce([seat])
+    .mockResolvedValue([{ ...seat, spentUsd: 0.03 }]);
+  agent.env = {
+    ORCHESTRATOR: { getByName: () => ({ refreshSeats }) },
+    TERRAIN_CACHE: {},
+    API_KEY: "machine",
+    STAVKA_AI_PROVIDER: "mock",
+  } as unknown as Env;
+  return { agent, refreshSeats };
+};
+
 describe("stale commander decision accounting", () => {
+  beforeEach(() => {
+    mocks.scheduled.mockClear();
+    mocks.sqlCalls.length = 0;
+    mocks.planCalls.mockClear();
+    mocks.waitDuringPlan = undefined;
+    mocks.mutateDuringPlan = undefined;
+    mocks.plannedDecision = plannedDecision;
+  });
+
+  it("accepts useful model work across ticks but revalidates ownership, resources and IDs", async () => {
+    const { agent } = createAgent();
+    const alpha = {
+      id: "alpha",
+      faction: "OPFOR",
+      template: "infantry_squad",
+      position: [100, 0, 100],
+      strength: { current: 6, max: 6 },
+      behavior: "hold",
+      status: "idle",
+    } as const;
+    agent.state = {
+      ...agent.state,
+      snapshot: { ...snapshot, friendly_groups: [alpha, { ...alpha, id: "lost" }] },
+    };
+    const planningSnapshot = agent.state.snapshot;
+    mocks.plannedDecision = {
+      ...plannedDecision,
+      summary: "Advance alpha and reinforce",
+      commands: [
+        {
+          command_id: "cmd_00000001",
+          type: "move_group",
+          params: { group_id: "alpha", destination: [200, 0, 200] },
+        },
+        { command_id: "cmd_00000002", type: "despawn_group", params: { group_id: "lost" } },
+        {
+          command_id: "cmd_00000003",
+          type: "spawn_group",
+          params: { template: "infantry_squad", position: [100, 0, 100] },
+        },
+      ],
+      commandSequenceAdvance: 3,
+      manpowerSpent: 6,
+    } satisfies PlannedDecision;
+    mocks.mutateDuringPlan = () =>
+      agent.setState({
+        ...agent.state,
+        lastTickId: 20,
+        nextCommandSequence: 40,
+        snapshot: {
+          ...snapshot,
+          mission: { ...snapshot.mission, time_elapsed_seconds: 130 },
+          friendly_groups: [alpha],
+        },
+        budget: { ...agent.state.budget, manpower: 0 },
+        pendingCommands: [
+          {
+            command_id: "existing",
+            type: "defend_group",
+            params: { group_id: "alpha", position: [100, 0, 100] },
+          },
+        ],
+      });
+    await agent.runScheduledDecision({ kind: "commander", version: 4 });
+    expect(agent.state.lastTickId).toBe(20);
+    expect(agent.state.lastDecisionAt).toBe(130);
+    expect(agent.state.decisionPending).toBe(false);
+    expect(agent.state.pendingCommands.map((c) => c.command_id)).toEqual([
+      "existing",
+      "cmd_00000040",
+    ]);
+    expect(agent.state.pendingCommands[1]).toMatchObject({
+      type: "move_group",
+      params: { group_id: "alpha" },
+    });
+    expect(agent.state.budget.manpower).toBe(0);
+    expect(agent.state.nextCommandSequence).toBe(43);
+    expect(agent.state.seats[0]?.spentUsd).toBe(0.03);
+    expect(agent.state.costAggregates.reduce((total, item) => total + item.cost_usd, 0)).toBe(0.03);
+    expect(agent.state.recentLogs[0]?.input.stateSnapshot).toEqual(planningSnapshot);
+    expect(agent.state.recentLogs[0]?.output.summary).toContain(
+      "Rejected 2 command(s) after validating the latest state.",
+    );
+    expect(mocks.scheduled).not.toHaveBeenCalled();
+  });
+
+  it("runs one provider attempt for overlapping callbacks of the same version", async () => {
+    const { agent } = createAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mocks.waitDuringPlan = () => gate;
+    const first = agent.runScheduledDecision({ kind: "commander", version: 4 });
+    await vi.waitFor(() => expect(mocks.planCalls).toHaveBeenCalledTimes(1));
+    await agent.runScheduledDecision({ kind: "commander", version: 4 });
+    release();
+    await first;
+    expect(mocks.planCalls).toHaveBeenCalledTimes(1);
+    expect(agent.state.recentLogs).toHaveLength(1);
+    expect(agent.state.costAggregates.map((item) => item.calls)).toEqual([1, 1]);
+    expect(agent.state.decisionPending).toBe(false);
+  });
+
+  it.each(["disconnect", "epoch", "faction"] as const)(
+    "fences a result after %s without overwriting replacement state",
+    async (change) => {
+      const { agent } = createAgent();
+      mocks.mutateDuringPlan = () =>
+        agent.setState({
+          ...agent.state,
+          ...(change === "disconnect"
+            ? { connected: false }
+            : change === "epoch"
+              ? { missionEpoch: 2 }
+              : { faction: "BLUFOR" }),
+        });
+      await agent.runScheduledDecision({ kind: "commander", version: 4 });
+      expect(agent.state.pendingCommands).toEqual([]);
+      expect(agent.state.pendingDecisionVersion).toBe(4);
+      expect(mocks.scheduled).not.toHaveBeenCalled();
+      expect(mocks.sqlCalls).toHaveLength(1);
+      expect(JSON.parse(mocks.sqlCalls[0]?.at(-1) as string)).toMatchObject({
+        trigger: "scheduled_tick:stale_discarded",
+        commandsIssued: [],
+      });
+      if (change !== "disconnect") expect(agent.state.costAggregates).toEqual([]);
+    },
+  );
   it("audits spent provider work without issuing stale commands or double-charging the registry mirror", async () => {
     mocks.scheduled.mockClear();
     mocks.sqlCalls.length = 0;
@@ -159,7 +327,12 @@ describe("stale commander decision accounting", () => {
       STAVKA_AI_PROVIDER: "mock",
     } as unknown as Env;
     mocks.mutateDuringPlan = () => {
-      agent.setState({ ...agent.state, lastTickId: 2 });
+      agent.setState({
+        ...agent.state,
+        lastTickId: 2,
+        pendingDecisionVersion: 5,
+        pendingDecisionTrigger: "event:casualty",
+      });
     };
 
     await agent.runScheduledDecision({ kind: "commander", version: 4 });
@@ -203,11 +376,7 @@ describe("stale commander decision accounting", () => {
       output: { parsedCommands: [] },
       costUsd: 0.03,
     });
-    expect(mocks.scheduled).toHaveBeenCalledWith(
-      0,
-      "runScheduledDecision",
-      { kind: "commander", version: 5 },
-      expect.any(Object),
-    );
+    expect(agent.state.pendingDecisionTrigger).toBe("event:casualty");
+    expect(mocks.scheduled).not.toHaveBeenCalled();
   });
 });
