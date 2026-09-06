@@ -6,11 +6,12 @@ import { encodeBase64Url } from "../src/base64";
 import { restoreSubscriptionAuth, subscriptionCredential } from "../src/container/auth-state";
 
 const originalEnvironment = { ...process.env };
+const credentialExpiresAt = Date.now() + 60 * 60_000;
 const codexCredential = (accessToken: string) => ({
   kind: "codex-chatgpt-oauth" as const,
   accessToken,
   refreshToken: "refresh-token",
-  expiresAt: Date.now() + 60 * 60_000,
+  expiresAt: credentialExpiresAt,
   accountId: "account-1",
 });
 const encodedCredential = (accessToken: string): string =>
