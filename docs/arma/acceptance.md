@@ -1,5 +1,9 @@
 # Native addon acceptance — 2026-09-06
 
+This is the initial Workbench report. See the [production and dedicated-server
+follow-up](production-acceptance-2026-09-06.md) for subsequent Docker builds,
+Cloudflare deployment, live Commander execution and native join/rejoin evidence.
+
 This is local native-engine evidence for the uncommitted addon based on repository
 commit `4d89d42a4508c67b81767cfff695f3a897496081`. It is not a deployed revision.
 [source-manifest.json](source-manifest.json) records the exact addon file hashes.

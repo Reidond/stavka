@@ -31,13 +31,14 @@ require the native success marker, and produce fresh output under `out/arma`.
 Override `ARMA_WORKBENCH_EXE` and `ARMA_REFORGER_ADDONS` when Steam is installed
 elsewhere. Packing is local; it does not publish to Workshop or deploy Cloudflare.
 
-The prepared archive is `out/arma/Stavka-1.8.0.13.zip`. Extract it and retain the
+Each successful pack produces `out/arma/<run-id>/Stavka.zip`. Extract it and retain the
 `Stavka` directory containing `addon.gproj`, `data.pak` and `resourceDatabase.rdb`.
 Point the game's `-addonsDir` at that directory's parent and load
 `-addons 6A4B4D6187F605E0`. For example, an extraction under `C:/ArmaMods` uses
 `-addonsDir C:/ArmaMods/Stavka-1.8.0.13 -addons 6A4B4D6187F605E0`.
 This is a local package, not a Workshop subscription. The bridge remains disabled
-until configured below; full packaged-game acceptance is still pending.
+until configured below. A local dedicated host passed late join, spawn and rejoin;
+see the [dated acceptance report](production-acceptance-2026-09-06.md) for its scope.
 
 Close Workbench before updating the game: its open PAK files can block Steam's
 final installation step. Restart Tools after a game update or failed hot reload.
@@ -114,9 +115,9 @@ provider execution. See [remaining work](../REMAINING_WORK.md) for acceptance st
   navmesh accessibility and key-feature extraction remain future classifiers.
 
 No custom client RPC, chat command or browser token-entry surface is added.
-Native entity replication supplies ordinary game synchronization; dedicated
-multiplayer, JIP, BattlEye and load acceptance still require separate real-host
-tests before a public release.
+Native entity replication supplies ordinary game synchronization. A single-client
+dedicated join/rejoin check passed; simultaneous clients, BattlEye, Workshop and
+load acceptance still require separate tests before a public release.
 
 ## Workbench acceptance mode
 

@@ -23,23 +23,27 @@ The account-scoped Commander execution path is implemented in source. An
 owner/admin explicitly grants a bounded session/epoch/faction authorization;
 Commander uses a private inference entrypoint to consume that grant against
 the owner's provider accounts. Human provider routes retain Access verification.
-Production deployment and successful tactical application still require the
-release checks below. Do not report rule fallback as a successful model decision.
+The three-service production deployment and a bounded live tactical test are now
+complete. Archived outcomes confirm accepted `set_objective` and `move_group`
+commands, and the owner grant was disabled afterward. The dedicated host passed
+single-client late join, spawn and reconnect. See the [dated acceptance report](arma/production-acceptance-2026-09-06.md)
+for exact commits, versions, receipts and limits. Rule fallback is excluded from
+successful model evidence.
 
 Still outstanding:
 
-- Deploy the account-scoped Commander execution path and verify
-  successful tactical command application. A paused local simulation produced
-  a model response, but all five proposed commands failed tactical validation;
-  no successful application is claimed.
 - Verify provider refresh, streaming, billing/budget behavior,
   container start/restart/sleep, deployed R2 exports, and rollback/lifecycle drills.
-- Review GitHub `production` secrets, reviewers, and branch policy at release
-  time. The Cloudflare audit does not inspect GitHub settings.
+- Repair the GitHub `production` deployment token's zone route permissions.
+  Its required secret names and main-only branch policy were verified; no
+  reviewer rules are configured. The explicit local OAuth deployment succeeded,
+  but the manual GitHub deployment failed during custom-domain route sync.
 - The native addon and local Workbench workflow are now implemented; see
-  [Arma setup and evidence](arma/README.md). Deploy the new game-server ingress
-  explicitly, then verify the protected Cloudflare connection, dedicated-server
-  Conflict/JIP, BattlEye, Workshop installation and in-game load behavior.
+  [Arma setup and evidence](arma/README.md). The game-server ingress is deployed.
+  Supply the private server machine bearer and Access service-token configuration
+  to verify the native Cloudflare connection. Single-client dedicated Conflict
+  late join and reconnect passed; simultaneous clients, BattlEye, Workshop
+  installation and load behavior remain unverified.
 
 The old workers.dev repair item is obsolete: the intended public origin is
 `stavka.sands.red`, protected by Access. workers.dev and preview URLs are
