@@ -82,12 +82,21 @@ class StavkaConfig
 
   string IdentityJson()
   {
-    return "\"protocol_version\":1,\"session_id\":" + StavkaWire.Quote(sessionId) + ",\"faction\":" + StavkaWire.Quote(faction);
+    return "\"protocol_version\":1,\"session_id\":" + StavkaWire.Quote(sessionId) + ",\"faction\":" + StavkaWire.Quote(faction)
+      + ",\"mission_epoch\":" + epoch.ToString();
+  }
+
+  string HeaderDefinition()
+  {
+    // Enfusion 1.8 accepts at most three custom headers. Keep both auth gates;
+    // carry the mission epoch in the JSON envelope instead of a fourth header.
+    return "Authorization,Bearer " + apiKey + ",CF-Access-Client-Id," + accessClientId
+      + ",CF-Access-Client-Secret," + accessClientSecret;
   }
 
   string ConnectJson()
   {
-    return "{" + IdentityJson() + ",\"mission_id\":" + StavkaWire.Quote(missionId) + ",\"mission_epoch\":" + epoch.ToString()
+    return "{" + IdentityJson() + ",\"mission_id\":" + StavkaWire.Quote(missionId)
       + ",\"map_name\":" + StavkaWire.Quote(mapName) + ",\"doctrine\":" + StavkaWire.Quote(doctrine) + "}";
   }
 }

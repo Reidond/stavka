@@ -34,6 +34,41 @@ const makeEnv = (overrides: Partial<Env> = {}): Env => ({
 });
 
 describe("Poligon HTTP routing", () => {
+  it("preserves native JSON bytes and media type across both authentication gates", async () => {
+    const fetch = vi.fn<Fetcher["fetch"]>(async () => new Response("{}"));
+    const body = '{"protocol_version":1,"mission_epoch":7,"session_id":"native","faction":"OPFOR"}';
+    for (const [access, machine, expected] of [
+      [false, true, 401],
+      [true, false, 401],
+      [true, true, 200],
+    ] as const) {
+      const response = await handleRequest(
+        new Request("http://127.0.0.1/api/tick", {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: machine ? "Bearer native-machine" : "Bearer wrong",
+            "cf-access-client-id": "native-client",
+            "cf-access-client-secret": "native-secret",
+          },
+          body,
+        }),
+        makeEnv({
+          ...(access ? { ENVIRONMENT: "local", DEV_ACCESS_EMAIL: "qa@localhost" } : {}),
+          COMMANDER_API_KEY: "native-machine",
+          COMMANDER_SERVICE: { fetch, connect: vi.fn() },
+        }),
+      );
+      expect(response.status).toBe(expected);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const forwarded = fetch.mock.calls[0]?.[0] as Request;
+    expect(await forwarded.text()).toBe(body);
+    expect(forwarded.headers.get("content-type")).toBe("application/x-www-form-urlencoded");
+    expect(forwarded.headers.get("authorization")).toBe("Bearer native-machine");
+    expect(forwarded.headers.has("cf-access-client-id")).toBe(false);
+    expect(forwarded.headers.has("cf-access-client-secret")).toBe(false);
+  });
   beforeEach(() => {
     mocks.agentRoute.mockReset().mockResolvedValue(null);
     mocks.tanStackFetch.mockReset().mockResolvedValue(new Response("app"));

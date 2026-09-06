@@ -51,7 +51,9 @@ const ApiErrors = [
 ] as const;
 
 const MissionEpochHeaders = {
-  "x-stavka-mission-epoch": Schema.optional(Schema.NumberFromString),
+  "x-stavka-mission-epoch": Schema.optional(
+    Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  ),
 };
 
 const AdminQuery = {
@@ -105,6 +107,15 @@ const StrictTickRequest = strictPayload(TickRequest);
 const StrictDisconnectRequest = strictPayload(DisconnectRequest);
 const StrictMapUploadRequest = strictPayload(MapUploadRequest);
 
+// Enfusion reserves its three custom headers for machine and Access credentials.
+// Its POST default labels the unchanged JSON bytes as form data. Decode those
+// bytes as JSON with the same closed protocol schema; never parse them as a form.
+const gamePayload = <S extends Schema.Top>(schema: S) =>
+  [
+    schema,
+    schema.pipe(HttpApiSchema.asJson({ contentType: "application/x-www-form-urlencoded" })),
+  ] as const;
+
 const HealthResponse = Schema.Struct({
   ok: Schema.Boolean,
   /** live: fully configured; degraded: serving but incomplete alias/provider config; not_ready: unusable. */
@@ -142,24 +153,24 @@ const PublicGroup = HttpApiGroup.make("public", { topLevel: true }).add(
 const MachineGroup = HttpApiGroup.make("machine")
   .add(
     HttpApiEndpoint.post("connect", "/api/connect", {
-      payload: StrictConnectRequest,
+      payload: gamePayload(StrictConnectRequest),
       success: ConnectResponse,
       error: ApiErrors,
     }),
     HttpApiEndpoint.post("tick", "/api/tick", {
       headers: MissionEpochHeaders,
-      payload: StrictTickRequest,
+      payload: gamePayload(StrictTickRequest),
       success: TickResponse,
       error: ApiErrors,
     }),
     HttpApiEndpoint.post("disconnect", "/api/disconnect", {
       headers: MissionEpochHeaders,
-      payload: StrictDisconnectRequest,
+      payload: gamePayload(StrictDisconnectRequest),
       success: HttpApiSchema.NoContent,
       error: ApiErrors,
     }),
     HttpApiEndpoint.post("map", "/api/map", {
-      payload: StrictMapUploadRequest,
+      payload: gamePayload(StrictMapUploadRequest),
       success: MapAcceptedResponse,
       error: ApiErrors,
     }),

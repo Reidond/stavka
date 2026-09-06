@@ -36,6 +36,12 @@ class StavkaSmoke
     config.sessionId = "native-smoke";
     config.missionId = "native-arland";
     config.epoch = 1;
+    config.apiKey = "smoke-machine";
+    config.accessClientId = "smoke-client";
+    config.accessClientSecret = "smoke-secret";
+    // Configure only: no HTTP request is issued by this smoke check.
+    RestContext rest = GetGame().GetRestApi().GetContext(config.origin);
+    Check(rest && rest.SetHeaders(config.HeaderDefinition()), "native REST accepts all authentication headers");
     config.ConfigureTemplates();
     registry = new StavkaGroups(config);
     snapshot = new StavkaSnapshot(registry);

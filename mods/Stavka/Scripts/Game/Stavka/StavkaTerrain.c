@@ -75,7 +75,7 @@ class StavkaTerrain
       + ",\"grid_width\":" + width.ToString() + ",\"grid_height\":" + height.ToString() + ",\"grid_resolution_meters\":" + resolution.ToString()
       + ",\"source\":\"arma_extracted\",\"classification_version\":1,\"content_hash\":" + StavkaWire.Quote(Hash(canonical))
       + ",\"terrain_grid\":" + StavkaSnapshot.Join(cells) + ",\"key_features\":[]}";
-    return "{" + config.IdentityJson() + ",\"mission_id\":" + StavkaWire.Quote(config.missionId) + ",\"mission_epoch\":" + config.epoch.ToString()
+    return "{" + config.IdentityJson() + ",\"mission_id\":" + StavkaWire.Quote(config.missionId)
       + ",\"briefing\":" + briefing + "}";
   }
 }

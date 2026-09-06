@@ -36,6 +36,8 @@ const TickBase = {
   protocol_version: Schema.Literal(PROTOCOL_VERSION),
   session_id: NonEmptyString,
   faction: NonEmptyString,
+  /** Native clients with a three-header limit carry epoch in the body. */
+  mission_epoch: Schema.optional(NonNegativeInteger),
   tick_id: NonNegativeInteger,
   timestamp: NonNegativeFinite,
   full_snapshot_interval: PositiveInteger,
@@ -156,6 +158,7 @@ export const DisconnectRequest = Schema.Struct({
   protocol_version: Schema.Literal(PROTOCOL_VERSION),
   session_id: NonEmptyString,
   faction: NonEmptyString,
+  mission_epoch: Schema.optional(NonNegativeInteger),
   reason: Schema.optional(NonEmptyString),
 });
 export type DisconnectRequest = typeof DisconnectRequest.Type;

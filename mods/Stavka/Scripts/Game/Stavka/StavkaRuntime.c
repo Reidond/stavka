@@ -12,7 +12,19 @@ class StavkaHttpCallback : RestCallback
   }
 
   void Success() { if (owner) owner.Response(generation, GetHttpCode(), GetData()); }
-  void Failure() { if (owner) owner.Response(generation, GetHttpCode(), ""); }
+  void Failure()
+  {
+    if (GetHttpCode() == 415)
+    {
+      // Report only known, credential-free media-type errors, never arbitrary
+      // response bodies or request headers.
+      string error = GetData();
+      if (error == "Unsupported content-type: application/octet-stream") Print("[Stavka] Native REST uses application/octet-stream.", LogLevel.ERROR);
+      if (error == "Unsupported content-type: text/plain") Print("[Stavka] Native REST uses text/plain.", LogLevel.ERROR);
+      if (error == "Unsupported content-type: application/x-www-form-urlencoded") Print("[Stavka] Native REST uses application/x-www-form-urlencoded.", LogLevel.ERROR);
+    }
+    if (owner) owner.Response(generation, GetHttpCode(), "");
+  }
 }
 
 class StavkaRuntime
@@ -94,9 +106,7 @@ class StavkaRuntime
     }
     context = GetGame().GetRestApi().GetContext(config.origin);
     if (!context) { Fail(0); return; }
-    if (!context.SetHeaders("Content-Type,application/json,Authorization,Bearer " + config.apiKey
-      + ",CF-Access-Client-Id," + config.accessClientId + ",CF-Access-Client-Secret," + config.accessClientSecret
-      + ",X-Stavka-Mission-Epoch," + config.epoch.ToString()))
+    if (!context.SetHeaders(config.HeaderDefinition()))
     { active = false; Print("[Stavka] REST headers rejected.", LogLevel.ERROR); return; }
     context.SetTimeout(20);
     generation++;

@@ -6,7 +6,13 @@ import {
   HttpServerRequest,
   HttpServerResponse,
 } from "effect/unstable/http";
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import {
+  HttpApi,
+  HttpApiBuilder,
+  HttpApiEndpoint,
+  HttpApiGroup,
+  HttpApiSchema,
+} from "effect/unstable/httpapi";
 import { authorizeMachine, verifyAccessRequest } from "@stavka/access-auth";
 import { ConnectRequest, DisconnectRequest, MapUploadRequest, TickRequest } from "@stavka/protocol";
 import handler from "@tanstack/react-start/server-entry";
@@ -68,15 +74,26 @@ const healthGroup = HttpApiGroup.make("health").add(healthEndpoint);
 const inferenceGroup = HttpApiGroup.make("inference").add(responsesEndpoint, messagesEndpoint);
 // The private Commander validates these exact protocol schemas. Raw handlers keep
 // the original bytes intact for immutable tick retries and receipt hashing.
+const gamePayload = <S extends Schema.Top>(schema: S) =>
+  [
+    schema,
+    schema.pipe(HttpApiSchema.asJson({ contentType: "application/x-www-form-urlencoded" })),
+  ] as const;
 const gameGroup = HttpApiGroup.make("game").add(
   HttpApiEndpoint.post("connect", "/api/connect", {
-    payload: ConnectRequest,
+    payload: gamePayload(ConnectRequest),
     success: Schema.Unknown,
   }),
-  HttpApiEndpoint.post("tick", "/api/tick", { payload: TickRequest, success: Schema.Unknown }),
-  HttpApiEndpoint.post("map", "/api/map", { payload: MapUploadRequest, success: Schema.Unknown }),
+  HttpApiEndpoint.post("tick", "/api/tick", {
+    payload: gamePayload(TickRequest),
+    success: Schema.Unknown,
+  }),
+  HttpApiEndpoint.post("map", "/api/map", {
+    payload: gamePayload(MapUploadRequest),
+    success: Schema.Unknown,
+  }),
   HttpApiEndpoint.post("disconnect", "/api/disconnect", {
-    payload: DisconnectRequest,
+    payload: gamePayload(DisconnectRequest),
     success: Schema.Unknown,
   }),
 );

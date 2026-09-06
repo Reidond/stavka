@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import test12Fixture from "../../../packages/protocol/fixtures/test-12-round-trip.json";
+import nativeDelta from "../../../packages/protocol/tests/fixtures/arma-1.8.0.13/stavka-smoke-delta.json";
 
 import type { Env } from "../src/config";
 import {
@@ -110,6 +111,71 @@ class FakeR2Bucket implements R2BucketLike {
 }
 
 describe("Commander HTTP routing", () => {
+  it.each([undefined, 0, 7])("routes native delta and disconnect body epoch %s", async (epoch) => {
+    const handleTick = vi
+      .fn()
+      .mockResolvedValue({ ...test12Fixture.response, tick_id: nativeDelta.tick_id });
+    const disconnectSession = vi.fn();
+    const getByName = vi.fn(() => ({ handleTick, disconnectSession }));
+    const env = makeEnv({ ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"] });
+    for (const [path, payload] of [
+      ["tick", { ...nativeDelta, changes: { ...nativeDelta.changes, mission: undefined } }],
+      [
+        "disconnect",
+        { protocol_version: 1, session_id: nativeDelta.session_id, faction: nativeDelta.faction },
+      ],
+    ] as const) {
+      const response = await handleRequest(
+        new Request(`https://commander.test/api/${path}`, {
+          method: "POST",
+          headers: {
+            authorization: "Bearer machine-secret",
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: JSON.stringify({ ...payload, mission_epoch: epoch }),
+        }),
+        env,
+      );
+      expect(response.status).toBe(path === "tick" ? 200 : 204);
+      expect(getByName).toHaveBeenLastCalledWith(
+        JSON.stringify([nativeDelta.session_id, epoch ?? 1, nativeDelta.faction]),
+      );
+    }
+  });
+
+  it.each([
+    ["tick", { ...test12Fixture.request, mission_epoch: 7 }, undefined, 409],
+    ["tick", { ...test12Fixture.request, mission_epoch: 1 }, "7", 409],
+    ["tick", { ...nativeDelta, mission_epoch: 7 }, "8", 409],
+    ["tick", { ...nativeDelta, mission_epoch: -1 }, undefined, 400],
+    ["tick", nativeDelta, "-1", 400],
+    [
+      "disconnect",
+      { protocol_version: 1, session_id: "native", faction: "OPFOR", mission_epoch: 7 },
+      "8",
+      409,
+    ],
+  ] as const)(
+    "rejects invalid or conflicting mission epochs before %s routing",
+    async (path, payload, epochHeader, status) => {
+      const getByName = vi.fn();
+      const response = await handleRequest(
+        new Request(`https://commander.test/api/${path}`, {
+          method: "POST",
+          headers: {
+            authorization: "Bearer machine-secret",
+            "content-type": "application/json",
+            ...(epochHeader === undefined ? {} : { "x-stavka-mission-epoch": epochHeader }),
+          },
+          body: JSON.stringify(payload),
+        }),
+        makeEnv({ ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"] }),
+      );
+      expect(response.status).toBe(status);
+      expect(getByName).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([null, makeExport()])(
     "returns a missing-session 404 or the canonical export",
     async (exported) => {
@@ -182,38 +248,63 @@ describe("Commander HTTP routing", () => {
     });
   });
 
-  it("accepts the Test-12 tick contract but rejects an unexpected wire field", async () => {
-    const handleTick = vi.fn().mockResolvedValue(test12Fixture.response);
-    const env = makeEnv({
-      ORCHESTRATOR: {
-        getByName: vi.fn(() => ({ handleTick })),
-      } as unknown as Env["ORCHESTRATOR"],
-    });
-    const request = (payload: unknown) =>
-      new Request("https://commander.test/api/tick", {
-        method: "POST",
-        headers: {
-          authorization: "Bearer machine-secret",
-          "content-type": "application/json",
-          "x-stavka-mission-epoch": "1",
-        },
-        body: JSON.stringify(payload),
+  it.each(["application/json", "application/x-www-form-urlencoded"])(
+    "accepts JSON tick bytes labeled %s but rejects an unexpected wire field",
+    async (contentType) => {
+      const handleTick = vi.fn().mockResolvedValue(test12Fixture.response);
+      const env = makeEnv({
+        ORCHESTRATOR: {
+          getByName: vi.fn(() => ({ handleTick })),
+        } as unknown as Env["ORCHESTRATOR"],
       });
+      const request = (payload: unknown) =>
+        new Request("https://commander.test/api/tick", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer machine-secret",
+            "content-type": contentType,
+            "x-stavka-mission-epoch": "1",
+          },
+          body: JSON.stringify(payload),
+        });
 
-    const accepted = await handleRequest(request(test12Fixture.request), env);
-    expect(accepted.status).toBe(200);
-    expect(handleTick).toHaveBeenCalledWith(test12Fixture.request);
+      const accepted = await handleRequest(request(test12Fixture.request), env);
+      expect(accepted.status).toBe(200);
+      expect(handleTick).toHaveBeenCalledWith(test12Fixture.request);
 
-    const rejected = await handleRequest(
-      request({
-        ...test12Fixture.request,
-        unexpected: true,
-      }),
-      env,
-    );
-    expect(rejected.status).toBe(400);
-    expect(handleTick).toHaveBeenCalledTimes(1);
-  });
+      const rejected = await handleRequest(
+        request({
+          ...test12Fixture.request,
+          unexpected: true,
+        }),
+        env,
+      );
+      expect(rejected.status).toBe(400);
+      expect(handleTick).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["connect", "map", "tick", "disconnect"])(
+    "requires JSON and machine authorization for native %s requests",
+    async (path) => {
+      const getByName = vi.fn();
+      for (const [authorization, expectedStatus] of [
+        ["Bearer machine-secret", 400],
+        ["Bearer wrong", 401],
+      ] as const) {
+        const response = await handleRequest(
+          new Request(`https://commander.test/api/${path}`, {
+            method: "POST",
+            headers: { authorization, "content-type": "application/x-www-form-urlencoded" },
+            body: "session_id=native&mission_epoch=7",
+          }),
+          makeEnv({ ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"] }),
+        );
+        expect(response.status).toBe(expectedStatus);
+        expect(getByName).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("uses the strict live map contract and provenance-bearing terrain cache keys", async () => {
     const values = new Map<string, string>();

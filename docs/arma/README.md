@@ -55,6 +55,13 @@ token authorized for `https://stavka.sands.red`. The service token is presented
 to Access; the application independently verifies the machine bearer. Provider
 tokens do not belong in this configuration.
 
+Enfusion 1.8 accepts three custom headers. The bridge uses them for the machine
+bearer and Access client ID/secret, and includes `mission_epoch` in every JSON
+envelope. Its native POST media type is `application/x-www-form-urlencoded`;
+the game HTTP contracts explicitly decode its unchanged bytes as strict JSON.
+Legacy JSON clients and mission-epoch headers remain supported. Conflicting
+epochs are rejected before session routing.
+
 Choose a unique session and mission identity. Increment `mission_epoch` before
 starting a new authoritative game process for the same session. Reusing an epoch
 after a process restart can collide with immutable tick receipts. Network retries

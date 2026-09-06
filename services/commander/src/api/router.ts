@@ -316,7 +316,14 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
           const epoch =
             payload.type === "full"
               ? payload.snapshot.mission.epoch
-              : (headers["x-stavka-mission-epoch"] ?? 1);
+              : (payload.mission_epoch ?? headers["x-stavka-mission-epoch"] ?? 1);
+          if (
+            (payload.mission_epoch !== undefined && payload.mission_epoch !== epoch) ||
+            (headers["x-stavka-mission-epoch"] !== undefined &&
+              headers["x-stavka-mission-epoch"] !== epoch)
+          ) {
+            return errorResponse(409, "MISSION_EPOCH_MISMATCH", "Mission epochs must agree");
+          }
           const stub = yield* resolveOrchestrator(
             env,
             sessionName(payload.session_id, epoch, payload.faction),
@@ -333,7 +340,13 @@ const MachineLive = HttpApiBuilder.group(CommanderApi, "machine", (handlers) =>
         request,
         Effect.gen(function* () {
           const env = yield* CommanderEnvironment;
-          const epoch = headers["x-stavka-mission-epoch"] ?? 1;
+          const epoch = payload.mission_epoch ?? headers["x-stavka-mission-epoch"] ?? 1;
+          if (
+            headers["x-stavka-mission-epoch"] !== undefined &&
+            headers["x-stavka-mission-epoch"] !== epoch
+          ) {
+            return errorResponse(409, "MISSION_EPOCH_MISMATCH", "Mission epochs must agree");
+          }
           const stub = yield* resolveOrchestrator(
             env,
             sessionName(payload.session_id, epoch, payload.faction),
