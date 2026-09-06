@@ -108,6 +108,11 @@ installation, BattlEye, public hosting, simultaneous clients or campaign victory
 
 ## Remaining operator inputs
 
+The following blockers describe the earlier run. Both were resolved in the
+[native Cloudflare follow-up](native-cloudflare-acceptance-2026-09-06.md), which
+records the private credential setup, successful GitHub deployment and native
+Cloudflare receipts.
+
 The native server's `profile/stavka.json` stays disabled. A private configuration
 containing the Commander machine bearer and an authorized Cloudflare Access
 service token is required to test native connect/map/tick/disconnect against

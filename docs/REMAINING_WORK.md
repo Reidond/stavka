@@ -34,16 +34,14 @@ Still outstanding:
 
 - Verify provider refresh, streaming, billing/budget behavior,
   container start/restart/sleep, deployed R2 exports, and rollback/lifecycle drills.
-- Repair the GitHub `production` deployment token's zone route permissions.
-  Its required secret names and main-only branch policy were verified; no
-  reviewer rules are configured. The explicit local OAuth deployment succeeded,
-  but the manual GitHub deployment failed during custom-domain route sync.
 - The native addon and local Workbench workflow are now implemented; see
   [Arma setup and evidence](arma/README.md). The game-server ingress is deployed.
-  Supply the private server machine bearer and Access service-token configuration
-  to verify the native Cloudflare connection. Single-client dedicated Conflict
-  late join and reconnect passed; simultaneous clients, BattlEye, Workshop
-  installation and load behavior remain unverified.
+  Private machine and Access credentials have been provisioned, native
+  connect/map/tick and command receipts reached Cloudflare, and GitHub production
+  deployment now succeeds. See the [native Cloudflare follow-up](arma/native-cloudflare-acceptance-2026-09-06.md).
+  Single-client dedicated Conflict late join and reconnect passed; simultaneous
+  clients, BattlEye, Workshop installation, graceful native disconnect and load
+  behavior remain unverified.
 
 The old workers.dev repair item is obsolete: the intended public origin is
 `stavka.sands.red`, protected by Access. workers.dev and preview URLs are
