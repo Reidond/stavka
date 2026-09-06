@@ -25,7 +25,11 @@ Commander and inference reachable only through Cloudflare service bindings.
    - One owner/operator policy (email list or IdP group).
    - Worker-side JWT verification is already enforced by
      `@stavka/access-auth`; configure `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`
-     as Worker secrets/vars on `apps/stavka`.
+   as Worker secrets/vars on `apps/stavka`.
+   Use that same team domain and application audience on Commander and inference.
+   Configure `ACCESS_OWNER_SUBJECTS` on Commander for the existing verified owner
+   identity (Access subject or email), as on inference. Unlisted human identities
+   remain spectators; service tokens retain their separately scoped permissions.
 3. **Game bridge**: `/api/connect`, `/api/map`, `/api/tick`, and
    `/api/disconnect` require a Cloudflare Access service token at the edge and
    the Commander machine bearer at the application. Keep server credentials

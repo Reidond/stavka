@@ -13,6 +13,8 @@ export interface Env {
   readonly DEV_ACCESS_EMAIL?: string;
   readonly ACCESS_TEAM_DOMAIN?: string;
   readonly ACCESS_AUD?: string;
+  readonly ACCESS_OWNER_SUBJECTS?: string;
+  readonly ACCESS_OPERATOR_SUBJECTS?: string;
   readonly ACCESS_AUTOMATION_PERMISSIONS?: string;
   readonly COMMANDER_MODEL?: string;
   readonly SERGEANT_MODEL?: string;
@@ -190,6 +192,14 @@ export const accessConfig = (env: Env): AccessConfig => ({
         : "production",
   teamDomain: env.ACCESS_TEAM_DOMAIN ?? "",
   audience: env.ACCESS_AUD ?? "",
+  ownerSubjects: (env.ACCESS_OWNER_SUBJECTS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+  operatorSubjects: (env.ACCESS_OPERATOR_SUBJECTS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
   ...(env.DEV_ACCESS_EMAIL ? { devEmail: env.DEV_ACCESS_EMAIL } : {}),
   automationPermissions: automationPermissions(env.ACCESS_AUTOMATION_PERMISSIONS),
 });
