@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { readConfig } from "../src/config";
 
 describe("Maskirovka Access environment", () => {
+  it("keeps the CLI Sergeant cap closed unless hosted admission is explicit", () => {
+    expect(readConfig({}, "/tmp/maskirovka-config").liveSergeantBudget).toBe(0);
+    expect(
+      readConfig({ MASKIROVKA_LIVE_SERGEANTS: "hosted" }, "/tmp/maskirovka-config")
+        .liveSergeantBudget,
+    ).toBe("hosted");
+    expect(
+      readConfig({ MASKIROVKA_LIVE_SERGEANTS: "typo" }, "/tmp/maskirovka-config")
+        .liveSergeantBudget,
+    ).toBe(0);
+  });
   it("rejects an invalid gateway mode instead of silently enabling live traffic", () => {
     expect(() => readConfig({ MASKIROVKA_MODE: "replaay" }, "/tmp/maskirovka-config")).toThrow(
       /MASKIROVKA_MODE must be live, record, or replay/u,

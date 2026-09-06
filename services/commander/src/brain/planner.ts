@@ -15,6 +15,7 @@ import {
   reportedSeatFailureUsage,
   resolveLlmRoute,
   routedFailureCostAttributions,
+  seatFailureSummary,
   type RoutedAiCostAttribution,
   type RoutedAiDecision,
 } from "./seat-router";
@@ -54,7 +55,7 @@ export const revalidateDecision = (
     summary:
       validated.rejected.length === 0
         ? decision.summary
-        : `${decision.summary} Rejected ${validated.rejected.length} command(s) after validating the latest state.`,
+        : `${decision.summary} Rejected commands after validating the latest state: ${validated.rejected.map((item) => `${item.commandId}: ${item.reason}`).join("; ")}.`,
   };
 };
 
@@ -128,7 +129,7 @@ export const planDecision = (
         summary:
           validated.rejected.length === 0
             ? generated.decision.summary
-            : `${generated.decision.summary} Rejected ${validated.rejected.length} unsafe command(s).`,
+            : `${generated.decision.summary} Rejected commands: ${validated.rejected.map((item) => `${item.commandId}: ${item.reason}`).join("; ")}.`,
         commands: validated.commands,
         prompt,
         rawResponse: generated.rawResponse || JSON.stringify(generated.decision),
@@ -159,7 +160,7 @@ export const planDecision = (
     const failureAttributions = routedFailureCostAttributions(failure);
     return {
       ...rules,
-      summary: `Degraded to rules: ${failure instanceof Error ? failure.message : "LLM failure"}`,
+      summary: `Degraded to rules: ${seatFailureSummary(failure)}`,
       prompt,
       rawResponse: "",
       model: reported.resolvedModel ?? config.commanderModel,

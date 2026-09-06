@@ -60,6 +60,24 @@ class StavkaSmoke
     Check(Math.AbsFloat(StavkaWire.TickIntervalSeconds(750) - 0.75) < 0.001, "active tick milliseconds become seconds");
     Check(Math.AbsFloat(StavkaWire.TickIntervalSeconds(300) - 0.3) < 0.001, "burst tick milliseconds become seconds");
     Check(StavkaWire.TickIntervalSeconds(90000) == 60, "tick interval remains bounded");
+    Check(StavkaWire.IsEmptyBodyRejection("{\"error\":{\"code\":\"EMPTY_REQUEST_BODY\"}}"), "recognize server-confirmed empty body");
+    Check(!StavkaWire.IsEmptyBodyRejection("{\"error\":{\"code\":\"INVALID_REQUEST\"}}"), "never retry semantic rejection");
+    Check(!StavkaWire.IsEmptyBodyRejection("EMPTY_REQUEST_BODY"), "never infer retry from unstructured text");
+    StavkaRuntime retryRuntime = new StavkaRuntime();
+    retryRuntime.registry = registry;
+    retryRuntime.active = true;
+    retryRuntime.pendingBody = "retained-payload";
+    retryRuntime.pendingPath = "/api/tick";
+    retryRuntime.tick = 71;
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+      retryRuntime.busy = true;
+      retryRuntime.Response(retryRuntime.generation, 400, "{\"error\":{\"code\":\"EMPTY_REQUEST_BODY\"}}");
+      Check(retryRuntime.active, "empty body recovery attempt " + attempt.ToString());
+      Check(retryRuntime.pendingBody == "retained-payload" && retryRuntime.tick == 71, "retry preserves tick and payload");
+    }
+    Check(!StavkaWire.RetryEmptyBody(400, "{\"error\":{\"code\":\"EMPTY_REQUEST_BODY\"}}", retryRuntime.emptyBodyFailures), "empty body retry budget exhausted");
+    Check(!StavkaWire.RetryEmptyBody(401, "{\"error\":{\"code\":\"EMPTY_REQUEST_BODY\"}}", 0), "authentication failure is never retried");
     Check(StavkaWire.DecodeConnect("{\"protocol_version\":1,\"accepted\":true,\"request_full_snapshot\":true,\"tick_rate_hint\":5}", interval), "connect decode");
     string command = "{\"command_id\":\"smoke-spawn\",\"type\":\"spawn_group\",\"params\":{\"template\":\"infantry_squad\",\"position\":[2059,0,2047]}}";
     string replyBody = "{\"protocol_version\":1,\"tick_id\":0,\"tick_rate_hint\":5,\"request_full_snapshot\":false,\"config_updates\":{},";

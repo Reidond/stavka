@@ -19,7 +19,8 @@ export interface MaskirovkaConfig {
   readonly cacheDirectory: string;
   readonly stateDirectory: string;
   readonly apiKey?: string;
-  readonly liveSergeantBudget: number;
+  /** Hosted traffic is admitted by the private gateway's owner/grant gate. */
+  readonly liveSergeantBudget: number | "hosted";
   readonly budgetPolicy: "fallback" | "stretch";
   readonly claudeMonthlyCreditUsd: number;
   readonly codexWindowCallLimit: number;
@@ -131,7 +132,10 @@ export const readConfig = (
     cacheDirectory: resolve(cwd, env.MASKIROVKA_CACHE_DIR ?? ".maskirovka/cache"),
     stateDirectory: resolve(cwd, env.MASKIROVKA_STATE_DIR ?? ".maskirovka/state"),
     ...(env.MASKIROVKA_SEAT_KEY ? { apiKey: env.MASKIROVKA_SEAT_KEY } : {}),
-    liveSergeantBudget: Math.max(0, Math.floor(envNumber(env.MASKIROVKA_LIVE_SERGEANTS, 0))),
+    liveSergeantBudget:
+      env.MASKIROVKA_LIVE_SERGEANTS === "hosted"
+        ? "hosted"
+        : Math.max(0, Math.floor(envNumber(env.MASKIROVKA_LIVE_SERGEANTS, 0))),
     budgetPolicy: env.MASKIROVKA_BUDGET_POLICY === "stretch" ? "stretch" : "fallback",
     claudeMonthlyCreditUsd,
     codexWindowCallLimit: Math.max(

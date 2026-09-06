@@ -568,9 +568,18 @@ const MachineAuthLive = Layer.succeed(MachineAuth)((httpEffect) =>
     const authorized = yield* authorizeMachine(raw, env.API_KEY).pipe(
       Effect.catch(() => Effect.succeed(false)),
     );
-    return authorized
-      ? yield* httpEffect
-      : errorResponse(401, "UNAUTHORIZED", "Invalid machine bearer token");
+    if (!authorized) return errorResponse(401, "UNAUTHORIZED", "Invalid machine bearer token");
+    // Enfusion can intermittently send a zero-byte POST. Confirm the actual
+    // body before identifying this transport failure; no session work has run.
+    // The cached request text remains available to HttpApi's schema decoder.
+    if (request.headers["content-length"] === "0" || raw.body === null) {
+      const body = yield* Effect.result(request.text);
+      if (body._tag === "Failure")
+        return errorResponse(400, "INVALID_REQUEST", "Unable to read request body");
+      if (body.success.length === 0)
+        return errorResponse(400, "EMPTY_REQUEST_BODY", "No request body was received");
+    }
+    return yield* httpEffect;
   }),
 );
 

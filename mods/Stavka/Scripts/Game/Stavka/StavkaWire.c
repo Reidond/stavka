@@ -85,6 +85,20 @@ class StavkaWire
       && context.ReadValue("tick_rate_hint", interval) && IsFinite(interval) && interval > 0;
   }
 
+  static bool IsEmptyBodyRejection(string body)
+  {
+    if (body.IsEmpty() || body.Length() > 4096) return false;
+    JsonLoadContext context = new JsonLoadContext();
+    string code;
+    return context.LoadFromString(body) && context.StartObject("error")
+      && context.ReadValue("code", code) && code == "EMPTY_REQUEST_BODY" && context.EndObject();
+  }
+
+  static bool RetryEmptyBody(int status, string body, int previousFailures)
+  {
+    return status == 400 && previousFailures >= 0 && previousFailures < 3 && IsEmptyBodyRejection(body);
+  }
+
   static float TickIntervalSeconds(float milliseconds)
   {
     // Protocol hints use milliseconds; native world time uses seconds.

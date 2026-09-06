@@ -182,6 +182,10 @@ export const validateCommands = (
         reject(command, "objective assignee is not an owned group");
         continue;
       }
+      // Receivers execute this batch in order. Project only accepted changes so
+      // later commands can refer to a newly created objective, but not a removed one.
+      if (command.params.action === "create") objectives.add(command.params.objective_id);
+      if (command.params.action === "remove") objectives.delete(command.params.objective_id);
       commands.push(command);
       continue;
     }

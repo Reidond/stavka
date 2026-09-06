@@ -13,10 +13,27 @@ import {
   reportedSeatFailureUsage,
   resolveLlmRoute,
   stretchedInterval,
+  RoutedAiFailure,
+  seatFailureSummary,
 } from "../src/brain/seat-router";
 import type { CommanderConfig } from "../src/config";
 import type { Env } from "../src/config";
 import type { SeatRegistration } from "../src/state/types";
+
+it("explains wrapped model failures without exposing raw provider data", () => {
+  const failure = new RoutedAiFailure({
+    cause: {
+      _tag: "AiError",
+      reason: { _tag: "RateLimitError", description: "private provider body" },
+    },
+    costAttributions: [],
+  });
+  expect(seatFailureSummary(failure)).toBe("Provider rate or budget limit reached (HTTP 429)");
+  const circular: { cause?: unknown } = {};
+  circular.cause = circular;
+  expect(seatFailureSummary(circular)).toBe("Model request failed; inspect provider health");
+  expect(seatFailureSummary(new Error("secret provider body"))).not.toContain("secret");
+});
 
 const config: CommanderConfig = {
   commanderModel: "stavka/commander",

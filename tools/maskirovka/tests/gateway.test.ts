@@ -525,6 +525,45 @@ describe("record and replay", () => {
 });
 
 describe("seat budgets and routing", () => {
+  it("admits hosted Sergeants while preserving subscription limits and the CLI cap", async () => {
+    const base = baseConfig();
+    const config: MaskirovkaConfig = {
+      ...base,
+      liveSergeantBudget: "hosted",
+      budgetPolicy: "stretch",
+      codexWindowCallLimit: 1,
+      aliases: base.aliases.map((alias) =>
+        alias.tier === "stavka/sergeant" ? { ...alias, seat: "codex", model: "test-codex" } : alias,
+      ),
+      seats: base.seats.map((seat) =>
+        seat.id === "codex" ? { ...seat, status: "healthy", monthlyBudgetUsd: 1 } : seat,
+      ),
+    };
+    let calls = 0;
+    const adapter: SeatAdapter = {
+      id: "codex",
+      invoke: () =>
+        Effect.sync(() => {
+          calls += 1;
+          return { text: "Hold position", usage: { inputTokens: 10, outputTokens: 5 } };
+        }),
+    };
+    const request = (input: string) =>
+      normalizeRequest("openai-responses", { model: "stavka/sergeant", input });
+    const local = await Effect.runPromise(
+      makeService({ ...config, liveSergeantBudget: 0 }, { adapter }),
+    );
+    await expect(Effect.runPromise(local.run(request("local")))).rejects.toMatchObject({
+      code: "LIVE_SERGEANT_BUDGET",
+    });
+    expect(calls).toBe(0);
+    const hosted = await Effect.runPromise(makeService(config, { adapter }));
+    expect((await Effect.runPromise(hosted.run(request("first")))).metadata.seat).toBe("codex");
+    await expect(Effect.runPromise(hosted.run(request("second")))).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(calls).toBe(1);
+  });
   const meteredAdapter: SeatAdapter = {
     id: "api",
     invoke: () =>

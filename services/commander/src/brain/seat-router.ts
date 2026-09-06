@@ -209,6 +209,38 @@ export const estimatedSeatReservationUsd = (tier: LlmTierAlias): number => {
 const errorRecord = (cause: unknown): Record<string, unknown> | undefined =>
   typeof cause === "object" && cause !== null ? (cause as Record<string, unknown>) : undefined;
 
+/** Summarize typed causes without exposing provider bodies, headers or credentials. */
+export const seatFailureSummary = (cause: unknown): string => {
+  const visited = new Set<unknown>();
+  const pending = [cause];
+  const descriptions: Readonly<Record<string, string>> = {
+    RateLimitError: "Provider rate or budget limit reached (HTTP 429)",
+    AuthenticationError: "Provider authentication failed",
+    InvalidOutputError: "Provider returned an invalid decision",
+    StructuredOutputError: "Provider returned an invalid structured decision",
+    InvalidRequestError: "Provider rejected the model request",
+    ContentPolicyError: "Provider declined the request",
+    NetworkError: "Provider network request failed",
+    RequestError: "Provider transport request failed",
+    TimeoutException: "Provider request timed out",
+    LlmRouteUnavailable: "No model route has available budget",
+  };
+  while (pending.length > 0 && visited.size < 16) {
+    const value = pending.shift();
+    if (visited.has(value)) continue;
+    visited.add(value);
+    const record = errorRecord(value);
+    if (record === undefined) continue;
+    const tag = typeof record._tag === "string" ? record._tag : "";
+    if (descriptions[tag]) return descriptions[tag];
+    const response = errorRecord(record.response);
+    if (typeof response?.status === "number")
+      return `Provider request failed (HTTP ${response.status})`;
+    pending.push(record.reason, record.cause);
+  }
+  return "Model request failed; inspect provider health";
+};
+
 /** Only transport, timeout, rate-limit, and unavailable failures may fail over. */
 export const isRetryableSeatFailure = (cause: unknown): boolean => {
   const record = errorRecord(cause);

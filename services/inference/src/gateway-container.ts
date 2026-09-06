@@ -648,6 +648,10 @@ export class MaskirovkaGateway extends Container<GatewayEnv> {
         MASKIROVKA_HOST: "0.0.0.0",
         MASKIROVKA_PORT: String(this.defaultPort),
         MASKIROVKA_MODE: readGatewayConfig(env).mode,
+        // Every request has already passed owner authorization or a durable
+        // execution grant. The CLI's process-lifetime Sergeant cap is not a
+        // hosted budget; subscription reservations still apply in the container.
+        MASKIROVKA_LIVE_SERGEANTS: "hosted",
         MASKIROVKA_STATE_DIR: "/tmp/maskirovka-state",
         MASKIROVKA_CACHE_DIR: "/tmp/maskirovka-cache",
         MASKIROVKA_AUTH_STATE_B64: encodeBase64Url(JSON.stringify(checkpoint)),

@@ -67,6 +67,63 @@ const state = () => ({
 });
 
 describe("LLM command semantic validation", () => {
+  it("projects accepted objective changes in batch order", () => {
+    const commands: Command[] = [
+      {
+        command_id: "create",
+        type: "set_objective",
+        params: { action: "create", objective_id: "new", position: [200, 0, 200] },
+      },
+      {
+        command_id: "assign",
+        type: "set_objective",
+        params: { action: "assign", objective_id: "new", assignee_group_id: "owned" },
+      },
+      {
+        command_id: "duplicate",
+        type: "set_objective",
+        params: { action: "create", objective_id: "new", position: [200, 0, 200] },
+      },
+      {
+        command_id: "spawn",
+        type: "spawn_group",
+        params: { template: "infantry", position: [100, 0, 100], target_objective: "new" },
+      },
+      {
+        command_id: "remove",
+        type: "set_objective",
+        params: { action: "remove", objective_id: "new" },
+      },
+      {
+        command_id: "missing",
+        type: "set_objective",
+        params: { action: "assign", objective_id: "new", assignee_group_id: "owned" },
+      },
+      {
+        command_id: "invalid-create",
+        type: "set_objective",
+        params: { action: "create", objective_id: "invalid", position: [2000, 0, 2000] },
+      },
+      {
+        command_id: "invalid-assign",
+        type: "set_objective",
+        params: { action: "assign", objective_id: "invalid", assignee_group_id: "owned" },
+      },
+    ];
+    const result = validateCommands(commands, state());
+    expect(result.commands.map((command) => command.command_id)).toEqual([
+      "create",
+      "assign",
+      "spawn",
+      "remove",
+    ]);
+    expect(result.rejected.map((command) => command.commandId)).toEqual([
+      "duplicate",
+      "missing",
+      "invalid-create",
+      "invalid-assign",
+    ]);
+  });
   it("rejects foreign groups, out-of-map positions, and unavailable vehicle spawns", () => {
     const commands: Command[] = [
       {

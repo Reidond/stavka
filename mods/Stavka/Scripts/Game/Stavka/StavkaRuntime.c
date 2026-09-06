@@ -23,7 +23,7 @@ class StavkaHttpCallback : RestCallback
       if (error == "Unsupported content-type: text/plain") Print("[Stavka] Native REST uses text/plain.", LogLevel.ERROR);
       if (error == "Unsupported content-type: application/x-www-form-urlencoded") Print("[Stavka] Native REST uses application/x-www-form-urlencoded.", LogLevel.ERROR);
     }
-    if (owner) owner.Response(generation, GetHttpCode(), "");
+    if (owner) owner.Response(generation, GetHttpCode(), GetData());
   }
 }
 
@@ -44,6 +44,7 @@ class StavkaRuntime
   int tick;
   int generation;
   int failures;
+  int emptyBodyFailures;
   float nextRequest;
   float watchdog;
   float refreshAt;
@@ -98,6 +99,12 @@ class StavkaRuntime
 
   void Send()
   {
+    if (pendingBody.IsEmpty())
+    {
+      active = false;
+      Print("[Stavka] Empty protocol envelope; bridge stopped before POST. Tick " + tick.ToString(), LogLevel.ERROR);
+      return;
+    }
     if (pendingBody.Length() > StavkaWire.MAX_BYTES)
     {
       active = false;
@@ -119,7 +126,21 @@ class StavkaRuntime
   void Response(int requestGeneration, int status, string body)
   {
     if (!active || !busy || requestGeneration != generation) return;
-    if (status < 200 || status >= 300) { Fail(status); return; }
+    if (status < 200 || status >= 300)
+    {
+      Print("[Stavka] Request rejected: path=" + pendingPath + " tick=" + tick.ToString() + " chars=" + pendingBody.Length().ToString() + " status=" + status.ToString(), LogLevel.WARNING);
+      if (StavkaWire.RetryEmptyBody(status, body, emptyBodyFailures))
+      {
+        emptyBodyFailures++;
+        // The server confirms that no payload reached its handler. Retain
+        // this tick and its exact pending body; never retry other 400 errors.
+        Print("[Stavka] Server received an empty body; retrying retained payload.", LogLevel.WARNING);
+        Fail(0);
+        return;
+      }
+      Fail(status);
+      return;
+    }
     if (pendingPath == "/api/connect")
     {
       float interval;
@@ -140,6 +161,7 @@ class StavkaRuntime
       if (reply.detectionRange > 0) config.detectionRange = Math.Clamp(reply.detectionRange, 1, 10000);
       forceFull = reply.full;
       if (tick == 0) Print("[Stavka] First snapshot acknowledged.", LogLevel.NORMAL);
+      else if (tick % 60 == 0) Print("[Stavka] Snapshot acknowledged: tick=" + tick.ToString(), LogLevel.NORMAL);
       if (reply.commands.Count() > 0) Print("[Stavka] Commander orders received: " + reply.commands.Count().ToString(), LogLevel.NORMAL);
       tick++;
       foreach (StavkaCommand command : reply.commands) registry.Execute(command);
@@ -152,6 +174,7 @@ class StavkaRuntime
     pendingBody = "";
     busy = false;
     failures = 0;
+    emptyBodyFailures = 0;
     nextRequest = registry.Now() + config.interval;
   }
 

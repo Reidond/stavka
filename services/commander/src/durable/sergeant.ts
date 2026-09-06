@@ -10,6 +10,7 @@ import {
   reportedSeatFailureUsage,
   resolveLlmRoute,
   routedFailureCostAttributions,
+  seatFailureSummary,
   runRoutedAiDecision,
   type RoutedAiCostAttribution,
 } from "../brain/seat-router";
@@ -200,9 +201,7 @@ const assessWithModel = (
     const failureAttributions = routedFailureCostAttributions(result.failure);
     return {
       commands: rules,
-      summary: `Degraded to tactical rules: ${
-        result.failure instanceof Error ? result.failure.message : "LLM failure"
-      }`,
+      summary: `Degraded to tactical rules: ${seatFailureSummary(result.failure)}`,
       rawResponse: "",
       mode: "degraded" as const,
       latencyMs: finished - started,

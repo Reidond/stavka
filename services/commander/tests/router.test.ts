@@ -284,6 +284,35 @@ describe("Commander HTTP routing", () => {
     },
   );
 
+  it("identifies empty native bodies after auth without trusting Content-Length", async () => {
+    const handleTick = vi.fn().mockResolvedValue(test12Fixture.response);
+    const getByName = vi.fn(() => ({ handleTick }));
+    const env = makeEnv({ ORCHESTRATOR: { getByName } as unknown as Env["ORCHESTRATOR"] });
+    const request = (body: string, authorization = "Bearer machine-secret") =>
+      new Request("https://commander.test/api/tick", {
+        method: "POST",
+        headers: {
+          authorization,
+          "content-type": "application/x-www-form-urlencoded",
+          "content-length": "0",
+        },
+        body,
+      });
+    const empty = await handleRequest(request(""), env);
+    expect(empty.status).toBe(400);
+    expect(await empty.json()).toMatchObject({ error: { code: "EMPTY_REQUEST_BODY" } });
+    expect(getByName).not.toHaveBeenCalled();
+    expect((await handleRequest(request("", "Bearer wrong"), env)).status).toBe(401);
+    const invalid = await handleRequest(request("{}"), env);
+    expect(invalid.status).toBe(400);
+    expect(await invalid.text()).not.toContain("EMPTY_REQUEST_BODY");
+    expect(getByName).not.toHaveBeenCalled();
+    expect((await handleRequest(request(JSON.stringify(test12Fixture.request)), env)).status).toBe(
+      200,
+    );
+    expect(handleTick).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["connect", "map", "tick", "disconnect"])(
     "requires JSON and machine authorization for native %s requests",
     async (path) => {

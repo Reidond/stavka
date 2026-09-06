@@ -6,6 +6,8 @@ The full Maskirovka gateway runs in a Cloudflare Container behind a private Work
 
 Model execution requires verified human Cloudflare Access, an active Stavka profile, and owner/admin membership. Credentials are selected within that user's organization and account scope and encrypted in Durable Object SQLite. Service tokens and machine bearers cannot authorize provider execution. Browser pages expose metadata only.
 
+Hosted containers use `MASKIROVKA_LIVE_SERGEANTS=hosted`: Sergeant requests pass through the same owner or durable session-grant admission as the other tiers. Subscription call, token, and credit reservations still apply. Other runtime configurations retain the default zero live-Sergeant allowance or their explicit numeric cap. A process-lifetime CLI counter must not override an authorized hosted session.
+
 Connect named accounts through the operator CLI:
 
 ```sh

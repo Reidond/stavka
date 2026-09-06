@@ -5,6 +5,14 @@ identity `6A4B4D6187F605E0`; it depends only on the base Arma Reforger addon.
 Use matching game and Tools versions. Development and native checks currently
 target **1.8.0.13**.
 
+The bridge retains each pending payload until acknowledged. If Commander confirms
+`EMPTY_REQUEST_BODY` with HTTP 400, it retries the same tick and payload at most
+three times with backoff. Other semantic, authentication, and epoch errors stop
+the bridge. Rejection logs include the path, tick, and payload length without
+credentials or payload contents; every 60th acknowledged tick provides a progress
+marker. This recovers a transient empty native POST without weakening protocol
+validation or inventing a new mission identity.
+
 ## Open, compile, and package
 
 Open `mods/Stavka/addon.gproj` in Arma Reforger Workbench. Add the installed

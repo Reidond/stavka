@@ -151,7 +151,11 @@ export class GatewayService {
           `${request.tier} ${initialResolution.routingReason}: ${initialResolution.fallbackFromSeat} -> ${initialResolution.seat}`,
         );
       }
-      if (request.tier === "stavka/sergeant" && initialResolution.seat !== "mock") {
+      if (
+        request.tier === "stavka/sergeant" &&
+        initialResolution.seat !== "mock" &&
+        this.config.liveSergeantBudget !== "hosted"
+      ) {
         if (this.liveSergeantsUsed >= this.config.liveSergeantBudget) {
           return yield* Effect.fail(
             new GatewayError(

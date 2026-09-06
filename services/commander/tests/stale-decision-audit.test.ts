@@ -241,7 +241,7 @@ describe("stale commander decision accounting", () => {
     expect(agent.state.costAggregates.reduce((total, item) => total + item.cost_usd, 0)).toBe(0.03);
     expect(agent.state.recentLogs[0]?.input.stateSnapshot).toEqual(planningSnapshot);
     expect(agent.state.recentLogs[0]?.output.summary).toContain(
-      "Rejected 2 command(s) after validating the latest state.",
+      "cmd_00000041: group is not an existing owned group; cmd_00000042: insufficient manpower",
     );
     expect(mocks.scheduled).not.toHaveBeenCalled();
   });
